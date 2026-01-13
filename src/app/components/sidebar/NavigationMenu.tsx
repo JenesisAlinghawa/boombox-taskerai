@@ -324,6 +324,56 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
               </Link>
             );
           })}
+
+          {/* Role-Based: Team Management - Only visible to OWNER, CO_OWNER, MANAGER */}
+          {currentUser &&
+            ["OWNER", "CO_OWNER", "MANAGER"].includes(currentUser.role) && (
+              <Link href="/settings/team" style={{ textDecoration: "none" }}>
+                <button
+                  style={{
+                    width: "100%",
+                    padding: collapsed ? "10px" : "10px 12px",
+                    background:
+                      pathname === "/settings/team"
+                        ? "linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.25) 100%)"
+                        : "transparent",
+                    color:
+                      pathname === "/settings/team" ? "#a0d8ef" : "#ffffff",
+                    border: "none",
+                    borderRadius: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: collapsed ? "center" : "flex-start",
+                    gap: collapsed ? 0 : 12,
+                    fontSize: 12,
+                    fontWeight: pathname === "/settings/team" ? 600 : 500,
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                    position: "relative",
+                    overflow: "hidden",
+                    fontFamily: "Inter, system-ui, -apple-system, sans-serif",
+                    marginTop: "8px",
+                  }}
+                  title="Team Management (Admin Only)"
+                >
+                  {pathname === "/settings/team" && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: 3,
+                        background:
+                          "linear-gradient(180deg, rgba(59,130,246,0.8) 0%, rgba(107,114,128,0.4) 100%)",
+                      }}
+                    />
+                  )}
+                  <span style={{ fontSize: "16px" }}>👥</span>
+                  {!collapsed && <span>Team Management</span>}
+                </button>
+              </Link>
+            )}
         </nav>
       </div>
 

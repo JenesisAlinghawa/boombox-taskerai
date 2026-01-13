@@ -64,12 +64,17 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // Create user
+    // Create user with default EMPLOYEE role
+    // EMPLOYEE role means:
+    // - Cannot manage users or access team settings
+    // - Can only participate in channels and view assigned tasks
+    // - Can be promoted to TEAM_LEAD, MANAGER, or CO_OWNER by OWNER
     const user = await prisma.user.create({
       data: {
         email: normalizedEmail,
         password: hashedPassword,
         name: name,
+        role: "EMPLOYEE", // Default role for all new users
       },
     })
 

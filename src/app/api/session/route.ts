@@ -16,10 +16,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Fetch user session data
+    // Fetch user session data including role
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, name: true, email: true, isVerified: true },
+      select: { id: true, name: true, email: true, isVerified: true, role: true },
     })
 
     if (!user) {

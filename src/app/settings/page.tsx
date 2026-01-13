@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { getCurrentUser, saveUserSession } from "@/utils/sessionManager";
 
 interface User {
   id: number;
   name: string;
   email: string;
+  role?: "EMPLOYEE" | "TEAM_LEAD" | "MANAGER" | "CO_OWNER" | "OWNER";
 }
 
 interface TeamMember {
@@ -522,16 +524,46 @@ export default function SettingsPage() {
             filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
           }}
         >
-          <h2
+          <div
             style={{
-              marginTop: 0,
-              color: "#333",
-              fontSize: "18px",
-              fontWeight: 600,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "20px",
             }}
           >
-            Team Management
-          </h2>
+            <h2
+              style={{
+                margin: 0,
+                color: "#333",
+                fontSize: "18px",
+                fontWeight: 600,
+              }}
+            >
+              Team Management
+            </h2>
+
+            {/* Link to dedicated team management page for admins */}
+            {user?.role &&
+              ["OWNER", "CO_OWNER", "MANAGER"].includes(user.role) && (
+                <Link href="/settings/team" style={{ textDecoration: "none" }}>
+                  <button
+                    style={{
+                      padding: "10px 20px",
+                      background: COLORS.primary,
+                      color: "white",
+                      border: "none",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      fontWeight: "500",
+                    }}
+                  >
+                    Manage Team
+                  </button>
+                </Link>
+              )}
+          </div>
 
           {/* Add User Section */}
           <div

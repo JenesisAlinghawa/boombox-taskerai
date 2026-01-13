@@ -8,6 +8,7 @@ export interface User {
   name: string;
   email: string;
   isVerified?: boolean;
+  role?: "EMPLOYEE" | "TEAM_LEAD" | "MANAGER" | "CO_OWNER" | "OWNER";
 }
 
 /**

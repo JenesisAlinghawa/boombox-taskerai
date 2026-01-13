@@ -10,11 +10,26 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Role-based access control for TaskerAI
+// EMPLOYEE: Default role for new users. Cannot manage users or access team settings.
+// TEAM_LEAD: Can view team data. RESERVED for future expansion.
+// MANAGER: Can create, edit, delete users. Can manage team settings.
+// CO_OWNER: Can do everything MANAGER can do. Can be promoted by OWNER for delegation.
+// OWNER: Full system access. Bootstrap account created via seed script. Only OWNER can promote users.
+enum Role {
+  EMPLOYEE
+  TEAM_LEAD
+  MANAGER
+  CO_OWNER
+  OWNER
+}
+
 model User {
   id        Int     @id @default(autoincrement())
   email     String  @unique
   password  String
   name      String?
+  role      Role    @default(EMPLOYEE) // Default role for new users
   isVerified Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
