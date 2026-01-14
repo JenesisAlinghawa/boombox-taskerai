@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { AlertCircle, Lock } from "lucide-react";
 import TaskStatusChart from "@/app/components/TaskStatusChart";
 import { getCurrentUser } from "@/utils/sessionManager";
 
@@ -67,6 +68,7 @@ export default function AnalyticsPage() {
         const user = await getCurrentUser();
         if (user) {
           setCurrentUser(user);
+          // Analytics restricted to MANAGER+ to prevent EMPLOYEE users from viewing team metrics
         }
       } catch (error) {
         console.error("Failed to load user:", error);
@@ -403,6 +405,76 @@ export default function AnalyticsPage() {
       >
         <div style={{ fontSize: 18, color: COLORS.muted }}>
           Loading analytics...
+        </div>
+      </div>
+    );
+  }
+
+  // Check authorization - Analytics restricted to MANAGER+
+  const authorizedRoles = ["MANAGER", "CO_OWNER", "OWNER"];
+  if (
+    currentUser &&
+    currentUser.role &&
+    !authorizedRoles.includes(currentUser.role)
+  ) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: COLORS.bg,
+          color: COLORS.text,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "20px",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: "400px",
+            textAlign: "center",
+            background: "#fef2f2",
+            border: "1px solid #fee2e2",
+            borderRadius: "12px",
+            padding: "40px 30px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "16px",
+          }}
+        >
+          <Lock size={48} color="#ef4444" />
+          <h2 style={{ margin: "0", fontSize: "20px", fontWeight: "600" }}>
+            Access Denied
+          </h2>
+          <p
+            style={{
+              margin: "0",
+              fontSize: "14px",
+              color: COLORS.muted,
+              lineHeight: "1.6",
+            }}
+          >
+            Analytics is restricted to managers and above. Your current role (
+            <strong>{currentUser.role}</strong>) does not have permission to
+            access this page.
+          </p>
+          <button
+            onClick={() => router.push("/dashboard")}
+            style={{
+              marginTop: "16px",
+              padding: "10px 20px",
+              background: COLORS.primary,
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontSize: "14px",
+              fontWeight: "500",
+            }}
+          >
+            Return to Dashboard
+          </button>
         </div>
       </div>
     );

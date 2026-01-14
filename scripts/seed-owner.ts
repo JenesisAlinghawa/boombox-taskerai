@@ -4,16 +4,21 @@
  * This script creates a one-time bootstrap OWNER account for TaskerAI.
  * The OWNER is the only user who can promote others and manage roles.
  * 
+ * Security Notes:
+ * - This account has full system access - protect credentials carefully
+ * - Only run this once per environment
+ * - Change the email and password BEFORE running in production
+ * - The OWNER is the only user who can promote other users to CO_OWNER
+ * - CO_OWNER cannot promote users (prevents privilege escalation)
+ * 
  * Usage:
  *   npx ts-node scripts/seed-owner.ts
  * 
- * Or add to package.json:
- *   "seed:owner": "ts-node scripts/seed-owner.ts"
- * 
  * IMPORTANT: After running this script:
- * 1. Change the dummy email from "owner.dummy@gmail.com" to your real email (e.g., "liz@boombox.com")
- * 2. Update the password to a secure value
- * 3. The hashed password below should be changed immediately in production
+ * 1. Change email to REAL EMAIL AFTER DEFENSE (e.g., "liz@boombox.com")
+ * 2. Update password to a strong value
+ * 3. Store credentials in secure password manager
+ * 4. Never commit real credentials to version control
  */
 
 import { PrismaClient } from "@prisma/client";
@@ -23,9 +28,9 @@ const prisma = new PrismaClient();
 
 async function main() {
   try {
-    // Dummy owner email - CHANGE THIS TO YOUR ACTUAL EMAIL
-    const ownerEmail = "owner.dummy@gmail.com"; // TODO: Change to liz@boombox.com or actual owner email
-    const ownerPassword = "ChangeMe@123456"; // TODO: Change to secure password in production
+    // CHANGE TO REAL EMAIL AFTER DEFENSE (e.g., "liz@boombox.com")
+    const ownerEmail = "jenesissanchezalinghawa@gmail.com"; // TODO: Change to real email after defense
+    const ownerPassword = "Jenesis@21"; // TODO: Change to secure password in production
 
     // Check if owner already exists
     const existingOwner = await prisma.user.findUnique({
