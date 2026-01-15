@@ -50,10 +50,12 @@ export async function POST(req: NextRequest) {
     try {
       const notification = await prisma.notification.create({
         data: {
-          userId: updatedUser.id,
+          receiverId: updatedUser.id,
           type: 'welcome',
-          title: 'Welcome to TaskerAI',
-          message: 'Welcome to TaskerAI — your email has been successfully verified!',
+          data: {
+            title: 'Welcome to TaskerAI',
+            message: 'Welcome to TaskerAI — your email has been successfully verified!',
+          },
         },
       })
 

@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     }
 
     const notifications = await prisma.notification.findMany({
-      where: { userId },
+      where: { receiverId: userId },
       orderBy: { createdAt: 'desc' },
       take: 50,
     })
@@ -33,7 +33,7 @@ export async function PUT(req: NextRequest) {
 
     await prisma.notification.update({
       where: { id: notificationId },
-      data: { isRead: true },
+      data: { read: true },
     })
 
     return NextResponse.json({ success: true })

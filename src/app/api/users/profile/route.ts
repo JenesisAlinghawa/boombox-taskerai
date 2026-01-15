@@ -16,15 +16,15 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { name } = await request.json();
-    if (!name) {
-      return NextResponse.json({ error: "Name required" }, { status: 400 });
+    const { firstName, lastName } = await request.json();
+    if (!firstName || !lastName) {
+      return NextResponse.json({ error: "First name and last name required" }, { status: 400 });
     }
 
     const user = await prisma.user.update({
       where: { id: userId },
-      data: { name },
-      select: { id: true, name: true, email: true },
+      data: { firstName, lastName },
+      select: { id: true, firstName: true, lastName: true, email: true },
     });
 
     return NextResponse.json({ user });

@@ -23,7 +23,7 @@ export async function GET(
       },
       include: {
         sender: {
-          select: { id: true, name: true, email: true },
+          select: { id: true, firstName: true, lastName: true, email: true },
         },
       },
       orderBy: { createdAt: 'asc' },
@@ -41,12 +41,12 @@ export async function GET(
 
     const otherUser = await prisma.user.findUnique({
       where: { id: otherUserId },
-      select: { name: true },
+      select: { firstName: true, lastName: true },
     })
 
     return NextResponse.json({
       messages,
-      userName: otherUser?.name,
+      userName: `${otherUser?.firstName} ${otherUser?.lastName}`,
     })
   } catch (error: any) {
     console.error('Get DM messages error:', error)
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       },
       include: {
         sender: {
-          select: { id: true, name: true, email: true },
+          select: { id: true, firstName: true, lastName: true, email: true },
         },
       },
     })
@@ -81,16 +81,18 @@ export async function POST(req: NextRequest) {
     // Create notification for recipient
     const sender = await prisma.user.findUnique({
       where: { id: senderId },
-      select: { name: true },
+      select: { firstName: true, lastName: true },
     })
 
     await prisma.notification.create({
       data: {
-        userId: recipientId,
+        receiverId: recipientId,
         type: 'direct_message',
-        title: `New message from ${sender?.name}`,
-        message: content,
-        relatedId: senderId,
+        data: {
+          title: `New message from ${sender?.firstName} ${sender?.lastName}`,
+          message: content,
+          senderId,
+        },
       },
     })
 

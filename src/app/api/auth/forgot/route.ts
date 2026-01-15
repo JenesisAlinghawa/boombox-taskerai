@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
     const resetLink = `${baseUrl}/auth/reset?token=${encodeURIComponent(token)}`
 
-    const html = `<p>Hi ${user.name || ''},</p><p>Click the link below to reset your password. This link expires in 1 hour.</p><p><a href="${resetLink}">Reset password</a></p>`
+    const html = `<p>Hi ${user.firstName || ''},</p><p>Click the link below to reset your password. This link expires in 1 hour.</p><p><a href="${resetLink}">Reset password</a></p>`
 
     try {
       console.log('📧 Attempting to send reset email to:', user.email)

@@ -26,9 +26,9 @@ export async function GET(request: NextRequest, { params }: Params) {
     const task = await prisma.task.findUnique({
       where: { id: taskId },
       include: {
-        createdBy: { select: { id: true, name: true, email: true } },
-        assignee: { select: { id: true, name: true, email: true } },
-        comments: { include: { user: { select: { id: true, name: true } } } },
+        createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+        assignee: { select: { id: true, firstName: true, lastName: true, email: true } },
+        comments: { include: { user: { select: { id: true, firstName: true, lastName: true } } } },
         attachments: true,
       },
     });
@@ -82,8 +82,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       where: { id: taskId }, 
       data, 
       include: { 
-        createdBy: { select: { id: true, name: true, email: true } },
-        assignee: { select: { id: true, name: true, email: true } } 
+        createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+        assignee: { select: { id: true, firstName: true, lastName: true, email: true } } 
       } 
     });
     return NextResponse.json({ task: updatedTask });

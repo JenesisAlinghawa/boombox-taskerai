@@ -44,7 +44,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const comment = await prisma.comment.update({
       where: { id: cId },
       data: { content },
-      include: { user: { select: { id: true, name: true } } }
+      include: { user: { select: { id: true, firstName: true, lastName: true } } }
     });
     return NextResponse.json({ comment });
   } catch (error) {

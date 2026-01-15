@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       },
       include: {
         sender: {
-          select: { id: true, name: true, email: true },
+          select: { id: true, firstName: true, lastName: true, email: true },
         },
       },
     })

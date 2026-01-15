@@ -1,0 +1,64 @@
+
+> boombox@0.1.0 build
+> next build
+
+   Gû¦ Next.js 15.4.6
+   - Environments: .env.local, .env
+
+   Creating an optimized production build ...
+node.exe : Failed to compile.
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Failed to compile.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+./src/app/messages/page.tsx
+Error:   [31mx[0m Unexpected token. Did you mean `{'>'}` or `&gt;`?
+     ,-[[36;1;4mD:\TaskerAI\src\app\messages\page.tsx[0m:329:1]
+ [2m326[0m |                       ? "bg-gray-100"
+ [2m327[0m |                       : "hover:bg-gray-50"
+ [2m328[0m |                   }`}
+ [2m329[0m |                 >
+     : [35;1m                ^[0m
+ [2m330[0m |                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex 
+items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+ [2m331[0m |                     {user.profilePicture ? (
+ [2m331[0m |                       <img
+     `----
+  [31mx[0m Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+     ,-[[36;1;4mD:\TaskerAI\src\app\messages\page.tsx[0m:350:1]
+ [2m347[0m |                     <span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
+ [2m348[0m |                   )}
+ [2m349[0m |                 </button>
+ [2m350[0m |               ))}
+     : [35;1m                ^[0m
+ [2m351[0m |             </div>
+ [2m352[0m |           </div>
+ [2m352[0m | 
+     `----
+  [31mx[0m Expected '</', got 'jsx text (
+  [31m|[0m               ))}
+  [31m|[0m             )'
+     ,-[[36;1;4mD:\TaskerAI\src\app\messages\page.tsx[0m:349:1]
+ [2m346[0m |                       {user.active && (
+ [2m347[0m |                         <span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
+ [2m348[0m |                       )}
+ [2m349[0m | [35;1m,[0m[35;1m-[0m[35;1m>[0m                 </button>
+ [2m350[0m | [35;1m|[0m                 ))}
+ [2m351[0m | [35;1m`[0m[35;1m-[0m[35;1m>[0m             </div>
+ [2m352[0m |               </div>
+ [2m353[0m |     
+ [2m353[0m |               {/* Archived Conversations */}
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/messages/page.tsx
+
+
+> Build failed because of webpack errors
+

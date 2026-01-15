@@ -15,9 +15,13 @@ import { Role } from "@prisma/client";
 export interface UserSession {
   id: number;
   email: string;
-  name: string | null;
+  firstName: string;
+  lastName: string;
   role: Role;
   isVerified: boolean;
+  active: boolean;
+  lastActive: Date | null;
+  profilePicture: string | null;
 }
 
 /**
@@ -42,9 +46,13 @@ export async function getCurrentUser(
       select: {
         id: true,
         email: true,
-        name: true,
+        firstName: true,
+        lastName: true,
         role: true,
         isVerified: true,
+        active: true,
+        lastActive: true,
+        profilePicture: true,
       },
     });
 
@@ -53,6 +61,17 @@ export async function getCurrentUser(
     console.error("Error getting current user:", error);
     return null;
   }
+}
+
+/**
+ * Helper function to extract user ID from request headers
+ * 
+ * @param req - NextRequest object
+ * @returns number | null - User ID or null
+ */
+export function getUserIdFromRequest(req: NextRequest): number | null {
+  const userId = req.headers.get("x-user-id");
+  return userId ? parseInt(userId, 10) : null;
 }
 
 /**
@@ -134,4 +153,21 @@ export function isValidRole(role: string): role is Role {
   return ["EMPLOYEE", "TEAM_LEAD", "MANAGER", "CO_OWNER", "OWNER"].includes(
     role
   );
+}
+
+/**
+ * Checks if user can assign tasks to specific users
+ * EMPLOYEE can only assign to themselves
+ * Higher roles can assign to anyone
+ * 
+ * @param role - User role
+ * @param assigneeId - ID of user being assigned
+ * @param currentUserId - Current user's ID
+ * @returns boolean
+ */
+export function canAssignTask(role: Role, assigneeId: number, currentUserId: number): boolean {
+  if (role === "EMPLOYEE") {
+    return assigneeId === currentUserId;
+  }
+  return true; // TEAM_LEAD and above can assign to anyone
 }

@@ -23,10 +23,10 @@ export async function GET(request: NextRequest) {
         members: {
           include: {
             user: {
-              select: { id: true, name: true, email: true },
+              select: { id: true, firstName: true, lastName: true, email: true },
             },
             inviter: {
-              select: { id: true, name: true, email: true },
+              select: { id: true, firstName: true, lastName: true, email: true },
             },
           },
         },
@@ -43,10 +43,10 @@ export async function GET(request: NextRequest) {
               members: {
                 include: {
                   user: {
-                    select: { id: true, name: true, email: true },
+                    select: { id: true, firstName: true, lastName: true, email: true },
                   },
                   inviter: {
-                    select: { id: true, name: true, email: true },
+                    select: { id: true, firstName: true, lastName: true, email: true },
                   },
                 },
               },
@@ -62,9 +62,11 @@ export async function GET(request: NextRequest) {
 
     // If still no team, create one for this user
     if (!team) {
+      const userNameData = (await prisma.user.findUnique({ where: { id: userId }, select: { firstName: true, lastName: true } }));
+      const displayName = `${userNameData?.firstName || ""} ${userNameData?.lastName || ""}`.trim() || "My";
       team = await prisma.team.create({
         data: {
-          name: `${(await prisma.user.findUnique({ where: { id: userId }, select: { name: true } }))?.name || "My"} Team`,
+          name: `${displayName} Team`,
           ownerId: userId,
           members: {
             create: {
@@ -76,10 +78,10 @@ export async function GET(request: NextRequest) {
           members: {
             include: {
               user: {
-                select: { id: true, name: true, email: true },
+                select: { id: true, firstName: true, lastName: true, email: true },
               },
               inviter: {
-                select: { id: true, name: true, email: true },
+                select: { id: true, firstName: true, lastName: true, email: true },
               },
             },
           },
@@ -110,7 +112,7 @@ export async function POST(request: NextRequest) {
     const normalizedEmail = email.toLowerCase();
     const userToAdd = await prisma.user.findUnique({
       where: { email: normalizedEmail },
-      select: { id: true, name: true, email: true },
+      select: { id: true, firstName: true, lastName: true, email: true },
     });
 
     if (!userToAdd) {
@@ -160,14 +162,16 @@ export async function POST(request: NextRequest) {
     });
 
     // Create notification for the added user
-    const inviterName = (await prisma.user.findUnique({ where: { id: userId }, select: { name: true } }))?.name || "A user";
+    const inviterData = (await prisma.user.findUnique({ where: { id: userId }, select: { firstName: true, lastName: true } }));
+    const inviterName = `${inviterData?.firstName || ""} ${inviterData?.lastName || ""}`.trim() || "A user";
     await prisma.notification.create({
       data: {
-        userId: userToAdd.id,
+        receiverId: userToAdd.id,
         type: "team_added",
-        title: "Added to Team",
-        message: `${inviterName} added you to their team`,
-        relatedId: team.id,
+        data: {
+          title: "Added to Team",
+          message: `${inviterName} added you to their team`,
+        },
       },
     });
 

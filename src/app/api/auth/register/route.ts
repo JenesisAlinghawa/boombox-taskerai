@@ -8,11 +8,11 @@ const secret = process.env.JWT_SECRET || 'your-secret-key'
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, name } = await request.json()
+    const { email, password, firstName, lastName } = await request.json()
 
-    if (!email || !password || !name) {
+    if (!email || !password || !firstName || !lastName) {
       return NextResponse.json(
-        { error: 'Email, name, and password required' },
+        { error: 'Email, firstName, lastName, and password required' },
         { status: 400 }
       )
     }
@@ -49,18 +49,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if name already exists
-    const existingName = await prisma.user.findFirst({
-      where: { name: name },
-    })
-
-    if (existingName) {
-      return NextResponse.json(
-        { error: 'Name already taken' },
-        { status: 409 }
-      )
-    }
-
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
@@ -73,8 +61,11 @@ export async function POST(request: NextRequest) {
       data: {
         email: normalizedEmail,
         password: hashedPassword,
-        name: name,
+        firstName: firstName,
+        lastName: lastName,
         role: "EMPLOYEE", // Default role for all new users
+        isVerified: false,
+        active: true,
       },
     })
 
@@ -84,7 +75,7 @@ export async function POST(request: NextRequest) {
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
       const verificationToken = jwt.sign({ id: user.id }, secret, { expiresIn: '24h' })
       const verificationLink = `${baseUrl}/auth/verify?token=${encodeURIComponent(verificationToken)}`
-      const html = `<p>Hi ${user.name || ''},</p><p>Welcome to TaskerAI! Click the link below to verify your email address.</p><p><a href="${verificationLink}">Verify Email</a></p><p>This link expires in 24 hours.</p>`
+      const html = `<p>Hi ${user.firstName || ''},</p><p>Welcome to TaskerAI! Click the link below to verify your email address.</p><p><a href="${verificationLink}">Verify Email</a></p><p>This link expires in 24 hours.</p>`
       await sendEmail(user.email, 'Verify your TaskerAI account', html)
     } catch (e) {
       console.warn('Failed to send verification email', e)

@@ -16,6 +16,14 @@ export function SidePanel() {
     }
   }, [collapsed]);
 
+  // Also set initial margin on mount
+  React.useEffect(() => {
+    const main = document.querySelector("main");
+    if (main) {
+      main.style.marginLeft = "260px";
+    }
+  }, []);
+
   return (
     <aside
       style={{

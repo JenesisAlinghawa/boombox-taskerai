@@ -52,15 +52,18 @@ async function main() {
       data: {
         email: ownerEmail.toLowerCase(),
         password: hashedPassword,
-        name: "System Owner",
+        firstName: "System",
+        lastName: "Owner",
         role: "OWNER", // Bootstrap as OWNER
         isVerified: true, // Owner is auto-verified
+        active: true,
+        lastActive: new Date(),
       },
     });
 
     console.log(`✓ OWNER account created successfully!`);
     console.log(`  Email: ${owner.email}`);
-    console.log(`  Name: ${owner.name}`);
+    console.log(`  Name: ${owner.firstName} ${owner.lastName}`);
     console.log(`  Role: ${owner.role}`);
     console.log(`  ID: ${owner.id}`);
     console.log(`\n⚠️  IMPORTANT: Change the password immediately in production!`);

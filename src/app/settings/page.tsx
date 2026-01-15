@@ -1,841 +1,557 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { getCurrentUser, saveUserSession } from "@/utils/sessionManager";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  Upload,
+  Users,
+  Trash2,
+  ChevronDown,
+  LogOut,
+  AlertCircle,
+  Check,
+  Plus,
+  Mail,
+  Clock,
+} from "lucide-react";
+import { getCurrentUser, clearUserSession } from "@/utils/sessionManager";
+import { useRouter } from "next/navigation";
 
 interface User {
   id: number;
-  name: string;
   email: string;
-  role?: "EMPLOYEE" | "TEAM_LEAD" | "MANAGER" | "CO_OWNER" | "OWNER";
+  firstName: string;
+  lastName: string;
+  role: string;
+  isVerified: boolean;
+  profilePicture?: string;
 }
 
-interface TeamMember {
+interface ListUser {
   id: number;
-  user: {
-    id: number;
-    name: string;
-    email: string;
-  };
-  status: string;
-  inviter?: {
-    id: number;
-    name: string;
-    email: string;
-  } | null;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  isVerified: boolean;
 }
 
-interface Team {
-  id: number;
-  ownerId: number;
-  members: TeamMember[];
-}
+type TabType = "profile" | "notifications" | "team";
 
-const COLORS = {
-  bg: "#ffffff",
-  cardBg: "#F9FAFD",
-  text: "#1f2937",
-  muted: "#6b7280",
-  border: "rgba(0,0,0,0.1)",
-  primary: "#5d8bb1",
-  hover: "#2d3748",
-  danger: "#ef4444",
-  success: "#10b981",
-  shadow: "#E1F1FD",
-};
+const ROLES = ["EMPLOYEE", "TEAM_LEAD", "MANAGER", "CO_OWNER"];
 
 export default function SettingsPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<
-    "profile" | "notifications" | "team"
-  >("profile");
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>("profile");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Profile state
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [profilePicture, setProfilePicture] = useState("");
+  const [profileSaving, setProfileSaving] = useState(false);
   const [profileMessage, setProfileMessage] = useState("");
-  const [profileLoading, setProfileLoading] = useState(false);
 
   // Notification state
   const [emailNotifications, setEmailNotifications] = useState(true);
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [notificationLoading, setNotificationLoading] = useState(false);
+  const [notificationSaving, setNotificationSaving] = useState(false);
 
-  // Team state
-  const [team, setTeam] = useState<Team | null>(null);
+  // Team management state
+  const [users, setUsers] = useState<ListUser[]>([]);
   const [teamLoading, setTeamLoading] = useState(false);
-  const [email, setEmail] = useState("");
-  const [addingUser, setAddingUser] = useState(false);
-  const [error, setError] = useState("");
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editStatus, setEditStatus] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<number | null>(null);
+  const [editingRole, setEditingRole] = useState("");
+  const [showRoleDropdown, setShowRoleDropdown] = useState<number | null>(null);
 
-  // Load user from session API
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const userData = await getCurrentUser();
-        if (userData) {
-          setUser(userData);
-          setName(userData.name || "");
-        }
-      } catch (e) {
-        console.error("Failed to load user data", e);
-      }
-    };
-    loadUser();
+    loadCurrentUser();
   }, []);
 
-  // Load team when activeTab is team
-  useEffect(() => {
-    if (activeTab === "team" && user) {
-      fetchTeam();
+  const loadCurrentUser = async () => {
+    try {
+      const user = await getCurrentUser();
+      if (!user) {
+        router.push("/auth/login");
+        return;
+      }
+      setCurrentUser(user as User);
+      setFirstName(user.firstName || "");
+      setLastName(user.lastName || "");
+      setProfilePicture(user.profilePicture || "");
+      setError(null);
+    } catch (err) {
+      setError("Failed to load user data");
+    } finally {
+      setLoading(false);
     }
-  }, [activeTab, user]);
+  };
 
-  const fetchTeam = async () => {
-    if (!user) return;
+  const handleProfilePictureChange = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfilePicture(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const saveProfile = async () => {
+    if (!currentUser) return;
+    setProfileSaving(true);
+    setProfileMessage("");
+
+    try {
+      const response = await fetch(`/api/users/${currentUser.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": String(currentUser.id),
+        },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          profilePicture,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to save profile");
+      }
+
+      setProfileMessage("Profile updated successfully");
+      setCurrentUser({ ...currentUser, firstName, lastName, profilePicture });
+      setTimeout(() => setProfileMessage(""), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save profile");
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const fetchUsers = async () => {
     setTeamLoading(true);
     try {
-      const res = await fetch("/api/teams", {
-        headers: { "x-user-id": user.id.toString() },
-      });
-      const data = await res.json();
-      setTeam(data.team);
+      const response = await fetch("/api/users");
+      if (!response.ok) throw new Error("Failed to fetch users");
+      const data = await response.json();
+      setUsers(data.users || []);
     } catch (err) {
-      console.error("Failed to fetch team:", err);
+      setError(err instanceof Error ? err.message : "Failed to fetch users");
     } finally {
       setTeamLoading(false);
     }
   };
 
-  const handleProfileUpdate = async () => {
-    if (!name.trim() || !user) {
-      setProfileMessage("Name is required");
-      return;
-    }
+  const inviteUser = async () => {
+    if (!inviteEmail) return;
+    setInviting(true);
 
-    setProfileLoading(true);
     try {
-      const res = await fetch("/api/users/profile", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": user.id.toString(),
-        },
-        body: JSON.stringify({ name }),
-      });
-
-      if (res.ok) {
-        const updatedUser = { ...user, name };
-        setUser(updatedUser);
-        saveUserSession(updatedUser);
-        setProfileMessage("Profile updated successfully!");
-        setTimeout(() => setProfileMessage(""), 3000);
-      } else {
-        setProfileMessage("Failed to update profile");
-      }
-    } catch {
-      setProfileMessage("Error updating profile");
-    } finally {
-      setProfileLoading(false);
-    }
-  };
-
-  const handleNotificationSave = async () => {
-    setNotificationLoading(true);
-    try {
-      // Save notification preferences
-      // For now, just show success message
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setProfileMessage("Notification preferences saved!");
-      setTimeout(() => setProfileMessage(""), 3000);
-    } finally {
-      setNotificationLoading(false);
-    }
-  };
-
-  const handleAddUser = async () => {
-    if (!email.trim() || !user) {
-      setError("Email is required");
-      return;
-    }
-
-    setAddingUser(true);
-    setError("");
-    try {
-      const res = await fetch("/api/teams", {
+      const response = await fetch("/api/invite/send", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": user.id.toString(),
-        },
-        body: JSON.stringify({ email }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: inviteEmail }),
       });
 
-      if (res.ok) {
-        setEmail("");
-        await fetchTeam();
-      } else {
-        const data = await res.json();
-        setError(data.error || "Failed to add user");
-      }
+      if (!response.ok) throw new Error("Failed to send invite");
+
+      setInviteEmail("");
+      setError(null);
     } catch (err) {
-      setError("Error adding user");
+      setError(err instanceof Error ? err.message : "Failed to send invite");
     } finally {
-      setAddingUser(false);
+      setInviting(false);
     }
   };
 
-  const handleStatusChange = async (memberId: number, newStatus: string) => {
-    if (!user) return;
+  const promoteUser = async (userId: number, newRole: string) => {
     try {
-      const res = await fetch(`/api/teams/${memberId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": user.id.toString(),
-        },
-        body: JSON.stringify({ status: newStatus }),
+      const response = await fetch("/api/users/promote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, newRole }),
       });
 
-      if (res.ok) {
-        setEditingId(null);
-        await fetchTeam();
-      }
+      if (!response.ok) throw new Error("Failed to promote user");
+
+      fetchUsers();
+      setEditingUserId(null);
+      setShowRoleDropdown(null);
     } catch (err) {
-      console.error("Failed to update member:", err);
+      setError(err instanceof Error ? err.message : "Failed to promote user");
     }
   };
 
-  const handleDeactivate = async (memberId: number) => {
-    if (
-      !confirm("Are you sure you want to remove this user from your team?") ||
-      !user
-    )
-      return;
+  const deleteUser = async (userId: number) => {
+    if (!confirm("Are you sure you want to delete this user?")) return;
 
     try {
-      const res = await fetch(`/api/teams/${memberId}`, {
+      const response = await fetch(`/api/users/${userId}`, {
         method: "DELETE",
-        headers: { "x-user-id": user.id.toString() },
       });
 
-      if (res.ok) {
-        await fetchTeam();
-      }
+      if (!response.ok) throw new Error("Failed to delete user");
+
+      fetchUsers();
     } catch (err) {
-      console.error("Failed to remove member:", err);
+      setError(err instanceof Error ? err.message : "Failed to delete user");
     }
   };
 
-  const handleMessageInviter = (inviterId: number) => {
-    // Navigate to messages page with the inviter
-    const messagesUrl = `/dashboard/messages?userId=${inviterId}`;
-    window.location.href = messagesUrl;
+  const handleLogout = async () => {
+    clearUserSession();
+    router.push("/auth/login");
   };
+
+  if (loading) {
+    return (
+      <div className="p-8 bg-white min-h-screen">
+        <p className="text-gray-600">Loading settings...</p>
+      </div>
+    );
+  }
+
+  const canManageUsers = ["OWNER", "CO_OWNER", "MANAGER"].includes(
+    currentUser?.role || ""
+  );
 
   return (
-    <div style={{ padding: 20, minHeight: "100vh", background: COLORS.bg }}>
-      <h1
-        style={{
-          margin: "0 0 24px",
-          color: COLORS.text,
-          fontSize: 24,
-          fontWeight: 600,
-        }}
-      >
-        Settings
-      </h1>
-
-      {/* Tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: "16px",
-          marginBottom: "24px",
-          borderBottom: `1px solid ${COLORS.border}`,
-        }}
-      >
-        {["profile", "notifications", "team"].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab as any)}
-            style={{
-              padding: "12px 24px",
-              background: activeTab === tab ? COLORS.primary : "transparent",
-              color: COLORS.text,
-              border: "none",
-              cursor: "pointer",
-              fontSize: "14px",
-              fontWeight: 600,
-              borderBottom:
-                activeTab === tab ? `2px solid ${COLORS.primary}` : "none",
-              transition: "all 0.2s",
-              textTransform: "capitalize",
-            }}
-            onMouseEnter={(e) => {
-              if (activeTab !== tab) {
-                e.currentTarget.style.color = COLORS.primary;
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (activeTab !== tab) {
-                e.currentTarget.style.color = COLORS.text;
-              }
-            }}
-          >
-            {tab === "profile" && "👤 Profile"}
-            {tab === "notifications" && "🔔 Notifications"}
-            {tab === "team" && "👥 Team"}
-          </button>
-        ))}
+    <div className="p-8 bg-white min-h-screen">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+        >
+          <LogOut size={18} />
+          Logout
+        </button>
       </div>
 
-      {/* Profile Tab */}
-      {activeTab === "profile" && (
-        <div
-          style={{
-            background: "#F9FAFD",
-            borderRadius: "8px",
-            padding: "20px",
-            maxWidth: "600px",
-            border: `1px solid ${COLORS.border}`,
-            filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
+      {/* Tabs */}
+      <div className="flex gap-2 mb-8 border-b border-gray-200">
+        <button
+          onClick={() => {
+            setActiveTab("profile");
+            setError(null);
           }}
+          className={`px-4 py-3 font-medium transition-colors ${
+            activeTab === "profile"
+              ? "text-blue-600 border-b-2 border-blue-600"
+              : "text-gray-600 hover:text-gray-900"
+          }`}
         >
-          <h2
-            style={{
-              marginTop: 0,
-              color: "#333",
-              fontSize: "18px",
-              fontWeight: 600,
-            }}
-          >
-            Update Profile Details
-          </h2>
-
-          <div style={{ marginBottom: "16px" }}>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "6px",
-                fontSize: "13px",
-                fontWeight: 500,
-                color: "#333",
-              }}
-            >
-              Name
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                border: `1px solid ${COLORS.border}`,
-                borderRadius: "6px",
-                background: "#ffffff",
-                color: "#333",
-                fontSize: "13px",
-                boxSizing: "border-box",
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: "16px" }}>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "6px",
-                fontSize: "13px",
-                fontWeight: 500,
-                color: "#333",
-              }}
-            >
-              Email
-            </label>
-            <input
-              type="email"
-              value={user?.email || ""}
-              disabled
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                border: `1px solid ${COLORS.border}`,
-                borderRadius: "6px",
-                background: "#f5f5f5",
-                color: COLORS.muted,
-                fontSize: "13px",
-                boxSizing: "border-box",
-              }}
-            />
-          </div>
-
-          {profileMessage && (
-            <div
-              style={{
-                marginBottom: "16px",
-                padding: "10px 12px",
-                borderRadius: "6px",
-                background: profileMessage.includes("success")
-                  ? "rgba(16, 185, 129, 0.1)"
-                  : "rgba(239, 68, 68, 0.1)",
-                color: profileMessage.includes("success")
-                  ? COLORS.success
-                  : COLORS.danger,
-                fontSize: "13px",
-              }}
-            >
-              {profileMessage}
-            </div>
-          )}
-
+          Profile
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab("notifications");
+            setError(null);
+          }}
+          className={`px-4 py-3 font-medium transition-colors ${
+            activeTab === "notifications"
+              ? "text-blue-600 border-b-2 border-blue-600"
+              : "text-gray-600 hover:text-gray-900"
+          }`}
+        >
+          Notifications
+        </button>
+        {canManageUsers && (
           <button
-            onClick={handleProfileUpdate}
-            disabled={profileLoading}
-            style={{
-              padding: "10px 24px",
-              background: COLORS.primary,
-              color: "#fff",
-              border: "none",
-              borderRadius: "6px",
-              cursor: profileLoading ? "not-allowed" : "pointer",
-              fontSize: "13px",
-              fontWeight: 500,
-              opacity: profileLoading ? 0.6 : 1,
+            onClick={() => {
+              setActiveTab("team");
+              setError(null);
+              fetchUsers();
             }}
+            className={`px-4 py-3 font-medium transition-colors ${
+              activeTab === "team"
+                ? "text-blue-600 border-b-2 border-blue-600"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
           >
-            {profileLoading ? "Saving..." : "Save Changes"}
+            Team Management
           </button>
+        )}
+      </div>
+
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
+          <AlertCircle size={20} className="text-red-600" />
+          <p className="text-red-800 text-sm">{error}</p>
+        </div>
+      )}
+
+      {/* Profile Tab */}
+      {activeTab === "profile" && currentUser && (
+        <div className="max-w-2xl space-y-6">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              Update Profile Details
+            </h2>
+
+            <div className="space-y-4">
+              {/* Profile Picture */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Profile Picture
+                </label>
+                <div className="flex items-center gap-4">
+                  <div className="w-20 h-20 rounded-lg bg-gray-200 flex items-center justify-center overflow-hidden">
+                    {profilePicture ? (
+                      <img
+                        src={profilePicture}
+                        alt="Profile"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Users size={32} className="text-gray-400" />
+                    )}
+                  </div>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Upload size={16} />
+                    Upload
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProfilePictureChange}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+
+              {/* First Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  First Name
+                </label>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  placeholder="Your first name"
+                />
+              </div>
+
+              {/* Last Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Last Name
+                </label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  placeholder="Your last name"
+                />
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email (Read-only)
+                </label>
+                <input
+                  type="email"
+                  value={currentUser.email}
+                  disabled
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                />
+              </div>
+
+              {/* Role */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Role (Read-only)
+                </label>
+                <input
+                  type="text"
+                  value={currentUser.role}
+                  disabled
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                />
+              </div>
+
+              {profileMessage && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm flex items-center gap-2">
+                  <Check size={16} />
+                  {profileMessage}
+                </div>
+              )}
+
+              <button
+                onClick={saveProfile}
+                disabled={profileSaving}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {profileSaving ? "Saving..." : "Save Profile"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Notifications Tab */}
       {activeTab === "notifications" && (
-        <div
-          style={{
-            background: "#F9FAFD",
-            borderRadius: "8px",
-            padding: "20px",
-            maxWidth: "600px",
-            border: `1px solid ${COLORS.border}`,
-            filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
-          }}
-        >
-          <h2
-            style={{
-              marginTop: 0,
-              color: "#333",
-              fontSize: "18px",
-              fontWeight: 600,
-            }}
-          >
+        <div className="max-w-2xl space-y-6">
+          <h2 className="text-xl font-semibold text-gray-900">
             Notification Preferences
           </h2>
-
-          <div style={{ marginBottom: "16px" }}>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                cursor: "pointer",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={emailNotifications}
-                onChange={(e) => setEmailNotifications(e.target.checked)}
-                style={{ cursor: "pointer", width: "16px", height: "16px" }}
-              />
-              <span style={{ color: "#333", fontSize: "13px" }}>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+              <label className="font-medium text-gray-900">
                 Email Notifications
-              </span>
-            </label>
-          </div>
-
-          <div style={{ marginBottom: "16px" }}>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                cursor: "pointer",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={pushNotifications}
-                onChange={(e) => setPushNotifications(e.target.checked)}
-                style={{ cursor: "pointer", width: "16px", height: "16px" }}
-              />
-              <span style={{ color: "#333", fontSize: "13px" }}>
-                Push Notifications
-              </span>
-            </label>
-          </div>
-
-          <button
-            onClick={handleNotificationSave}
-            disabled={notificationLoading}
-            style={{
-              padding: "10px 24px",
-              background: COLORS.primary,
-              color: "#fff",
-              border: "none",
-              borderRadius: "6px",
-              cursor: notificationLoading ? "not-allowed" : "pointer",
-              fontSize: "13px",
-              fontWeight: 500,
-              opacity: notificationLoading ? 0.6 : 1,
-            }}
-          >
-            {notificationLoading ? "Saving..." : "Save Preferences"}
-          </button>
-
-          {profileMessage && (
-            <div
-              style={{
-                marginTop: "16px",
-                padding: "10px 12px",
-                borderRadius: "6px",
-                background: "rgba(16, 185, 129, 0.1)",
-                color: COLORS.success,
-                fontSize: "13px",
-              }}
-            >
-              {profileMessage}
+              </label>
+              <button
+                onClick={() => setEmailNotifications(!emailNotifications)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  emailNotifications ? "bg-blue-600" : "bg-gray-300"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    emailNotifications ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
             </div>
-          )}
+          </div>
         </div>
       )}
 
-      {/* Team Tab */}
-      {activeTab === "team" && (
-        <div
-          style={{
-            background: "#F9FAFD",
-            borderRadius: "8px",
-            padding: "20px",
-            maxWidth: "700px",
-            border: `1px solid ${COLORS.border}`,
-            filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "20px",
-            }}
-          >
-            <h2
-              style={{
-                margin: 0,
-                color: "#333",
-                fontSize: "18px",
-                fontWeight: 600,
-              }}
-            >
-              Team Management
-            </h2>
+      {/* Team Management Tab */}
+      {activeTab === "team" && canManageUsers && (
+        <div className="max-w-4xl space-y-6">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Team Management
+          </h2>
 
-            {/* Link to dedicated team management page for admins */}
-            {user?.role &&
-              ["OWNER", "CO_OWNER", "MANAGER"].includes(user.role) && (
-                <Link href="/settings/team" style={{ textDecoration: "none" }}>
-                  <button
-                    style={{
-                      padding: "10px 20px",
-                      background: COLORS.primary,
-                      color: "white",
-                      border: "none",
-                      borderRadius: "6px",
-                      cursor: "pointer",
-                      fontSize: "14px",
-                      fontWeight: "500",
-                    }}
-                  >
-                    Manage Team
-                  </button>
-                </Link>
-              )}
-          </div>
-
-          {/* Add User Section */}
-          <div
-            style={{
-              marginBottom: "24px",
-              paddingBottom: "24px",
-              borderBottom: `1px solid ${COLORS.border}`,
-            }}
-          >
-            <h3
-              style={{
-                margin: "0 0 12px",
-                fontSize: "14px",
-                fontWeight: 600,
-                color: "#333",
-              }}
-            >
-              Add User to Team
+          {/* Invite Section */}
+          <div className="p-4 border border-gray-200 rounded-lg">
+            <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+              <Plus size={18} />
+              Add New Team Member
             </h3>
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div className="flex gap-2">
               <input
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter user email"
-                style={{
-                  flex: 1,
-                  padding: "10px 12px",
-                  border: `1px solid ${COLORS.border}`,
-                  borderRadius: "6px",
-                  background: "#ffffff",
-                  color: "#333",
-                  fontSize: "13px",
-                  boxSizing: "border-box",
-                }}
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="Enter email address"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
               />
               <button
-                onClick={handleAddUser}
-                disabled={addingUser}
-                style={{
-                  padding: "10px 16px",
-                  background: COLORS.primary,
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "6px",
-                  cursor: addingUser ? "not-allowed" : "pointer",
-                  fontSize: "13px",
-                  fontWeight: 500,
-                  opacity: addingUser ? 0.6 : 1,
-                }}
+                onClick={inviteUser}
+                disabled={inviting || !inviteEmail}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
               >
-                {addingUser ? "Adding..." : "Add"}
+                {inviting ? "Sending..." : "Send Invite"}
               </button>
             </div>
-            {error && (
-              <div
-                style={{
-                  color: COLORS.danger,
-                  marginTop: "8px",
-                  fontSize: "12px",
-                }}
-              >
-                {error}
-              </div>
-            )}
+            <p className="text-xs text-gray-500 mt-2">
+              An invitation link will be sent to their email
+            </p>
           </div>
 
-          {/* Team Members List */}
+          {/* Users List */}
           <div>
-            <h3
-              style={{
-                margin: "0 0 12px",
-                fontSize: "14px",
-                fontWeight: 600,
-                color: "#333",
-              }}
-            >
-              Team Members ({team?.members?.length || 0})
+            <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+              <Users size={18} />
+              Team Members ({users.length})
             </h3>
 
             {teamLoading ? (
-              <div
-                style={{
-                  color: COLORS.muted,
-                  textAlign: "center",
-                  padding: "20px",
-                }}
-              >
-                Loading team...
-              </div>
-            ) : team?.members && team.members.length > 0 ? (
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: "8px" }}
-              >
-                {team.members.map((member) => (
+              <p className="text-gray-600">Loading team members...</p>
+            ) : users.length === 0 ? (
+              <p className="text-gray-600">No team members yet</p>
+            ) : (
+              <div className="space-y-2">
+                {users.map((user) => (
                   <div
-                    key={member.id}
-                    style={{
-                      padding: "12px",
-                      background: "#ffffff",
-                      borderRadius: "6px",
-                      border: `1px solid ${COLORS.border}`,
-                    }}
+                    key={user.id}
+                    className="p-4 border border-gray-200 rounded-lg flex items-center justify-between hover:bg-gray-50 transition-colors"
                   >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <div>
-                        <div
-                          style={{
-                            color: "#333",
-                            fontSize: "13px",
-                            fontWeight: 500,
-                          }}
-                        >
-                          {member.user.name}{" "}
-                          {user?.id === member.user.id && (
-                            <span style={{ color: COLORS.primary }}>(You)</span>
-                          )}
-                        </div>
-                        <div style={{ color: COLORS.muted, fontSize: "12px" }}>
-                          {member.user.email}
-                        </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium text-gray-900">
+                          {user.firstName} {user.lastName}
+                        </h4>
+                        <span className="text-xs font-semibold px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                          {user.role}
+                        </span>
                       </div>
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        {editingId === member.id ? (
-                          <>
-                            <select
-                              value={editStatus}
-                              onChange={(e) => setEditStatus(e.target.value)}
-                              style={{
-                                padding: "6px 8px",
-                                background: COLORS.bg,
-                                color: COLORS.text,
-                                border: `1px solid ${COLORS.border}`,
-                                borderRadius: "4px",
-                                fontSize: "12px",
-                              }}
-                            >
-                              <option value="active">Active</option>
-                              <option value="inactive">Inactive</option>
-                            </select>
+                      <p className="text-sm text-gray-600 truncate">
+                        {user.email}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {!user.isVerified && (
+                          <span className="inline-block px-2 py-0.5 bg-amber-50 text-amber-700 rounded">
+                            Pending Approval
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 ml-2">
+                      {currentUser?.role === "OWNER" &&
+                        user.id !== currentUser.id && (
+                          <div className="relative">
                             <button
                               onClick={() =>
-                                handleStatusChange(member.id, editStatus)
+                                setShowRoleDropdown(
+                                  showRoleDropdown === user.id ? null : user.id
+                                )
                               }
-                              style={{
-                                padding: "6px 12px",
-                                background: COLORS.primary,
-                                color: "#fff",
-                                border: "none",
-                                borderRadius: "4px",
-                                cursor: "pointer",
-                                fontSize: "12px",
-                              }}
+                              className="text-sm px-3 py-1 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition-colors whitespace-nowrap"
                             >
-                              Save
+                              Change Role
                             </button>
-                            <button
-                              onClick={() => setEditingId(null)}
-                              style={{
-                                padding: "6px 12px",
-                                background: COLORS.border,
-                                color: COLORS.text,
-                                border: "none",
-                                borderRadius: "4px",
-                                cursor: "pointer",
-                                fontSize: "12px",
-                              }}
-                            >
-                              Cancel
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <span
-                              style={{
-                                padding: "6px 12px",
-                                background:
-                                  member.status === "active"
-                                    ? "transparent"
-                                    : "transparent",
-                                color:
-                                  member.status === "active"
-                                    ? COLORS.success
-                                    : COLORS.muted,
-                                borderRadius: "4px",
-                                fontSize: "12px",
-                                fontWeight: 500,
-                              }}
-                            >
-                              {member.status}
-                            </span>
 
-                            {/* Show Message button if user is not the team owner AND current user is the member */}
-                            {user?.id === member.user.id &&
-                              team?.ownerId !== user.id &&
-                              member.inviter && (
-                                <button
-                                  onClick={() =>
-                                    handleMessageInviter(member.inviter!.id)
-                                  }
-                                  style={{
-                                    padding: "6px 12px",
-                                    background: COLORS.primary,
-                                    color: "#fff",
-                                    border: "none",
-                                    borderRadius: "4px",
-                                    cursor: "pointer",
-                                    fontSize: "12px",
-                                  }}
-                                >
-                                  Message {member.inviter.name.split(" ")[0]}
-                                </button>
-                              )}
-
-                            {/* Show Edit and Remove buttons only if user is team owner */}
-                            {team?.ownerId === user?.id && (
-                              <>
-                                <button
-                                  onClick={() => {
-                                    setEditingId(member.id);
-                                    setEditStatus(member.status);
-                                  }}
-                                  style={{
-                                    padding: "6px 12px",
-                                    background: COLORS.primary,
-                                    color: "#fff",
-                                    border: "none",
-                                    borderRadius: "4px",
-                                    cursor: "pointer",
-                                    fontSize: "12px",
-                                  }}
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={() => handleDeactivate(member.id)}
-                                  style={{
-                                    padding: "6px 12px",
-                                    background: "transparent",
-                                    color: COLORS.danger,
-                                    border: `1px solid ${COLORS.danger}`,
-                                    borderRadius: "4px",
-                                    cursor: "pointer",
-                                    fontSize: "12px",
-                                  }}
-                                >
-                                  Remove
-                                </button>
-                              </>
+                            {showRoleDropdown === user.id && (
+                              <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 w-40">
+                                {ROLES.map((role) => (
+                                  <button
+                                    key={role}
+                                    onClick={() => promoteUser(user.id, role)}
+                                    className="w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors text-sm"
+                                  >
+                                    {role}
+                                  </button>
+                                ))}
+                              </div>
                             )}
-                          </>
+                          </div>
                         )}
-                      </div>
+
+                      {currentUser?.role === "OWNER" &&
+                        user.id !== currentUser.id && (
+                          <button
+                            onClick={() => deleteUser(user.id)}
+                            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title="Delete user"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                     </div>
                   </div>
                 ))}
-              </div>
-            ) : (
-              <div
-                style={{
-                  color: COLORS.muted,
-                  textAlign: "center",
-                  padding: "16px",
-                }}
-              >
-                No team members yet
               </div>
             )}
           </div>

@@ -41,7 +41,8 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         email: true,
-        name: true,
+        firstName: true,
+        lastName: true,
         role: true,
         isVerified: true,
         createdAt: true,
@@ -89,11 +90,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { email, password, name, role } = await request.json();
+    const { email, password, firstName, lastName, role } = await request.json();
 
-    if (!email || !password || !name) {
+    if (!email || !password || !firstName || !lastName) {
       return NextResponse.json(
-        { error: "Email, password, and name are required" },
+        { error: "Email, password, first name, and last name are required" },
         { status: 400 }
       );
     }
@@ -137,14 +138,16 @@ export async function POST(request: NextRequest) {
       data: {
         email: email.toLowerCase(),
         password: hashedPassword,
-        name,
+        firstName,
+        lastName,
         role: userRole,
         isVerified: true, // Admin-created users are auto-verified
       },
       select: {
         id: true,
         email: true,
-        name: true,
+        firstName: true,
+        lastName: true,
         role: true,
         createdAt: true,
       },

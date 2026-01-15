@@ -7,8 +7,10 @@ import { getCurrentUser } from "@/utils/sessionManager";
 
 interface User {
   id: number;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
+  role?: string;
 }
 
 const COLORS = {
@@ -44,7 +46,7 @@ export default function Sidebar() {
   return (
     <aside
       style={{
-        width: collapsed ? 64 : 220,
+        width: collapsed ? 80 : 220,
         background: COLORS.sidebar,
         color: COLORS.text,
         height: "100vh",
@@ -106,7 +108,7 @@ export default function Sidebar() {
           {!collapsed && (
             <div style={{ minWidth: 0 }}>
               <p style={{ margin: 0, fontWeight: 600, fontSize: 13 }}>
-                {user.name || "User"}
+                {`${user.firstName} ${user.lastName}` || "User"}
               </p>
               <p
                 style={{

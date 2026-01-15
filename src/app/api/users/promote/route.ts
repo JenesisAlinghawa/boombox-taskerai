@@ -18,7 +18,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getCurrentUser, canPromoteTo, isValidRole } from "@/lib/auth";
+import { getCurrentUser, canPromoteUsers, isValidRole, canPromoteTo } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,12 +29,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Only OWNER can promote users
-    if (user.role !== "OWNER") {
+    if (!canPromoteUsers(user.role)) {
       return NextResponse.json(
-        {
-          error: "Only Owner can promote users",
-          code: "INSUFFICIENT_ROLE",
-        },
+        { error: "Only OWNER can promote users" },
         { status: 403 }
       );
     }
@@ -51,7 +48,7 @@ export async function POST(request: NextRequest) {
     // Validate role
     if (!isValidRole(newRole)) {
       return NextResponse.json(
-        { error: "Invalid role" },
+        { error: `Invalid role. Must be one of: EMPLOYEE, TEAM_LEAD, MANAGER, CO_OWNER, OWNER` },
         { status: 400 }
       );
     }
@@ -59,7 +56,7 @@ export async function POST(request: NextRequest) {
     // Check if promotion is allowed
     if (!canPromoteTo(user.role, newRole)) {
       return NextResponse.json(
-        { error: "Cannot promote to this role" },
+        { error: "Cannot promote to OWNER role" },
         { status: 403 }
       );
     }
@@ -81,6 +78,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Cannot promote self
+    if (userId === user.id) {
+      return NextResponse.json(
+        { error: "Cannot promote yourself" },
+        { status: 400 }
+      );
+    }
+
     // Update user role
     const updatedUser = await prisma.user.update({
       where: { id: userId },
@@ -88,7 +93,8 @@ export async function POST(request: NextRequest) {
       select: {
         id: true,
         email: true,
-        name: true,
+        firstName: true,
+        lastName: true,
         role: true,
       },
     });

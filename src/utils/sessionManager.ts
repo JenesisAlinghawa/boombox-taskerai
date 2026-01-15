@@ -5,10 +5,14 @@
 
 export interface User {
   id: number;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   isVerified?: boolean;
   role?: "EMPLOYEE" | "TEAM_LEAD" | "MANAGER" | "CO_OWNER" | "OWNER";
+  profilePicture?: string;
+  active?: boolean;
+  lastActive?: Date;
 }
 
 /**

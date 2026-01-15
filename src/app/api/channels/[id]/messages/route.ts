@@ -13,8 +13,8 @@ export async function GET(
     const messages = await prisma.message.findMany({
       where: { channelId },
       include: {
-        user: {
-          select: { id: true, name: true, email: true },
+        sender: {
+          select: { id: true, firstName: true, lastName: true, email: true },
         },
       },
       orderBy: { createdAt: 'asc' },
@@ -49,12 +49,12 @@ export async function POST(req: NextRequest) {
     const message = await prisma.message.create({
       data: {
         channelId,
-        userId,
+        senderId: userId,
         content,
       },
       include: {
-        user: {
-          select: { id: true, name: true, email: true },
+        sender: {
+          select: { id: true, firstName: true, lastName: true, email: true },
         },
       },
     })
@@ -76,11 +76,13 @@ export async function POST(req: NextRequest) {
     for (const member of channelMembers) {
       await prisma.notification.create({
         data: {
-          userId: member.userId,
+          receiverId: member.userId,
           type: 'channel_message',
-          title: `New message in #${channel?.name}`,
-          message: content,
-          relatedId: channelId,
+          data: {
+            title: `New message in #${channel?.name}`,
+            message: content,
+            channelId,
+          },
         },
       })
       try {

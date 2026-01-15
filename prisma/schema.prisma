@@ -25,28 +25,34 @@ enum Role {
 }
 
 model User {
-  id        Int     @id @default(autoincrement())
-  email     String  @unique
-  password  String
-  name      String?
-  role      Role    @default(EMPLOYEE) // Default role for new users
-  isVerified Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  Int       @id @default(autoincrement())
+  email               String    @unique
+  password            String
+  firstName           String
+  lastName            String
+  role                Role      @default(EMPLOYEE)
+  isVerified          Boolean   @default(false)
+  active              Boolean   @default(false)
+  lastActive          DateTime?
+  profilePicture      String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
   
-  createdTasks Task[] @relation("CreatedTasks")
-  assignedTasks Task[] @relation("AssignedTasks")
-  comments  Comment[]
-  channels  ChannelMember[]
-  messages  Message[]
-  sentDirectMessages DirectMessage[] @relation("SentDirectMessages")
+  createdTasks        Task[]    @relation("CreatedTasks")
+  assignedTasks       Task[]    @relation("AssignedTasks")
+  comments            Comment[]
+  channelMembers      ChannelMember[]
+  channelEditors      ChannelEditor[]
+  createdChannels     Channel[] @relation("ChannelCreator")
+  messages            Message[]
+  sentDirectMessages  DirectMessage[] @relation("SentDirectMessages")
   receivedDirectMessages DirectMessage[] @relation("ReceivedDirectMessages")
-  notifications Notification[]
+  notifications       Notification[]
+  logs                Log[]
   
-  // Team management
-  ownedTeams Team[] @relation("TeamOwner")
-  teamMemberships TeamMember[]
-  invitedMembers TeamMember[] @relation("TeamMemberInviter")
+  ownedTeams          Team[]    @relation("TeamOwner")
+  teamMemberships     TeamMember[]
+  invitedMembers      TeamMember[] @relation("TeamMemberInviter")
 }
 
 model Task {
@@ -89,15 +95,19 @@ model Attachment {
 }
 
 model Channel {
-  id        Int      @id @default(autoincrement())
-  name      String
-  description String?
-  isPrivate Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              Int       @id @default(autoincrement())
+  name            String
+  description     String?
+  isPrivate       Boolean   @default(false)
+  creatorId       Int
+  profilePicture  String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  members   ChannelMember[]
-  messages  Message[]
+  creator         User      @relation("ChannelCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  members         ChannelMember[]
+  editors         ChannelEditor[]
+  messages        Message[]
 }
 
 model ChannelMember {
@@ -112,16 +122,36 @@ model ChannelMember {
   @@unique([userId, channelId])
 }
 
-model Message {
+model ChannelEditor {
   id        Int      @id @default(autoincrement())
-  channelId Int
   userId    Int
-  content   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  channelId Int
+  grantedAt DateTime @default(now())
 
-  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channelId])
+}
+
+model Message {
+  id              Int       @id @default(autoincrement())
+  channelId       Int?
+  senderId        Int
+  content         String
+  attachments     String[]
+  reactions       Json[]
+  isEdited        Boolean   @default(false)
+  isDeleted       Boolean   @default(false)
+  parentMessageId Int?
+  createdAt       DateTime  @default(now())
+  editedAt        DateTime?
+  updatedAt       DateTime  @updatedAt
+
+  channel         Channel?  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  sender          User      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  parentMessage   Message?  @relation("MessageReplies", fields: [parentMessageId], references: [id], onDelete: Cascade)
+  replies         Message[] @relation("MessageReplies")
 }
 
 model DirectMessage {
@@ -138,15 +168,24 @@ model DirectMessage {
 
 model Notification {
   id        Int      @id @default(autoincrement())
-  userId    Int
-  type      String   // "channel_message", "direct_message", "mention"
-  title     String
-  message   String
-  isRead    Boolean @default(false)
-  relatedId Int?     // channelId or userId for DM
+  receiverId Int
+  type      String
+  data      Json
+  read      Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  receiver  User     @relation(fields: [receiverId], references: [id], onDelete: Cascade)
+}
+
+model Log {
+  id        Int      @id @default(autoincrement())
+  taskId    Int?
+  userId    Int
+  action    String
+  data      Json?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Team {

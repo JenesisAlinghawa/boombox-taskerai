@@ -12,15 +12,18 @@
     "@google/generative-ai": "^0.24.1",
     "@heroicons/react": "^2.2.0",
     "@prisma/client": "^5.22.0",
+    "@vercel/blob": "^2.0.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
+    "date-fns": "^4.1.0",
     "jsonwebtoken": "^9.0.0",
     "lucide-react": "^0.562.0",
     "next": "^15.4.6",
     "nodemailer": "^6.9.0",
     "prisma": "^5.22.0",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

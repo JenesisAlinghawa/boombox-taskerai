@@ -39,7 +39,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     const comments = await prisma.comment.findMany({ 
       where: { taskId }, 
-      include: { user: { select: { id: true, name: true } } }, 
+      include: { user: { select: { id: true, firstName: true, lastName: true } } }, 
       orderBy: { createdAt: 'asc' } 
     });
     return NextResponse.json({ comments });
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     });
     const full = await prisma.comment.findUnique({ 
       where: { id: comment.id }, 
-      include: { user: { select: { id: true, name: true } } } 
+      include: { user: { select: { id: true, firstName: true, lastName: true } } } 
     });
     return NextResponse.json({ comment: full });
   } catch (error) {
