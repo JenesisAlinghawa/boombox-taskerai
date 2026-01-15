@@ -18,9 +18,13 @@ import {
   BarChart3,
   PieChart,
   MapPin,
+  X,
+  Loader,
 } from "lucide-react";
 import { getCurrentUser } from "@/utils/sessionManager";
 import { ChannelCreationModal } from "@/components/ChannelCreationModal";
+import { MessageBubble } from "@/app/components/MessageBubble";
+import { io, Socket } from "socket.io-client";
 
 interface User {
   id: number;
@@ -46,7 +50,7 @@ interface Message {
   id: number;
   content: string;
   attachments?: string[];
-  reactions?: any[];
+  reactions?: Array<{ emoji: string; userId: number }>;
   isEdited: boolean;
   isDeleted?: boolean;
   parentMessageId?: number;
@@ -65,13 +69,19 @@ export default function MessagesPage() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [dmConversations, setDmConversations] = useState<User[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [filteredMessages, setFilteredMessages] = useState<Message[]>([]);
 
   const [messageInput, setMessageInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [messageSearch, setMessageSearch] = useState("");
+  const [replyingTo, setReplyingTo] = useState<number | null>(null);
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   const [selectedUserTasks, setSelectedUserTasks] = useState<any[]>([]);
   const [selectedUserTaskStats, setSelectedUserTaskStats] = useState({
@@ -84,7 +94,6 @@ export default function MessagesPage() {
   const [loadingUserTasks, setLoadingUserTasks] = useState(false);
   const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
 
-  // Role-based permissions check
   const canViewUserTaskProgress = (currentUserRole: string): boolean => {
     const highRoles = ["ADMIN", "MANAGER", "LEAD"];
     return highRoles.includes(currentUserRole);
@@ -93,6 +102,124 @@ export default function MessagesPage() {
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  // Initialize Socket.io connection
+  useEffect(() => {
+    if (!currentUser) return;
+
+    // Connect to Socket.io server
+    socketRef.current = io(undefined, {
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
+    });
+
+    const socket = socketRef.current;
+
+    socket.on("connect", () => {
+      console.log("Socket.io connected");
+      // Emit user identification
+      socket.emit("user:join", {
+        userId: currentUser.id,
+        userName: `${currentUser.firstName} ${currentUser.lastName}`,
+      });
+    });
+
+    // Listen for new messages from other users
+    socket.on("message:new", (newMessage: Message) => {
+      setMessages((prev) => [...prev, newMessage]);
+    });
+
+    // Listen for edited messages
+    socket.on("message:edited", (editedMessage: Message) => {
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === editedMessage.id ? editedMessage : msg))
+      );
+    });
+
+    // Listen for deleted messages
+    socket.on("message:deleted", (messageId: number) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId ? { ...msg, isDeleted: true } : msg
+        )
+      );
+    });
+
+    // Listen for reactions
+    socket.on(
+      "message:reaction",
+      (data: { messageId: number; emoji: string; userId: number }) => {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === data.messageId
+              ? {
+                  ...msg,
+                  reactions: [
+                    ...(msg.reactions || []),
+                    { emoji: data.emoji, userId: data.userId },
+                  ],
+                }
+              : msg
+          )
+        );
+      }
+    );
+
+    socket.on("disconnect", () => {
+      console.log("Socket.io disconnected");
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (selectedChannel) {
+      fetchChannelMessages();
+      setSelectedUserTasks([]);
+      setSelectedUserTaskStats({
+        todo: 0,
+        inProgress: 0,
+        stuck: 0,
+        done: 0,
+        total: 0,
+      });
+    } else if (selectedDMUser) {
+      fetchDMMessages();
+      if (currentUser && canViewUserTaskProgress(currentUser.role)) {
+        fetchUserTaskProgress(selectedDMUser);
+      } else {
+        setSelectedUserTasks([]);
+        setSelectedUserTaskStats({
+          todo: 0,
+          inProgress: 0,
+          stuck: 0,
+          done: 0,
+          total: 0,
+        });
+      }
+    }
+  }, [selectedChannel, selectedDMUser, currentUser]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, filteredMessages]);
+
+  useEffect(() => {
+    if (!messageSearch.trim()) {
+      setFilteredMessages(messages);
+    } else {
+      const query = messageSearch.toLowerCase();
+      setFilteredMessages(
+        messages.filter(
+          (msg) => msg.content.toLowerCase().includes(query) && !msg.isDeleted
+        )
+      );
+    }
+  }, [messages, messageSearch]);
 
   const createChannel = async (data: {
     name: string;
@@ -132,39 +259,6 @@ export default function MessagesPage() {
     }
   };
 
-  useEffect(() => {
-    if (selectedChannel) {
-      fetchChannelMessages();
-      setSelectedUserTasks([]);
-      setSelectedUserTaskStats({
-        todo: 0,
-        inProgress: 0,
-        stuck: 0,
-        done: 0,
-        total: 0,
-      });
-    } else if (selectedDMUser) {
-      fetchDMMessages();
-      // Load task progress for the selected user if current user has permission
-      if (currentUser && canViewUserTaskProgress(currentUser.role)) {
-        fetchUserTaskProgress(selectedDMUser);
-      } else {
-        setSelectedUserTasks([]);
-        setSelectedUserTaskStats({
-          todo: 0,
-          inProgress: 0,
-          stuck: 0,
-          done: 0,
-          total: 0,
-        });
-      }
-    }
-  }, [selectedChannel, selectedDMUser, currentUser]);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
   const loadInitialData = async () => {
     try {
       const user = await getCurrentUser();
@@ -174,7 +268,6 @@ export default function MessagesPage() {
       }
       setCurrentUser(user as User);
 
-      // Fetch channels for the current user
       const channelsRes = await fetch(
         `/api/channels?userId=${(user as any).id}`
       );
@@ -183,7 +276,6 @@ export default function MessagesPage() {
         setChannels(data.channels || []);
       }
 
-      // Fetch DM conversations
       const dmsRes = await fetch("/api/direct-messages");
       if (dmsRes.ok) {
         const data = await dmsRes.json();
@@ -233,7 +325,6 @@ export default function MessagesPage() {
 
     setLoadingUserTasks(true);
     try {
-      // Fetch tasks for this specific user
       const res = await fetch(`/api/tasks?userId=${user.id}`, {
         headers: {
           "x-user-id": String(currentUser.id),
@@ -244,7 +335,6 @@ export default function MessagesPage() {
         const data = await res.json();
         const taskList = Array.isArray(data?.tasks) ? data.tasks : [];
 
-        // Filter tasks assigned to or created by the selected user
         const userTasks = taskList.filter(
           (t: any) => t.assigneeId === user.id || t.createdById === user.id
         );
@@ -271,6 +361,7 @@ export default function MessagesPage() {
   const sendMessage = async () => {
     if (!messageInput.trim()) return;
 
+    setSendingMessage(true);
     try {
       if (selectedChannel && currentUser) {
         const res = await fetch(
@@ -282,21 +373,37 @@ export default function MessagesPage() {
               channelId: selectedChannel.id,
               content: messageInput,
               userId: currentUser.id,
+              parentMessageId: replyingTo || undefined,
             }),
           }
         );
 
         if (!res.ok) {
           const errorData = await res.json();
-          setError(errorData.error || "Failed to send message");
-          console.error("Send message error:", errorData);
+          const errorMsg =
+            errorData.details || errorData.error || "Failed to send message";
+          console.error("Channel message API error:", errorMsg);
+          setError(errorMsg);
+          setSendingMessage(false);
           return;
         }
 
         const data = await res.json();
-        setMessages([...messages, data.message]);
+        const newMessage = data.message;
+        setMessages([...messages, newMessage]);
+
+        // Emit real-time event to other clients
+        if (socketRef.current) {
+          socketRef.current.emit("message:send", {
+            channelId: selectedChannel.id,
+            message: newMessage,
+          });
+        }
+
         setMessageInput("");
+        setReplyingTo(null);
         setError("");
+        setSendingMessage(false);
       } else if (selectedDMUser && currentUser) {
         const res = await fetch("/api/direct-messages/send", {
           method: "POST",
@@ -305,24 +412,139 @@ export default function MessagesPage() {
             recipientId: selectedDMUser.id,
             content: messageInput,
             senderId: currentUser.id,
+            parentMessageId: replyingTo || undefined,
           }),
         });
 
         if (!res.ok) {
           const errorData = await res.json();
-          setError(errorData.error || "Failed to send message");
-          console.error("Send DM error:", errorData);
+          const errorMsg =
+            errorData.details || errorData.error || "Failed to send message";
+          console.error("DM API error:", errorMsg);
+          setError(errorMsg);
+          setSendingMessage(false);
           return;
         }
 
         const data = await res.json();
-        setMessages([...messages, data.message]);
+        const newMessage = data.message;
+        setMessages([...messages, newMessage]);
+
+        // Emit real-time event
+        if (socketRef.current) {
+          socketRef.current.emit("message:send", {
+            recipientId: selectedDMUser.id,
+            message: newMessage,
+          });
+        }
+
         setMessageInput("");
+        setReplyingTo(null);
         setError("");
       }
     } catch (err) {
       console.error("Error sending message:", err);
       setError("Failed to send message");
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
+  const handleEditMessage = async (messageId: number, newContent: string) => {
+    if (!newContent.trim()) return;
+
+    try {
+      const res = await fetch(`/api/messages/${messageId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: newContent }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to edit message");
+      }
+
+      const updatedMessages = messages.map((msg) =>
+        msg.id === messageId
+          ? { ...msg, content: newContent, isEdited: true }
+          : msg
+      );
+      setMessages(updatedMessages);
+
+      // Emit real-time event
+      if (socketRef.current) {
+        socketRef.current.emit("message:edit", {
+          messageId,
+          content: newContent,
+        });
+      }
+    } catch (err) {
+      console.error("Error editing message:", err);
+      setError("Failed to edit message");
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: number) => {
+    try {
+      const res = await fetch(`/api/messages/${messageId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to delete message");
+      }
+
+      const updatedMessages = messages.map((msg) =>
+        msg.id === messageId ? { ...msg, isDeleted: true } : msg
+      );
+      setMessages(updatedMessages);
+
+      // Emit real-time event
+      if (socketRef.current) {
+        socketRef.current.emit("message:delete", { messageId });
+      }
+    } catch (err) {
+      console.error("Error deleting message:", err);
+      setError("Failed to delete message");
+    }
+  };
+
+  const handleAddReaction = async (messageId: number, emoji: string) => {
+    if (!currentUser) return;
+
+    try {
+      const res = await fetch(`/api/messages/${messageId}/react`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reaction: emoji }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to add reaction");
+      }
+
+      const updatedMessages = messages.map((msg) =>
+        msg.id === messageId
+          ? {
+              ...msg,
+              reactions: [
+                ...(msg.reactions || []),
+                { emoji, userId: currentUser.id },
+              ],
+            }
+          : msg
+      );
+      setMessages(updatedMessages);
+
+      // Emit real-time event
+      if (socketRef.current) {
+        socketRef.current.emit("message:reaction", {
+          messageId,
+          emoji,
+        });
+      }
+    } catch (err) {
+      console.error("Error adding reaction:", err);
     }
   };
 
@@ -353,6 +575,10 @@ export default function MessagesPage() {
       .includes(searchQuery.toLowerCase())
   );
 
+  const getReplyingToMessage = (): Message | undefined => {
+    return messages.find((msg) => msg.id === replyingTo);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -368,6 +594,20 @@ export default function MessagesPage() {
         {/* Header */}
         <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
           <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
+        </div>
+
+        {/* Search Bar */}
+        <div className="px-4 py-3 border-b border-gray-200">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-3 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search chats..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm"
+            />
+          </div>
         </div>
 
         {/* Scrollable Content */}
@@ -391,6 +631,7 @@ export default function MessagesPage() {
                     onClick={() => {
                       setSelectedChannel(channel);
                       setSelectedDMUser(null);
+                      setMessageSearch("");
                     }}
                     className={`w-full text-left px-3 py-2.5 rounded-lg transition-all text-sm flex items-center gap-2 font-medium ${
                       selectedChannel?.id === channel.id
@@ -423,6 +664,7 @@ export default function MessagesPage() {
                     onClick={() => {
                       setSelectedDMUser(user);
                       setSelectedChannel(null);
+                      setMessageSearch("");
                     }}
                     className={`w-full text-left px-3 py-2.5 rounded-lg transition-all flex items-center gap-3 ${
                       selectedDMUser?.id === user.id
@@ -503,103 +745,103 @@ export default function MessagesPage() {
               </div>
             </div>
 
-            {/* Messages Container */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50">
-              {messages.length === 0 ? (
+            {/* Message Search Bar */}
+            <div className="px-6 py-3 border-b border-gray-200 bg-gray-50">
+              <div className="relative">
+                <Search
+                  size={16}
+                  className="absolute left-3 top-3 text-gray-400"
+                />
+                <input
+                  type="text"
+                  placeholder="Search messages..."
+                  value={messageSearch}
+                  onChange={(e) => setMessageSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Messages Container - Using flex-col-reverse for scroll-to-bottom */}
+            <div
+              ref={messagesContainerRef}
+              className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50 flex flex-col-reverse"
+            >
+              <div ref={messagesEndRef} />
+              {filteredMessages.length === 0 ? (
                 <div className="flex items-center justify-center h-full">
-                  <p className="text-gray-500 text-center">
-                    <p className="text-lg font-medium mb-2">No messages yet</p>
+                  <div className="text-gray-500 text-center">
+                    <p className="text-lg font-medium mb-2">
+                      {messageSearch
+                        ? "No messages match your search"
+                        : "No messages yet"}
+                    </p>
                     <p className="text-sm">Start the conversation!</p>
-                  </p>
+                  </div>
                 </div>
               ) : (
-                messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex gap-3 ${
-                      msg.sender.id === currentUser?.id
-                        ? "justify-end"
-                        : "justify-start"
-                    }`}
-                  >
-                    {msg.sender.id !== currentUser?.id && (
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 shadow-sm">
-                        {msg.sender.profilePicture ? (
-                          <img
-                            src={msg.sender.profilePicture}
-                            alt={msg.sender.firstName}
-                            className="w-full h-full rounded-full object-cover"
-                          />
-                        ) : (
-                          `${msg.sender.firstName[0]}${msg.sender.lastName[0]}`
-                        )}
+                [...filteredMessages].reverse().map((msg) => (
+                  <div key={msg.id}>
+                    {msg.parentMessageId && (
+                      <div className="text-xs text-gray-600 italic mb-2 px-3">
+                        <Reply size={12} className="inline mr-1" />
+                        {messages
+                          .find((m) => m.id === msg.parentMessageId)
+                          ?.content.slice(0, 40)}
+                        ...
                       </div>
                     )}
-                    <div
-                      className={`max-w-xs ${
-                        msg.sender.id === currentUser?.id
-                          ? "items-end"
-                          : "items-start"
-                      } flex flex-col`}
-                    >
-                      {msg.sender.id !== currentUser?.id && (
-                        <p className="text-xs font-semibold text-gray-700 mb-1 px-3">
-                          {msg.sender.firstName}
-                        </p>
-                      )}
-                      <div
-                        className={`px-4 py-2.5 rounded-2xl shadow-sm border ${
-                          msg.sender.id === currentUser?.id
-                            ? "bg-blue-600 text-white rounded-br-none border-blue-600"
-                            : "bg-white text-gray-900 rounded-bl-none border-gray-200"
-                        }`}
-                      >
-                        <p className="text-sm font-medium break-words">
-                          {msg.content}
-                        </p>
-                      </div>
-                      <p
-                        className={`text-xs mt-1.5 px-3 ${
-                          msg.sender.id === currentUser?.id
-                            ? "text-gray-600"
-                            : "text-gray-600"
-                        }`}
-                      >
-                        {new Date(msg.createdAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                        {msg.isEdited && " (edited)"}
-                      </p>
-                    </div>
-                    {msg.sender.id === currentUser?.id && (
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 shadow-sm">
-                        {msg.sender.profilePicture ? (
-                          <img
-                            src={msg.sender.profilePicture}
-                            alt={msg.sender.firstName}
-                            className="w-full h-full rounded-full object-cover"
-                          />
-                        ) : (
-                          `${msg.sender.firstName[0]}${msg.sender.lastName[0]}`
-                        )}
-                      </div>
-                    )}
+                    <MessageBubble
+                      message={msg}
+                      isCurrentUser={msg.sender.id === currentUser?.id}
+                      onEdit={handleEditMessage}
+                      onDelete={handleDeleteMessage}
+                      onReply={(msgId: number) => setReplyingTo(msgId)}
+                      onAddReaction={handleAddReaction}
+                      currentUserId={currentUser?.id || 0}
+                    />
                   </div>
                 ))
               )}
-              <div ref={messagesEndRef} />
             </div>
 
+            {/* Reply Context */}
+            {replyingTo && getReplyingToMessage() && (
+              <div className="px-6 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Reply size={16} className="text-blue-600" />
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-gray-700">
+                      Replying to {getReplyingToMessage()?.sender.firstName}
+                    </p>
+                    <p className="text-sm text-gray-600 truncate">
+                      {getReplyingToMessage()?.content}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setReplyingTo(null)}
+                  className="p-1 hover:bg-blue-100 rounded transition-colors"
+                >
+                  <X size={16} className="text-gray-600" />
+                </button>
+              </div>
+            )}
+
             {/* Message Input */}
-            <div className="border-t border-gray-300 px-6 py-4 bg-white flex items-center gap-3 shadow-sm rounded-b-xl">
-              <button className="p-2.5 hover:bg-gray-100 rounded-xl transition-colors text-gray-600">
+            <div className="border-t border-gray-300 px-6 py-4 bg-white flex items-end gap-3 shadow-sm rounded-b-xl">
+              <button className="p-2.5 hover:bg-gray-100 rounded-xl transition-colors text-gray-600 flex-shrink-0">
                 <Paperclip size={20} />
               </button>
-              <input
-                type="text"
+              <textarea
                 value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
+                onChange={(e) => {
+                  setMessageInput(e.target.value);
+                  // Auto-grow textarea height based on content
+                  e.target.style.height = "auto";
+                  const newHeight = Math.min(e.target.scrollHeight, 150);
+                  e.target.style.height = newHeight + "px";
+                }}
                 onKeyPress={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -607,33 +849,45 @@ export default function MessagesPage() {
                   }
                 }}
                 placeholder="Type your message..."
-                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm text-gray-900 placeholder-gray-500"
+                disabled={sendingMessage}
+                rows={1}
+                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm text-gray-900 placeholder-gray-500 disabled:opacity-50 resize-none overflow-hidden"
               />
               <button
                 onClick={sendMessage}
-                className="px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all text-sm font-medium flex items-center gap-2 shadow-sm hover:shadow-md"
+                disabled={sendingMessage || !messageInput.trim()}
+                className="px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all text-sm font-medium flex items-center gap-2 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Send
-                <Send size={16} />
+                {sendingMessage ? (
+                  <>
+                    <Loader size={16} className="animate-spin" />
+                    Sending
+                  </>
+                ) : (
+                  <>
+                    Send
+                    <Send size={16} />
+                  </>
+                )}
               </button>
             </div>
           </>
         ) : (
           <div className="flex items-center justify-center h-full">
-            <p className="text-gray-600 text-center">
+            <div className="text-gray-600 text-center">
               <p className="text-lg font-medium mb-2">Select a conversation</p>
               <p className="text-sm text-gray-500">
                 Choose a channel or direct message to start
               </p>
-            </p>
+            </div>
           </div>
         )}
       </div>
 
-      {/* RIGHT SIDEBAR - Conversation/Channel Profile & Stats */}
+      {/* RIGHT SIDEBAR - Conversation/Channel Profile */}
       {(selectedChannel || selectedDMUser) && currentUser && (
         <div className="w-80 bg-white border border-gray-300 rounded-xl flex flex-col shadow-lg overflow-hidden">
-          {/* Selected User/Channel Profile */}
+          {/* Profile Section */}
           <div className="p-6 border-b border-gray-300 bg-gradient-to-b from-blue-50 to-white">
             <h3 className="text-sm font-bold text-gray-900 mb-6">
               {selectedDMUser ? "User Profile" : "Channel Info"}
@@ -699,7 +953,7 @@ export default function MessagesPage() {
             </div>
           </div>
 
-          {/* Task Progress - Only show for DM with permission */}
+          {/* Task Progress */}
           {selectedDMUser && canViewUserTaskProgress(currentUser.role) && (
             <div className="p-6 border-b border-gray-300 bg-white overflow-y-auto flex-1">
               <h3 className="text-sm font-bold text-gray-900 mb-6">
@@ -806,6 +1060,22 @@ export default function MessagesPage() {
           )}
         </div>
       )}
+
+      {/* Error Toast */}
+      {error && (
+        <div className="fixed bottom-4 right-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 shadow-lg z-50">
+          <AlertCircle size={20} className="text-red-600 flex-shrink-0" />
+          <p className="text-red-800 text-sm">{error}</p>
+        </div>
+      )}
+
+      {/* Channel Creation Modal */}
+      <ChannelCreationModal
+        isOpen={isChannelModalOpen}
+        onClose={() => setIsChannelModalOpen(false)}
+        onSubmit={createChannel}
+        currentUserId={currentUser?.id || 0}
+      />
     </div>
   );
 }

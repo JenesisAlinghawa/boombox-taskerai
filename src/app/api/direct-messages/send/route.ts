@@ -35,7 +35,14 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, message })
   } catch (error: any) {
-    console.error('Send DM error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('Send DM error:', error.message || error)
+    console.error('Full error:', JSON.stringify(error, null, 2))
+    return NextResponse.json(
+      { 
+        error: 'Internal server error',
+        details: error.message || error.toString()
+      }, 
+      { status: 500 }
+    )
   }
 }
