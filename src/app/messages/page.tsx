@@ -390,6 +390,7 @@ export default function MessagesPage() {
 
     setSendingMessage(true);
     try {
+      // Send regular message (channel or DM)
       if (selectedChannel && currentUser) {
         const res = await fetch(
           `/api/channels/${selectedChannel.id}/messages`,
