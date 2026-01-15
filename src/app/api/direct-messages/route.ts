@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ messages });
     } else {
       // Get list of DM conversations
+      // First, get users from existing conversations
       const conversations = await prisma.directMessage.findMany({
         where: {
           OR: [
@@ -89,7 +90,7 @@ export async function GET(request: NextRequest) {
         distinct: ["senderId", "recipientId"],
       });
 
-      // Deduplicate and map conversations
+      // Deduplicate conversations
       const uniqueConversations = new Map();
       conversations.forEach((conv) => {
         const otherUserId = conv.senderId === user.id ? conv.recipientId : conv.senderId;
@@ -100,8 +101,36 @@ export async function GET(request: NextRequest) {
         }
       });
 
+      // Also get all active users that haven't been messaged yet
+      const allActiveUsers = await prisma.user.findMany({
+        where: {
+          AND: [
+            { id: { not: user.id } }, // Exclude current user
+            { active: true }, // Only active users
+          ],
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          profilePicture: true,
+          active: true,
+          lastActive: true,
+        },
+        orderBy: { firstName: "asc" },
+      });
+
+      // Merge: conversations (with most recent first) + new users (alphabetically)
+      const conversationUsers = Array.from(uniqueConversations.values());
+      const newUsers = allActiveUsers.filter(
+        (u) => !uniqueConversations.has(u.id)
+      );
+
+      const allUsers = [...conversationUsers, ...newUsers];
+
       return NextResponse.json({
-        conversations: Array.from(uniqueConversations.values()),
+        conversations: allUsers,
       });
     }
   } catch (error) {

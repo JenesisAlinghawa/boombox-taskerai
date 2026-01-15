@@ -80,7 +80,12 @@ export default function NotificationsPage() {
       }
 
       // Navigate based on notification type
-      if (notification.relatedType === "task" && notification.relatedId) {
+      if (notification.type === "new_user_registration") {
+        router.push("/settings?tab=team");
+      } else if (
+        notification.relatedType === "task" &&
+        notification.relatedId
+      ) {
         router.push(`/dashboard/tasks`);
       } else if (
         notification.relatedType === "channel" &&
@@ -91,7 +96,7 @@ export default function NotificationsPage() {
         router.push("/dashboard");
       }
     } catch (err) {
-      console.error("Failed to mark notification as read:", err);
+      console.error("Failed to handle notification click:", err);
     }
   };
 
@@ -105,6 +110,8 @@ export default function NotificationsPage() {
         return "🎉";
       case "task_deadline":
         return "⏰";
+      case "new_user_registration":
+        return "👤";
       default:
         return "📢";
     }
@@ -120,6 +127,8 @@ export default function NotificationsPage() {
         return "#f59e0b"; // amber
       case "task_deadline":
         return "#ef4444"; // red
+      case "new_user_registration":
+        return "#8b5cf6"; // purple
       default:
         return "#6366f1"; // indigo
     }
@@ -276,35 +285,66 @@ export default function NotificationsPage() {
                   />
                 )}
 
-                {/* Delete button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(notification.id);
-                  }}
-                  style={{
-                    background: "rgba(239, 68, 68, 0.2)",
-                    color: "#ef4444",
-                    border: "1px solid rgba(239, 68, 68, 0.3)",
-                    borderRadius: "6px",
-                    padding: "6px 12px",
-                    fontSize: "12px",
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                    flexShrink: 0,
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.background =
-                      "rgba(239, 68, 68, 0.3)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.background =
-                      "rgba(239, 68, 68, 0.2)";
-                  }}
-                >
-                  Delete
-                </button>
+                {/* Action buttons */}
+                {notification.type === "new_user_registration" ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(notification.id);
+                    }}
+                    style={{
+                      background: "rgba(100, 116, 139, 0.2)",
+                      color: "#64748b",
+                      border: "1px solid rgba(100, 116, 139, 0.3)",
+                      borderRadius: "6px",
+                      padding: "6px 12px",
+                      fontSize: "12px",
+                      fontWeight: 500,
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                      flexShrink: 0,
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.background =
+                        "rgba(100, 116, 139, 0.3)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.background =
+                        "rgba(100, 116, 139, 0.2)";
+                    }}
+                  >
+                    Dismiss
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(notification.id);
+                    }}
+                    style={{
+                      background: "rgba(239, 68, 68, 0.2)",
+                      color: "#ef4444",
+                      border: "1px solid rgba(239, 68, 68, 0.3)",
+                      borderRadius: "6px",
+                      padding: "6px 12px",
+                      fontSize: "12px",
+                      fontWeight: 500,
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                      flexShrink: 0,
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.background =
+                        "rgba(239, 68, 68, 0.3)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.background =
+                        "rgba(239, 68, 68, 0.2)";
+                    }}
+                  >
+                    Delete
+                  </button>
+                )}
               </div>
             ))}
           </div>

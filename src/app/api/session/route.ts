@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     // Fetch user session data including role
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, firstName: true, lastName: true, email: true, isVerified: true, role: true },
+      select: { id: true, firstName: true, lastName: true, email: true, isVerified: true, role: true, profilePicture: true, active: true, lastActive: true },
     })
 
     if (!user) {

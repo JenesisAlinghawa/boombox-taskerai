@@ -1,7 +1,7 @@
 // app/ClientLayout.tsx
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { SidePanel } from "@/app/components/sidebar/SidePanel";
 
@@ -11,6 +11,25 @@ export default function ClientLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+
+  // Initialize cleanup routine on app start
+  useEffect(() => {
+    const initCleanup = async () => {
+      try {
+        // Only initialize once on app start
+        const response = await fetch("/api/system/cleanup-init", {
+          method: "POST",
+        });
+        if (response.ok) {
+          console.log("[ClientLayout] Cleanup routine initialized");
+        }
+      } catch (error) {
+        console.error("[ClientLayout] Failed to initialize cleanup:", error);
+      }
+    };
+
+    initCleanup();
+  }, []); // Empty dependency array = run once on mount
 
   // List all auth routes — add more if you create them later
   const isAuthPage =

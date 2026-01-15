@@ -93,6 +93,9 @@ export default function MessagesPage() {
   });
   const [loadingUserTasks, setLoadingUserTasks] = useState(false);
   const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
+  const [editingChannelId, setEditingChannelId] = useState<number | null>(null);
+  const [editingChannelName, setEditingChannelName] = useState("");
+  const [editingChannelDesc, setEditingChannelDesc] = useState("");
 
   const canViewUserTaskProgress = (currentUserRole: string): boolean => {
     const highRoles = ["ADMIN", "MANAGER", "LEAD"];
@@ -201,6 +204,9 @@ export default function MessagesPage() {
           total: 0,
         });
       }
+    } else {
+      // Clear messages when nothing is selected
+      setMessages([]);
     }
   }, [selectedChannel, selectedDMUser, currentUser]);
 
@@ -269,14 +275,23 @@ export default function MessagesPage() {
       setCurrentUser(user as User);
 
       const channelsRes = await fetch(
-        `/api/channels?userId=${(user as any).id}`
+        `/api/channels?userId=${(user as any).id}`,
+        {
+          headers: {
+            "x-user-id": String((user as any).id),
+          },
+        }
       );
       if (channelsRes.ok) {
         const data = await channelsRes.json();
         setChannels(data.channels || []);
       }
 
-      const dmsRes = await fetch("/api/direct-messages");
+      const dmsRes = await fetch("/api/direct-messages", {
+        headers: {
+          "x-user-id": String((user as any).id),
+        },
+      });
       if (dmsRes.ok) {
         const data = await dmsRes.json();
         setDmConversations(data.conversations || []);
@@ -289,10 +304,16 @@ export default function MessagesPage() {
   };
 
   const fetchChannelMessages = async () => {
-    if (!selectedChannel) return;
+    if (!selectedChannel || !currentUser) return;
     try {
+      setMessages([]); // Clear messages while loading
       const res = await fetch(
-        `/api/messages?channelId=${selectedChannel.id}&limit=100`
+        `/api/messages?channelId=${selectedChannel.id}&limit=100`,
+        {
+          headers: {
+            "x-user-id": String(currentUser.id),
+          },
+        }
       );
       if (res.ok) {
         const data = await res.json();
@@ -306,8 +327,14 @@ export default function MessagesPage() {
   const fetchDMMessages = async () => {
     if (!selectedDMUser || !currentUser) return;
     try {
+      setMessages([]); // Clear messages while loading
       const res = await fetch(
-        `/api/direct-messages?userId=${selectedDMUser.id}`
+        `/api/direct-messages?userId=${selectedDMUser.id}`,
+        {
+          headers: {
+            "x-user-id": String(currentUser.id),
+          },
+        }
       );
       if (res.ok) {
         const data = await res.json();
@@ -407,11 +434,13 @@ export default function MessagesPage() {
       } else if (selectedDMUser && currentUser) {
         const res = await fetch("/api/direct-messages/send", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-id": String(currentUser.id),
+          },
           body: JSON.stringify({
             recipientId: selectedDMUser.id,
             content: messageInput,
-            senderId: currentUser.id,
             parentMessageId: replyingTo || undefined,
           }),
         });
@@ -563,6 +592,62 @@ export default function MessagesPage() {
       return `${Math.floor(minutes / 60)}h ago`;
     }
     return "Offline";
+  };
+
+  const handleEditChannel = async (
+    channelId: number,
+    newName: string,
+    newDesc: string
+  ) => {
+    if (!newName.trim()) return;
+    try {
+      const res = await fetch(`/api/channels/${channelId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": String(currentUser?.id),
+        },
+        body: JSON.stringify({ name: newName, description: newDesc }),
+      });
+      if (res.ok) {
+        setChannels(
+          channels.map((ch) =>
+            ch.id === channelId
+              ? { ...ch, name: newName, description: newDesc }
+              : ch
+          )
+        );
+        if (selectedChannel?.id === channelId) {
+          setSelectedChannel({
+            ...selectedChannel,
+            name: newName,
+            description: newDesc,
+          });
+        }
+        setEditingChannelId(null);
+      }
+    } catch (err) {
+      console.error("Error editing channel:", err);
+    }
+  };
+
+  const handleDeleteChannel = async (channelId: number) => {
+    if (!confirm("Are you sure you want to delete this channel?")) return;
+    try {
+      const res = await fetch(`/api/channels/${channelId}`, {
+        method: "DELETE",
+        headers: {
+          "x-user-id": String(currentUser?.id),
+        },
+      });
+      if (res.ok) {
+        setChannels(channels.filter((ch) => ch.id !== channelId));
+        setSelectedChannel(null);
+        setMessages([]);
+      }
+    } catch (err) {
+      console.error("Error deleting channel:", err);
+    }
   };
 
   const filteredChannels = channels.filter((ch) =>
@@ -743,7 +828,72 @@ export default function MessagesPage() {
                   </>
                 )}
               </div>
+
+              {/* Channel Edit/Delete Buttons */}
+              {selectedChannel &&
+                currentUser?.id === selectedChannel.creatorId && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setEditingChannelId(selectedChannel.id);
+                        setEditingChannelName(selectedChannel.name);
+                        setEditingChannelDesc(
+                          selectedChannel.description || ""
+                        );
+                      }}
+                      className="p-2 text-gray-600 hover:bg-blue-100 rounded-lg transition-colors"
+                      title="Edit channel"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteChannel(selectedChannel.id)}
+                      className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                      title="Delete channel"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                )}
             </div>
+
+            {/* Channel Edit Modal */}
+            {editingChannelId === selectedChannel?.id && (
+              <div className="px-6 py-3 bg-blue-50 border-b border-blue-200 flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={editingChannelName}
+                  onChange={(e) => setEditingChannelName(e.target.value)}
+                  placeholder="Channel name"
+                  className="flex-1 px-3 py-1.5 border border-blue-300 rounded text-sm focus:ring-2 focus:ring-blue-600"
+                />
+                <input
+                  type="text"
+                  value={editingChannelDesc}
+                  onChange={(e) => setEditingChannelDesc(e.target.value)}
+                  placeholder="Description"
+                  className="flex-1 px-3 py-1.5 border border-blue-300 rounded text-sm focus:ring-2 focus:ring-blue-600"
+                />
+                <button
+                  onClick={() =>
+                    handleEditChannel(
+                      selectedChannel!.id,
+                      editingChannelName,
+                      editingChannelDesc
+                    )
+                  }
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setEditingChannelId(null)}
+                  className="px-3 py-1.5 bg-gray-300 text-gray-800 rounded text-sm hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
 
             {/* Message Search Bar */}
             <div className="px-6 py-3 border-b border-gray-200 bg-gray-50">

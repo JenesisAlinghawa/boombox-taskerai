@@ -44,6 +44,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check if account is active (approved by owner)
+    if (!user.active) {
+      return NextResponse.json(
+        { error: 'Your account is pending approval from an administrator. Please wait for approval.' },
+        { status: 403 }
+      )
+    }
+
     // Return user data without password
     const { password: _, ...userWithoutPassword } = user
     return NextResponse.json({

@@ -114,19 +114,19 @@ export default function TasksPage() {
 
   useEffect(() => {
     if (!currentUser) return;
-    fetch("/api/teams", {
+    // Fetch all active users for task assignment instead of just team members
+    fetch("/api/users", {
       headers: {
         "x-user-id": String(currentUser.id),
       },
     })
       .then((r) => r.json())
       .then((d) => {
-        // Extract team members and add the current user
-        const members = d?.team?.members?.map((m: any) => m.user) || [];
-        const userList = Array.from(
-          new Map([...members, currentUser].map((u) => [u.id, u])).values()
+        // Filter to only active users (exclude inactive/pending approval)
+        const activeUsers = (d?.users || []).filter(
+          (u: User) => u.active !== false
         );
-        setUsers(userList);
+        setUsers(activeUsers);
       })
       .catch(console.error);
   }, [currentUser]);

@@ -1,7 +1,7 @@
 /**
  * Approve User API
  * 
- * Endpoint to approve a pending user (set isVerified=true)
+ * Endpoint to approve a pending user (set active=true)
  * Only OWNER can access this endpoint
  * 
  * POST /api/users/[id]/approve
@@ -32,7 +32,7 @@ export async function POST(
 
     const userId = parseInt(id, 10);
 
-    // Find and verify the user exists and is unverified
+    // Find and verify the user exists
     const targetUser = await prisma.user.findUnique({
       where: { id: userId },
     });
@@ -41,9 +41,10 @@ export async function POST(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    if (targetUser.isVerified) {
+    // Check if already approved
+    if (targetUser.active) {
       return NextResponse.json(
-        { error: "User is already verified" },
+        { error: "User is already approved" },
         { status: 400 }
       );
     }
@@ -51,7 +52,9 @@ export async function POST(
     // Approve the user
     const approvedUser = await prisma.user.update({
       where: { id: userId },
-      data: { isVerified: true },
+      data: { 
+        active: true, // Activate the account
+      },
       select: {
         id: true,
         email: true,
@@ -59,6 +62,7 @@ export async function POST(
         lastName: true,
         role: true,
         isVerified: true,
+        active: true,
       },
     });
 

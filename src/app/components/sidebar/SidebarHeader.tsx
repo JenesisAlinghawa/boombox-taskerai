@@ -8,6 +8,7 @@ interface User {
   lastName: string;
   email: string;
   role?: string;
+  profilePicture?: string;
 }
 
 interface SidebarHeaderProps {
@@ -23,8 +24,6 @@ const SidebarHeaderComponent = ({
   const loadedRef = useRef(false);
 
   useEffect(() => {
-    if (loadedRef.current) return; // Only load once
-
     const loadUser = async () => {
       try {
         const userData = await getCurrentUser();
@@ -36,7 +35,27 @@ const SidebarHeaderComponent = ({
         console.error("Failed to load user data", e);
       }
     };
+
     loadUser();
+
+    // Listen for storage changes (when profile is updated in another tab or same tab)
+    const handleStorageChange = () => {
+      loadUser();
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+
+    // Also listen for custom event when profile is updated
+    const handleProfileUpdate = () => {
+      loadUser();
+    };
+
+    window.addEventListener("profileUpdated", handleProfileUpdate);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("profileUpdated", handleProfileUpdate);
+    };
   }, []);
 
   return (
@@ -121,9 +140,22 @@ const SidebarHeaderComponent = ({
               justifyContent: "center",
               fontSize: 24,
               flexShrink: 0,
+              overflow: "hidden",
             }}
           >
-            👤
+            {user.profilePicture ? (
+              <img
+                src={user.profilePicture}
+                alt={`${user.firstName} ${user.lastName}`}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                }}
+              />
+            ) : (
+              `${user.firstName[0]}${user.lastName[0]}`
+            )}
           </div>
           {!collapsed && (
             <div style={{ width: "100%" }}>

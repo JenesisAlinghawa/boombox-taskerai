@@ -13,7 +13,11 @@ import {
   Mail,
   Clock,
 } from "lucide-react";
-import { getCurrentUser, clearUserSession } from "@/utils/sessionManager";
+import {
+  getCurrentUser,
+  clearUserSession,
+  saveUserSession,
+} from "@/utils/sessionManager";
 import { useRouter } from "next/navigation";
 
 interface User {
@@ -33,6 +37,7 @@ interface ListUser {
   lastName: string;
   role: string;
   isVerified: boolean;
+  active: boolean;
 }
 
 type TabType = "profile" | "notifications" | "team";
@@ -66,10 +71,18 @@ export default function SettingsPage() {
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [editingRole, setEditingRole] = useState("");
   const [showRoleDropdown, setShowRoleDropdown] = useState<number | null>(null);
+  const [approvingUserId, setApprovingUserId] = useState<number | null>(null);
+  const [rejectingUserId, setRejectingUserId] = useState<number | null>(null);
 
   useEffect(() => {
     loadCurrentUser();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === "team" && canManageUsers) {
+      fetchUsers();
+    }
+  }, [activeTab]);
 
   const loadCurrentUser = async () => {
     try {
@@ -128,7 +141,22 @@ export default function SettingsPage() {
       }
 
       setProfileMessage("Profile updated successfully");
-      setCurrentUser({ ...currentUser, firstName, lastName, profilePicture });
+      const updatedUser = {
+        ...currentUser,
+        firstName,
+        lastName,
+        profilePicture,
+      } as User;
+      setCurrentUser(updatedUser);
+
+      // Save updated profile to localStorage with proper type cast
+      saveUserSession(updatedUser as any);
+
+      // Dispatch custom event to notify sidebar of profile update
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("profileUpdated"));
+      }
+
       setTimeout(() => setProfileMessage(""), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save profile");
@@ -140,8 +168,15 @@ export default function SettingsPage() {
   const fetchUsers = async () => {
     setTeamLoading(true);
     try {
-      const response = await fetch("/api/users");
-      if (!response.ok) throw new Error("Failed to fetch users");
+      const userId =
+        typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+      const response = await fetch("/api/users", {
+        headers: userId ? { "x-user-id": userId } : {},
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to fetch users");
+      }
       const data = await response.json();
       setUsers(data.users || []);
     } catch (err) {
@@ -175,9 +210,14 @@ export default function SettingsPage() {
 
   const promoteUser = async (userId: number, newRole: string) => {
     try {
+      const sessionUserId =
+        typeof window !== "undefined" ? localStorage.getItem("userId") : null;
       const response = await fetch("/api/users/promote", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(sessionUserId && { "x-user-id": sessionUserId }),
+        },
         body: JSON.stringify({ userId, newRole }),
       });
 
@@ -195,8 +235,11 @@ export default function SettingsPage() {
     if (!confirm("Are you sure you want to delete this user?")) return;
 
     try {
+      const sessionUserId =
+        typeof window !== "undefined" ? localStorage.getItem("userId") : null;
       const response = await fetch(`/api/users/${userId}`, {
         method: "DELETE",
+        headers: sessionUserId ? { "x-user-id": sessionUserId } : {},
       });
 
       if (!response.ok) throw new Error("Failed to delete user");
@@ -204,6 +247,63 @@ export default function SettingsPage() {
       fetchUsers();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete user");
+    }
+  };
+
+  const approveUser = async (userId: number) => {
+    setApprovingUserId(userId);
+    try {
+      const sessionUserId =
+        typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+      const response = await fetch(`/api/users/${userId}/approve`, {
+        method: "POST",
+        headers: sessionUserId ? { "x-user-id": sessionUserId } : {},
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to approve user");
+      }
+
+      fetchUsers();
+      alert("User approved successfully!");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to approve user");
+      alert(err instanceof Error ? err.message : "Failed to approve user");
+    } finally {
+      setApprovingUserId(null);
+    }
+  };
+
+  const rejectUser = async (userId: number) => {
+    if (
+      !confirm(
+        "Are you sure you want to reject this user? Their account will be deleted."
+      )
+    )
+      return;
+
+    setRejectingUserId(userId);
+    try {
+      const sessionUserId =
+        typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+      const response = await fetch(`/api/users/${userId}/deny`, {
+        method: "POST",
+        headers: sessionUserId ? { "x-user-id": sessionUserId } : {},
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to reject user");
+      }
+
+      fetchUsers();
+      alert("User rejected and account deleted");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to reject user");
+      alert(err instanceof Error ? err.message : "Failed to reject user");
+    } finally {
+      setRejectingUserId(null);
     }
   };
 
@@ -500,7 +600,7 @@ export default function SettingsPage() {
                         {user.email}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
-                        {!user.isVerified && (
+                        {!user.active && (
                           <span className="inline-block px-2 py-0.5 bg-amber-50 text-amber-700 rounded">
                             Pending Approval
                           </span>
@@ -508,46 +608,75 @@ export default function SettingsPage() {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2 ml-2">
+                    <div className="flex items-center gap-2 ml-2 flex-wrap justify-end">
                       {currentUser?.role === "OWNER" &&
                         user.id !== currentUser.id && (
-                          <div className="relative">
-                            <button
-                              onClick={() =>
-                                setShowRoleDropdown(
-                                  showRoleDropdown === user.id ? null : user.id
-                                )
-                              }
-                              className="text-sm px-3 py-1 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition-colors whitespace-nowrap"
-                            >
-                              Change Role
-                            </button>
-
-                            {showRoleDropdown === user.id && (
-                              <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 w-40">
-                                {ROLES.map((role) => (
-                                  <button
-                                    key={role}
-                                    onClick={() => promoteUser(user.id, role)}
-                                    className="w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors text-sm"
-                                  >
-                                    {role}
-                                  </button>
-                                ))}
+                          <>
+                            {!user.active && (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => approveUser(user.id)}
+                                  disabled={approvingUserId === user.id}
+                                  className="text-sm px-3 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors disabled:opacity-50 whitespace-nowrap flex items-center gap-1"
+                                >
+                                  <Check size={14} />
+                                  {approvingUserId === user.id
+                                    ? "Approving..."
+                                    : "Approve"}
+                                </button>
+                                <button
+                                  onClick={() => rejectUser(user.id)}
+                                  disabled={rejectingUserId === user.id}
+                                  className="text-sm px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors disabled:opacity-50 whitespace-nowrap"
+                                >
+                                  {rejectingUserId === user.id
+                                    ? "Rejecting..."
+                                    : "Reject"}
+                                </button>
                               </div>
                             )}
-                          </div>
-                        )}
 
-                      {currentUser?.role === "OWNER" &&
-                        user.id !== currentUser.id && (
-                          <button
-                            onClick={() => deleteUser(user.id)}
-                            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Delete user"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                            {user.active && (
+                              <div className="relative">
+                                <button
+                                  onClick={() =>
+                                    setShowRoleDropdown(
+                                      showRoleDropdown === user.id
+                                        ? null
+                                        : user.id
+                                    )
+                                  }
+                                  className="text-sm px-3 py-1 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition-colors whitespace-nowrap"
+                                >
+                                  Change Role
+                                </button>
+
+                                {showRoleDropdown === user.id && (
+                                  <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 w-40">
+                                    {ROLES.map((role) => (
+                                      <button
+                                        key={role}
+                                        onClick={() =>
+                                          promoteUser(user.id, role)
+                                        }
+                                        className="w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors text-sm"
+                                      >
+                                        {role}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            <button
+                              onClick={() => deleteUser(user.id)}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="Delete user"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </>
                         )}
                     </div>
                   </div>

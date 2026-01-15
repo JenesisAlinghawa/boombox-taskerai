@@ -9,6 +9,7 @@ interface User {
   lastName: string;
   email: string;
   profilePicture?: string;
+  active?: boolean;
 }
 
 interface ChannelCreationModalProps {
@@ -74,13 +75,21 @@ export function ChannelCreationModal({
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch("/api/users");
+      const userId =
+        typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+      const response = await fetch("/api/users", {
+        headers: userId ? { "x-user-id": userId } : {},
+      });
       if (!response.ok) {
         throw new Error("Failed to fetch users");
       }
       const data = await response.json();
-      setAllUsers(data.users || []);
-      setFilteredUsers(data.users || []);
+      // Filter out inactive users and current user
+      const activeUsers = (data.users || []).filter(
+        (user: User) => user.active !== false && user.id !== currentUserId
+      );
+      setAllUsers(activeUsers);
+      setFilteredUsers(activeUsers);
     } catch (err) {
       console.error("Error fetching users:", err);
       setError("Failed to load users");

@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
         lastName: true,
         role: true,
         isVerified: true,
+        active: true,
         createdAt: true,
       },
       orderBy: { createdAt: "desc" },

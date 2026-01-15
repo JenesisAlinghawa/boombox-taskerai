@@ -52,38 +52,32 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // Create user with default EMPLOYEE role
-    // EMPLOYEE role means:
-    // - Cannot manage users or access team settings
-    // - Can only participate in channels and view assigned tasks
-    // - Can be promoted to TEAM_LEAD, MANAGER, or CO_OWNER by OWNER
-    const user = await prisma.user.create({
-      data: {
-        email: normalizedEmail,
-        password: hashedPassword,
-        firstName: firstName,
-        lastName: lastName,
-        role: "EMPLOYEE", // Default role for all new users
-        isVerified: false,
-        active: true,
-      },
-    })
+    // Create JWT token with registration data (NOT creating user in DB yet)
+    // Token will be valid for 24 hours
+    const registrationToken = jwt.sign({
+      email: normalizedEmail,
+      password: hashedPassword,
+      firstName,
+      lastName,
+    }, secret, { expiresIn: '24h' })
 
-    const { password: _, ...userWithoutPassword } = user
     // Send verification email with link
     try {
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-      const verificationToken = jwt.sign({ id: user.id }, secret, { expiresIn: '24h' })
-      const verificationLink = `${baseUrl}/auth/verify?token=${encodeURIComponent(verificationToken)}`
-      const html = `<p>Hi ${user.firstName || ''},</p><p>Welcome to TaskerAI! Click the link below to verify your email address.</p><p><a href="${verificationLink}">Verify Email</a></p><p>This link expires in 24 hours.</p>`
-      await sendEmail(user.email, 'Verify your TaskerAI account', html)
+      const verificationLink = `${baseUrl}/auth/verify?token=${encodeURIComponent(registrationToken)}`
+      const html = `<p>Hi ${firstName || ''},</p><p>Welcome to TaskerAI! Click the link below to verify your email address and create your account.</p><p><a href="${verificationLink}">Verify Email & Create Account</a></p><p>This link expires in 24 hours.</p>`
+      await sendEmail(normalizedEmail, 'Verify your TaskerAI account', html)
     } catch (e) {
       console.warn('Failed to send verification email', e)
+      return NextResponse.json(
+        { error: 'Failed to send verification email. Please try again.' },
+        { status: 500 }
+      )
     }
 
     return NextResponse.json({
       success: true,
-      user: userWithoutPassword,
+      message: 'Please check your email to verify your account and complete registration.',
     })
   } catch (error) {
     console.error('Registration error:', error)

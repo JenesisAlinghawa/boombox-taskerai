@@ -177,36 +177,36 @@ export function MessageBubble({
 
           {/* Action Buttons - Show on hover */}
           {!isEditing && (
-            <div className="absolute -bottom-10 left-0 flex gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
+            <div className="absolute -bottom-8 left-0 flex gap-0.5 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
               <button
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className="p-1.5 bg-white text-gray-600 rounded-lg shadow-md hover:bg-gray-50 transition-colors border border-gray-200"
+                className="p-1 bg-white text-gray-600 rounded shadow-sm hover:bg-gray-50 transition-colors border border-gray-300"
                 title="React"
               >
-                <Smile size={14} />
+                <Smile size={12} />
               </button>
               <button
                 onClick={() => onReply(message.id)}
-                className="p-1.5 bg-white text-gray-600 rounded-lg shadow-md hover:bg-gray-50 transition-colors border border-gray-200"
+                className="p-1 bg-white text-gray-600 rounded shadow-sm hover:bg-gray-50 transition-colors border border-gray-300"
                 title="Reply"
               >
-                <Reply size={14} />
+                <Reply size={12} />
               </button>
               {isCurrentUser && (
                 <>
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="p-1.5 bg-white text-gray-600 rounded-lg shadow-md hover:bg-gray-50 transition-colors border border-gray-200"
+                    className="p-1 bg-white text-gray-600 rounded shadow-sm hover:bg-gray-50 transition-colors border border-gray-300"
                     title="Edit"
                   >
-                    <Edit2 size={14} />
+                    <Edit2 size={12} />
                   </button>
                   <button
                     onClick={handleDelete}
-                    className="p-1.5 bg-white text-red-600 rounded-lg shadow-md hover:bg-red-50 transition-colors border border-red-200"
+                    className="p-1 bg-white text-red-600 rounded shadow-sm hover:bg-red-50 transition-colors border border-red-300"
                     title="Delete"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={12} />
                   </button>
                 </>
               )}
@@ -232,9 +232,9 @@ export function MessageBubble({
           </div>
         )}
 
-        {/* Reactions */}
+        {/* Reactions - Display directly below bubble, overlapping like Discord */}
         {message.reactions && message.reactions.length > 0 && (
-          <div className="mt-2 flex gap-1 flex-wrap justify-start">
+          <div className="-mt-3 flex flex-wrap gap-1 px-2 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg">
             {Array.from(
               new Map(message.reactions.map((r) => [r.emoji, r])).values()
             ).map((reaction) => {
@@ -248,13 +248,13 @@ export function MessageBubble({
                 <button
                   key={reaction.emoji}
                   onClick={() => onAddReaction(message.id, reaction.emoji)}
-                  className={`px-2 py-1 rounded-full text-sm flex items-center gap-1 transition-all whitespace-nowrap ${
+                  className={`px-1.5 py-0.5 rounded-full text-xs flex items-center gap-0.5 transition-all whitespace-nowrap ${
                     hasReacted
                       ? "bg-blue-100 border border-blue-300 text-gray-900"
                       : "bg-gray-100 border border-gray-300 hover:bg-gray-200 text-gray-900"
                   }`}
                 >
-                  <span>{reaction.emoji}</span>
+                  <span className="text-sm">{reaction.emoji}</span>
                   <span className="text-xs font-semibold">{count}</span>
                 </button>
               );
@@ -264,13 +264,14 @@ export function MessageBubble({
 
         {/* Timestamp */}
         <p
-          className={`text-xs mt-1.5 px-3 ${
-            isCurrentUser ? "text-blue-100" : "text-gray-600"
+          className={`text-xs mt-1 px-2 opacity-70 ${
+            isCurrentUser ? "text-blue-200" : "text-gray-500"
           }`}
         >
           {new Date(message.createdAt).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
+            hour12: true,
           })}
         </p>
       </div>

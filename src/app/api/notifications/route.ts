@@ -16,7 +16,20 @@ export async function GET(req: NextRequest) {
       take: 50,
     })
 
-    return NextResponse.json({ notifications })
+    // Transform notifications to include title and message from data
+    const transformedNotifications = notifications.map((notif: any) => ({
+      id: notif.id,
+      userId: notif.receiverId,
+      type: notif.type,
+      title: (notif.data as any)?.title || 'Notification',
+      message: (notif.data as any)?.message || '',
+      relatedId: (notif.data as any)?.relatedId,
+      relatedType: (notif.data as any)?.relatedType,
+      isRead: notif.read,
+      createdAt: notif.createdAt,
+    }))
+
+    return NextResponse.json({ notifications: transformedNotifications })
   } catch (error: any) {
     console.error('Get notifications error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

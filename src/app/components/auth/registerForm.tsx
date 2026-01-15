@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 
 export default function RegisterForm() {
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -66,7 +67,7 @@ export default function RegisterForm() {
         const res = await fetch("/api/auth/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, email, password }),
+          body: JSON.stringify({ firstName, lastName, email, password }),
         });
 
         const data = await res.json();
@@ -121,27 +122,47 @@ export default function RegisterForm() {
         </p>
       </div>
 
-      {/* Name */}
-      <input
-        type="text"
-        placeholder="Full Name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        required
-        style={{
-          width: "100%",
-          maxWidth: 320,
-          height: 32,
-          padding: "14px 20px",
-          fontSize: 12,
-          color: "#34495e",
-          background: "#ffffff",
-          border: "none",
-          borderRadius: 8,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-          outline: "none",
-        }}
-      />
+      {/* First Name and Last Name - Side by Side */}
+      <div style={{ display: "flex", gap: 12, width: "100%", maxWidth: 320 }}>
+        <input
+          type="text"
+          placeholder="First Name"
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
+          required
+          style={{
+            flex: 1,
+            height: 32,
+            padding: "14px 20px",
+            fontSize: 12,
+            color: "#34495e",
+            background: "#ffffff",
+            border: "none",
+            borderRadius: 8,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+            outline: "none",
+          }}
+        />
+        <input
+          type="text"
+          placeholder="Last Name"
+          value={lastName}
+          onChange={(e) => setLastName(e.target.value)}
+          required
+          style={{
+            flex: 1,
+            height: 32,
+            padding: "14px 20px",
+            fontSize: 12,
+            color: "#34495e",
+            background: "#ffffff",
+            border: "none",
+            borderRadius: 8,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+            outline: "none",
+          }}
+        />
+      </div>
 
       {/* Email */}
       <input

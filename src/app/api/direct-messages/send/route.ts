@@ -1,27 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { getCurrentUser } from '@/lib/auth'
 import { sendEvent } from '@/lib/sse'
 
 export async function POST(req: NextRequest) {
   try {
-    const { senderId, recipientId, content } = await req.json()
-
-    if (!senderId || !recipientId || !content) {
+    const user = await getCurrentUser(req)
+    
+    if (!user) {
       return NextResponse.json(
-        { error: 'Sender ID, recipient ID, and content required' },
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    const { recipientId, content } = await req.json()
+
+    if (!recipientId || !content) {
+      return NextResponse.json(
+        { error: 'Recipient ID and content required' },
         { status: 400 }
+      )
+    }
+
+    // Verify recipient exists and is active
+    const recipient = await prisma.user.findUnique({
+      where: { id: recipientId }
+    })
+
+    if (!recipient) {
+      return NextResponse.json(
+        { error: 'Recipient not found' },
+        { status: 404 }
       )
     }
 
     const message = await prisma.directMessage.create({
       data: {
-        senderId,
+        senderId: user.id,
         recipientId,
         content,
       },
       include: {
         sender: {
-          select: { id: true, firstName: true, lastName: true, email: true },
+          select: { id: true, firstName: true, lastName: true, profilePicture: true },
         },
       },
     })
@@ -33,10 +55,9 @@ export async function POST(req: NextRequest) {
       console.error('SSE push error:', e)
     }
 
-    return NextResponse.json({ success: true, message })
+    return NextResponse.json({ success: true, message }, { status: 201 })
   } catch (error: any) {
     console.error('Send DM error:', error.message || error)
-    console.error('Full error:', JSON.stringify(error, null, 2))
     return NextResponse.json(
       { 
         error: 'Internal server error',
