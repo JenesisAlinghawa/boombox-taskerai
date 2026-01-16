@@ -1,18 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import prisma from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-interface TaskChatRequest {
-  message: string;
-  teamMembers?: Array<{ id: number; firstName: string; lastName: string; email: string }>;
-  userId?: number;
+interface TeamMember {
+  id: number;
+  name: string;
+  email: string;
 }
 
-interface TaskChatResponse {
-  action: "create" | "assign" | "update" | "query" | "delete" | null;
+interface TaskerBotRequest {
+  message: string;
+  teamMembers: TeamMember[];
+}
+
+interface TaskerBotResponse {
+  action: "create" | "assign" | "update" | "delete" | "query" | null;
   title: string | null;
   description: string | null;
   assigneeEmail: string | null;
@@ -21,183 +24,48 @@ interface TaskChatResponse {
   message: string;
 }
 
-// Task-related keywords to trigger chatbot
-const TASK_KEYWORDS = [
-  "create task",
-  "make task",
-  "add task",
-  "assign task",
-  "update task",
-  "delete task",
-  "task for",
-  "give task to",
-  "new task",
-  "show tasks",
-  "my tasks",
-  "list tasks",
-  "create a task",
-  "add a task",
-  "assign to",
-  "who has",
-  "task status",
-  "mark as",
-  "complete task",
-  "finish task",
-  "due date",
-  "set priority",
-  "task priority",
-];
+const SYSTEM_PROMPT = `You are TaskerBot, a super smart, friendly, and helpful task assistant inspired by Grok. 
 
-function isTaskRelated(message: string): boolean {
-  const lowerMessage = message.toLowerCase();
-  return TASK_KEYWORDS.some((keyword) => lowerMessage.includes(keyword));
-}
+You understand natural language extremely well — typos, abbreviations, incomplete sentences, all requirements at once — you're very forgiving and intelligent.
 
-function getTeamMembersText(
-  members: Array<{ id: number; firstName: string; lastName: string; email: string }>
-): string {
-  if (!members || members.length === 0) return "No team members available";
-  return members
-    .map((m) => `${m.firstName} ${m.lastName} (${m.email})`)
-    .join(", ");
-}
+Your ONLY job is to help create, assign, update, query, or delete tasks in a team management app.
 
-export async function POST(request: NextRequest) {
-  try {
-    const data: TaskChatRequest = await request.json();
-    const { message, teamMembers = [] } = data;
+For non-task messages, reply: "I'm your task assistant — i can create tasks for you! 😊"
 
-    if (!message || !message.trim()) {
-      return NextResponse.json(
-        { error: "Message is required" },
-        { status: 400 }
-      );
-    }
+Respond naturally, conversationally, encouraging, with light humor when it fits.
 
-    // Check if message is task-related
-    if (!isTaskRelated(message)) {
-      return NextResponse.json({
-        action: null,
-        title: null,
-        description: null,
-        assigneeEmail: null,
-        dueDate: null,
-        priority: null,
-        message:
-          "I'm TaskerBot — I only handle tasks! Just type normally for team chat.",
-      } as TaskChatResponse);
-    }
+Always confirm actions clearly and use correct team member emails.
 
-    const user = await getCurrentUser(request);
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+When extracting dates, interpret natural language:
+- "tomorrow" = next day
+- "next Friday" = upcoming Friday
+- "in 3 days" = 3 days from now
+- ISO format: YYYY-MM-DD
 
-    // Get team members from database if not provided
-    let members = teamMembers;
-    if (!members || members.length === 0) {
-      const dbMembers = await prisma.user.findMany({
-        where: { active: true },
-        select: { id: true, firstName: true, lastName: true, email: true },
-      });
-      members = dbMembers;
-    }
-
-    const teamMembersText = getTeamMembersText(members);
-
-    // Grok-like system prompt for task handling
-    const systemPrompt = `You are TaskerBot, a helpful, friendly, and witty AI assistant inside a team task management app, inspired by Grok.
-
-YOUR ROLE:
-- ONLY help with task requests: create, assign, update, query, delete tasks
-- For non-task messages, respond: "I'm TaskerBot — I only handle tasks! Just type normally for team chat."
-- Be natural, encouraging, and witty when appropriate
-- Vary your phrasing so you never sound repetitive
-- Always confirm actions clearly with specific details
-- If unclear, ask clarifying questions
-
-TEAM MEMBERS:
-${teamMembersText}
-
-INSTRUCTIONS:
-1. CREATE: Extract title, description, priority (low/medium/high), due date from user message
-2. ASSIGN: Match the assignee name/email to team members (be smart about partial matches)
-   - If multiple matches: Ask which person they mean
-   - If no match: List available members and ask them to choose
-   - Always include the full email in confirmation
-3. UPDATE: Identify what field to update (title, description, priority, status, due date)
-4. QUERY: Return a friendly message about finding/showing tasks
-5. DELETE: Ask for confirmation with the task name
-
-RESPONSE FORMAT (VALID JSON ONLY):
+Output ONLY valid JSON with NO markdown or extra text:
 {
-  "action": "create"|"assign"|"update"|"query"|"delete"|null,
+  "action": "create" | "assign" | "update" | "delete" | "query" | null,
   "title": "task title or null",
   "description": "task description or null",
-  "assigneeEmail": "user@gmail.com or null",
-  "dueDate": "ISO date (YYYY-MM-DD) or null",
-  "priority": "low"|"medium"|"high"|null,
-  "message": "friendly confirmation, question, or explanation"
+  "assigneeEmail": "matched team member email or null",
+  "dueDate": "ISO date YYYY-MM-DD or null",
+  "priority": "low" | "medium" | "high" | null,
+  "message": "friendly response to user"
 }
 
-EXAMPLES:
-User: "Create a task called 'Post Q4 promo' for Henry"
-Response: {"action":"create","title":"Post Q4 promo","description":null,"assigneeEmail":"henry@boombox.com","dueDate":null,"priority":null,"message":"Got it! Task 'Post Q4 promo' created and assigned to Henry Boyd (henry@boombox.com). Want to add a due date or set priority? 🚀"}
+Be smart about matching team members by name or partial email. If ambiguous, ask!`;
 
-User: "Assign 'Finalize budget' to Martha"
-Response: {"action":"assign","title":"Finalize budget","description":null,"assigneeEmail":"martha@boombox.com","dueDate":null,"priority":null,"message":"All set! 'Finalize budget' assigned to Martha Garcia (martha@boombox.com). 💪"}
+function formatTeamMembers(members: TeamMember[]): string {
+  if (!members.length) return "No team members available.";
+  return members.map((m) => `- ${m.name} (${m.email})`).join("\n");
+}
 
-User: "Show my tasks"
-Response: {"action":"query","title":null,"description":null,"assigneeEmail":null,"dueDate":null,"priority":null,"message":"Fetching your tasks now... Want to see them sorted by due date or priority?"}
+export async function POST(req: NextRequest) {
+  try {
+    const body = (await req.json()) as TaskerBotRequest;
+    const { message, teamMembers = [] } = body;
 
-IMPORTANT: Return ONLY valid JSON, no other text. Be conversational and helpful!`;
-
-    // Call Gemini with temperature 0.85 for natural variation
-    const model = genAI.getGenerativeModel({
-      model: "gemini-pro",
-      generationConfig: {
-        temperature: 0.85,
-        maxOutputTokens: 512,
-      },
-    });
-
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: message }],
-        },
-      ],
-      systemInstruction: systemPrompt,
-    });
-
-    // Extract text from response
-    let responseText = "";
-    try {
-      const response = (result as any).response || result;
-      if (typeof response.text === "function") {
-        responseText = await response.text();
-      } else if (typeof response.text === "string") {
-        responseText = response.text;
-      } else {
-        responseText = JSON.stringify(result);
-      }
-    } catch (e) {
-      console.warn("Failed to extract text from Gemini response:", e);
-      responseText = "";
-    }
-
-    // Parse JSON response
-    let chatResponse: TaskChatResponse;
-    try {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        chatResponse = JSON.parse(jsonMatch[0]);
-      } else {
-        chatResponse = JSON.parse(responseText);
-      }
-    } catch (e) {
-      console.error("Failed to parse Gemini response as JSON:", responseText, e);
+    if (!message?.trim()) {
       return NextResponse.json(
         {
           action: null,
@@ -206,26 +74,198 @@ IMPORTANT: Return ONLY valid JSON, no other text. Be conversational and helpful!
           assigneeEmail: null,
           dueDate: null,
           priority: null,
-          message:
-            "Hmm, I had trouble understanding that. Can you rephrase your task request?",
-        } as TaskChatResponse
+          message: "Please type something!",
+        },
+        { status: 200 }
       );
     }
 
-    // Validate response structure
-    if (!chatResponse.message) {
-      chatResponse.message = "Something went wrong. Please try again.";
+    if (!process.env.GEMINI_API_KEY) {
+      return NextResponse.json(
+        {
+          action: null,
+          title: null,
+          description: null,
+          assigneeEmail: null,
+          dueDate: null,
+          priority: null,
+          message: "❌ API key not configured. Please set GEMINI_API_KEY in your environment.",
+        },
+        { status: 200 }
+      );
     }
 
-    return NextResponse.json(chatResponse);
+    // Use the correct, stable model (free tier friendly)
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash", // Fast, reliable, free tier — this fixes the 404 error!
+      generationConfig: {
+        temperature: 0.85,
+        maxOutputTokens: 500,
+        responseMimeType: "application/json", // Forces clean JSON output!
+      },
+    });
+
+    const teamContext = `\n\nAvailable team members:\n${formatTeamMembers(teamMembers)}`;
+
+    let responseText = "";
+
+    try {
+      console.log("[TaskerBot] Sending to Gemini API...", { message, teamMembersCount: teamMembers.length });
+      
+      const result = await model.generateContent({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: `${message}${teamContext}` }],
+          },
+        ],
+        systemInstruction: SYSTEM_PROMPT,
+      });
+
+      console.log("[TaskerBot] Got response from Gemini:", typeof result);
+
+      // The correct way to get text from GenerateContentResult
+      const response = result.response;
+      if (!response) {
+        throw new Error("No response from Gemini");
+      }
+
+      // response.text() is the method to get text
+      if (typeof response.text === "function") {
+        console.log("[TaskerBot] Using response.text() function");
+        responseText = response.text();
+      } else {
+        console.log("[TaskerBot] Response structure:", JSON.stringify(response).substring(0, 300));
+        throw new Error("response.text is not a function");
+      }
+
+      console.log("[TaskerBot] Response text:", responseText.substring(0, 200));
+    } catch (geminiError) {
+      console.error("[TaskerBot] Gemini API error:", geminiError);
+      return NextResponse.json(
+        {
+          action: null,
+          title: null,
+          description: null,
+          assigneeEmail: null,
+          dueDate: null,
+          priority: null,
+          message: "Oops, I'm having a quick moment. Try again in a sec? 😅",
+        },
+        { status: 200 }
+      );
+    }
+
+    let parsed: TaskerBotResponse;
+
+    try {
+      parsed = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("JSON parse error. Raw response:", responseText);
+      return NextResponse.json(
+        {
+          action: null,
+          title: null,
+          description: null,
+          assigneeEmail: null,
+          dueDate: null,
+          priority: null,
+          message: "Hmm... I didn't quite catch that. Can you tell me more about the task?",
+        },
+        { status: 200 }
+      );
+    }
+
+    // Ensure message field exists
+    if (!parsed.message || typeof parsed.message !== "string") {
+      parsed.message = "Got it! How else can I help with your tasks?";
+    }
+
+    // Post-process due date if needed (optional - AI should return ISO, but fallback)
+    if (parsed.dueDate && !parsed.dueDate.includes("-")) {
+      const calculated = calculateDueDate(parsed.dueDate);
+      if (calculated) parsed.dueDate = calculated;
+    }
+
+    // Smart team member matching fallback (if AI didn't match)
+    if (!parsed.assigneeEmail && teamMembers.length > 0) {
+      const lowerMessage = message.toLowerCase();
+      for (const member of teamMembers) {
+        if (
+          lowerMessage.includes(member.name.toLowerCase()) ||
+          lowerMessage.includes(member.email.split("@")[0].toLowerCase())
+        ) {
+          parsed.assigneeEmail = member.email;
+          break;
+        }
+      }
+    }
+
+    return NextResponse.json(parsed, { status: 200 });
   } catch (error) {
-    console.error("Task chat error:", error);
+    console.error("TaskerBot API error:", error);
     return NextResponse.json(
       {
-        error: "Failed to process task request",
-        details: error instanceof Error ? error.message : String(error),
+        action: null,
+        title: null,
+        description: null,
+        assigneeEmail: null,
+        dueDate: null,
+        priority: null,
+        message: `I'm here to help! Try asking me to create, assign, or update a task. (Error: ${error instanceof Error ? error.message : "Unknown"})`,
       },
-      { status: 500 }
+      { status: 200 }
     );
   }
+}
+
+// Helper function for date parsing
+function calculateDueDate(dueString: string | null): string | null {
+  if (!dueString) return null;
+
+  const lower = dueString.toLowerCase().trim();
+  const today = new Date();
+
+  if (lower === "tomorrow") {
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split("T")[0];
+  }
+
+  if (lower.includes("next")) {
+    const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+    for (let i = 0; i < dayNames.length; i++) {
+      if (lower.includes(dayNames[i])) {
+        const daysAhead = (i - today.getDay() + 7) % 7 || 7;
+        const nextDate = new Date(today);
+        nextDate.setDate(nextDate.getDate() + daysAhead);
+        return nextDate.toISOString().split("T")[0];
+      }
+    }
+  }
+
+  if (lower.includes("in")) {
+    const match = lower.match(/in\s+(\d+)\s+(day|week|month)/i);
+    if (match) {
+      const num = parseInt(match[1]);
+      const unit = match[2].toLowerCase();
+      const resultDate = new Date(today);
+
+      if (unit === "day" || unit === "days") {
+        resultDate.setDate(resultDate.getDate() + num);
+      } else if (unit === "week" || unit === "weeks") {
+        resultDate.setDate(resultDate.getDate() + num * 7);
+      } else if (unit === "month" || unit === "months") {
+        resultDate.setMonth(resultDate.getMonth() + num);
+      }
+
+      return resultDate.toISOString().split("T")[0];
+    }
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dueString)) {
+    return dueString;
+  }
+
+  return null;
 }

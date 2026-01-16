@@ -24,6 +24,7 @@ import {
 import { getCurrentUser } from "@/utils/sessionManager";
 import { ChannelCreationModal } from "@/components/ChannelCreationModal";
 import { MessageBubble } from "@/app/components/MessageBubble";
+import Chatbot from "@/app/components/ui/Chatbot";
 import { io, Socket } from "socket.io-client";
 
 interface User {
@@ -1226,6 +1227,15 @@ export default function MessagesPage() {
         onClose={() => setIsChannelModalOpen(false)}
         onSubmit={createChannel}
         currentUserId={currentUser?.id || 0}
+      />
+
+      {/* TaskerBot Chatbot */}
+      <Chatbot
+        teamMembers={dmConversations.map((user) => ({
+          id: user.id,
+          name: `${user.firstName} ${user.lastName}`,
+          email: user.email,
+        }))}
       />
     </div>
   );
