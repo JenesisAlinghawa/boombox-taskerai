@@ -4,32 +4,38 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getCurrentUser } from "@/utils/sessionManager";
+import type { User } from "@/utils/sessionManager";
+import {
+  LayoutDashboard,
+  ClipboardList,
+  MessageCircle,
+  Bell,
+  BarChart2,
+  FileText,
+  Settings,
+} from "lucide-react";
 
 interface NavigationMenuProps {
   collapsed: boolean;
 }
 
 const mainMenuItems = [
-  { iconFile: "dashboard-icon.png", label: "Dashboard", href: "/dashboard" },
-  {
-    iconFile: "notification-icon.png",
-    label: "Notifications",
-    href: "/notifications",
-  },
-  { iconFile: "task-icon.png", label: "Tasks", href: "/tasks" },
-  { iconFile: "messages-icon.png", label: "Messages", href: "/messages" },
+  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+  { icon: ClipboardList, label: "Tasks", href: "/tasks" },
+  { icon: MessageCircle, label: "Messages", href: "/messages" },
+  { icon: Bell, label: "Notifications", href: "/notifications" },
 ];
 
 const otherMenuItems = [
-  { iconFile: "analytics-icon.png", label: "Analytics", href: "/analytics" },
-  { iconFile: "logs-icon.png", label: "Logs", href: "/logs" },
-  { iconFile: "settings-icon.png", label: "Settings", href: "/settings" },
+  { icon: BarChart2, label: "Analytics", href: "/analytics" },
+  { icon: FileText, label: "Logs", href: "/logs" },
+  { icon: Settings, label: "Settings", href: "/settings" },
 ];
 
 export function NavigationMenu({ collapsed }: NavigationMenuProps) {
   const pathname = usePathname() || "";
   const [unreadMessages, setUnreadMessages] = useState(0);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -48,7 +54,10 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
       try {
         const user = await getCurrentUser();
         if (!user?.id) return;
-        const res = await fetch(`/api/direct-messages/users?userId=${user.id}`);
+
+        const res = await fetch(
+          `/api/direct-messages/users?userId=${user.id}`
+        );
         const data = await res.json();
         const users = Array.isArray(data?.users) ? data.users : [];
         const totalUnread = users.reduce(
@@ -56,9 +65,7 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
           0
         );
         setUnreadMessages(totalUnread);
-      } catch {
-        // ignore fetch errors
-      }
+      } catch {}
     };
 
     fetchUnreadMessages();
@@ -66,35 +73,45 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
     return () => clearInterval(id);
   }, []);
 
-  // Real-time updates via EventSource for notifications and messages
   useEffect(() => {
     if (!currentUser?.id) return;
     const es = new EventSource(`/api/subscribe?userId=${currentUser.id}`);
 
-    const onNotification = () => {
-      // Notifications are handled separately on the notifications page
-    };
-
     const onDirectMessage = (e: MessageEvent) => {
       try {
         const data = JSON.parse(e.data);
-        const payload = data;
-        if (payload && payload.message) {
-          // Increment unread message indicator
+        if (data?.message) {
           setUnreadMessages((prev) => prev + 1);
         }
-      } catch (err) {
-        // ignore
-      }
+      } catch {}
     };
 
-    es.addEventListener("notification", onNotification as EventListener);
     es.addEventListener("direct_message", onDirectMessage as EventListener);
-
-    return () => {
-      es.close();
-    };
+    return () => es.close();
   }, [currentUser]);
+
+  const isActive = (href: string) =>
+    href === "/dashboard"
+      ? pathname === href
+      : pathname === href || pathname.startsWith(href + "/");
+
+  const buttonStyle = (active: boolean): React.CSSProperties => ({
+    width: "100%",
+    padding: "10px",
+    background: active ? "rgba(59,130,246,0.15)" : "transparent",
+    color: active ? "#a0d8ef" : "#ffffff",
+    border: "none",
+    borderRadius: 8,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: collapsed ? "center" : "flex-start",
+    fontSize: 12,
+    cursor: "pointer",
+    transition: "background-color 0.2s, color 0.2s",
+    position: "relative",
+    overflow: "hidden",
+    gap: collapsed ? 0 : 12,
+  });
 
   return (
     <div
@@ -102,143 +119,42 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
         flex: 1,
         display: "flex",
         flexDirection: "column",
-        fontFamily: "Inter, system-ui, -apple-system, sans-serif",
+        fontFamily: "Inria-sans system-ui, -apple-system, sans-serif",
       }}
     >
-      {/* Search Bar - Hidden when collapsed */}
-      {!collapsed && (
-        <div
-          style={{
-            padding: "8px 12px",
-            marginBottom: 8,
-            display: "flex",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              background: "rgba(255,255,255,0.08)",
-              borderRadius: 6,
-              padding: "6px 10px",
-              border: "1px solid rgba(255,255,255,0.1)",
-              width: "100%",
-            }}
-          >
-            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
-              🔍
-            </span>
-            <input
-              type="text"
-              placeholder="Search.."
-              style={{
-                flex: 1,
-                background: "transparent",
-                border: "none",
-                color: "#ffffff",
-                fontSize: 12,
-                outline: "none",
-                fontFamily: "Inter, system-ui, -apple-system, sans-serif",
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Divider */}
-      {!collapsed && (
-        <div
-          style={{
-            margin: "0 12px 12px",
-            borderTop: "1px solid rgba(255,255,255,0.1)",
-          }}
-        />
-      )}
-
-      {/* Divider before Other section */}
-      {!collapsed && (
-        <div
-          style={{
-            margin: "12px 12px 0",
-            borderTop: "1px solid rgba(255,255,255,0.1)",
-          }}
-        />
-      )}
       <nav
         style={{
-          padding: "0 12px",
+          padding: collapsed ? "12px" : "12px 16px",
           display: "flex",
           flexDirection: "column",
-          gap: 0,
+          gap: 8,
+          alignItems: collapsed ? "center" : "flex-start",
         }}
       >
         {mainMenuItems.map((item) => {
-          let active = false;
-          if (item.href === "/dashboard") {
-            active = pathname === "/dashboard";
-          } else {
-            active =
-              pathname === item.href || pathname.startsWith(item.href + "/");
-          }
+          const active = isActive(item.href);
+          const Icon = item.icon;
           const isMessages = item.href === "/messages";
 
           return (
             <Link
-              href={item.href}
               key={item.label}
-              style={{ textDecoration: "none" }}
+              href={item.href}
+              style={{ textDecoration: "none", width: "100%" }}
             >
               <button
-                style={{
-                  width: "100%",
-                  padding: collapsed ? "10px" : "10px 12px",
-                  background: active
-                    ? "linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.25) 100%)"
-                    : "transparent",
-                  color: active ? "#a0d8ef" : "#ffffff",
-                  border: "none",
-                  borderRadius: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: collapsed ? "center" : "flex-start",
-                  gap: collapsed ? 0 : 12,
-                  fontSize: 12,
-                  fontWeight: active ? 600 : 500,
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                  position: "relative",
-                  overflow: "hidden",
-                  fontFamily: "Inter, system-ui, -apple-system, sans-serif",
-                }}
-                title={collapsed ? item.label : ""}
+                style={buttonStyle(active)}
+                title={collapsed ? item.label : undefined}
               >
-                {active && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      right: 0,
-                      top: 0,
-                      bottom: 0,
-                      width: 3,
-                      background:
-                        "linear-gradient(180deg, rgba(59,130,246,0.8) 0%, rgba(107,114,128,0.4) 100%)",
-                    }}
-                  />
-                )}
-                <img
-                  src={`/assets/images/${item.iconFile}`}
-                  alt={item.label}
-                  style={{ width: 20, height: 20, objectFit: "contain" }}
-                />
-                {!collapsed && <span>{item.label}</span>}
+                <Icon size={20} strokeWidth={1.5} />
+                {!collapsed && item.label}
+
                 {isMessages && unreadMessages > 0 && (
                   <div
                     style={{
                       position: "absolute",
                       top: 4,
-                      right: 4,
+                      right: collapsed ? 4 : 12,
                       width: 12,
                       height: 12,
                       borderRadius: "50%",
@@ -253,99 +169,44 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
         })}
       </nav>
 
-      {/* Divider before Other section */}
-      {!collapsed && (
-        <div
-          style={{
-            margin: "12px 12px 0",
-            borderTop: "1px solid rgba(255,255,255,0.1)",
-          }}
-        />
-      )}
+      <div
+        style={{
+          margin: collapsed ? "0 12px" : "0 16px",
+          borderTop: "1px solid rgba(255,255,255,0.1)",
+        }}
+      />
 
-      {/* Other Section */}
-      {!collapsed && (
-        <div style={{ padding: "12px 12px 0" }}>
-          <h3
-            style={{
-              fontSize: 11,
-              color: "rgba(255,255,255,0.5)",
-              margin: "8px 0 12px",
-              textTransform: "uppercase",
-              letterSpacing: 0.5,
-              fontFamily: "Inter, system-ui, -apple-system, sans-serif",
-            }}
-          >
-            OTHER
-          </h3>
-          <nav style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-            {otherMenuItems.map((item) => {
-              let active = false;
-              if (item.href === "/dashboard") {
-                active = pathname === "/dashboard";
-              } else {
-                active =
-                  pathname === item.href ||
-                  pathname.startsWith(item.href + "/");
-              }
+      <nav
+        style={{
+          padding: collapsed ? "12px" : "12px 16px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+          alignItems: collapsed ? "center" : "flex-start",
+        }}
+      >
+        {otherMenuItems.map((item) => {
+          const active = isActive(item.href);
+          const Icon = item.icon;
 
-              return (
-                <Link
-                  href={item.href}
-                  key={item.label}
-                  style={{ textDecoration: "none" }}
-                >
-                  <button
-                    style={{
-                      width: "100%",
-                      padding: collapsed ? "10px" : "10px 12px",
-                      background: active
-                        ? "linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.25) 100%)"
-                        : "transparent",
-                      color: active ? "#a0d8ef" : "#ffffff",
-                      border: "none",
-                      borderRadius: 8,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: collapsed ? "center" : "flex-start",
-                      gap: collapsed ? 0 : 12,
-                      fontSize: 12,
-                      fontWeight: active ? 600 : 500,
-                      cursor: "pointer",
-                      transition: "all 0.2s",
-                      position: "relative",
-                      overflow: "hidden",
-                      fontFamily: "Inter, system-ui, -apple-system, sans-serif",
-                    }}
-                  >
-                    {active && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          right: 0,
-                          top: 0,
-                          bottom: 0,
-                          width: 3,
-                          background:
-                            "linear-gradient(180deg, rgba(59,130,246,0.8) 0%, rgba(107,114,128,0.4) 100%)",
-                        }}
-                      />
-                    )}
-                    <img
-                      src={`/assets/images/${item.iconFile}`}
-                      alt={item.label}
-                      style={{ width: 20, height: 20, objectFit: "contain" }}
-                    />
-                    {!collapsed && <span>{item.label}</span>}
-                  </button>
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-      )}
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              style={{ textDecoration: "none", width: "100%" }}
+            >
+              <button
+                style={buttonStyle(active)}
+                title={collapsed ? item.label : undefined}
+              >
+                <Icon size={20} strokeWidth={1.5} />
+                {!collapsed && item.label}
+              </button>
+            </Link>
+          );
+        })}
+      </nav>
 
-      {/* Spacer */}
       <div style={{ flex: 1 }} />
     </div>
   );

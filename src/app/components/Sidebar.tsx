@@ -14,11 +14,12 @@ interface User {
 }
 
 const COLORS = {
-  sidebar: "#42527F",
-  sidebarDark: "#1a2237",
+  sidebar: "#0F1626",
+  sidebarDark: "#081529",
   text: "#ffffff",
-  textMuted: "rgba(255,255,255,0.7)",
+  textMuted: "rgba(255,255,255,0.6)",
   active: "#a0d8ef",
+  borderColor: "rgba(255,255,255,0.1)",
 };
 
 // menu handled by NavigationMenu (PNG-based)
@@ -46,7 +47,7 @@ export default function Sidebar() {
   return (
     <aside
       style={{
-        width: collapsed ? 80 : 220,
+        width: collapsed ? 80 : 280,
         background: COLORS.sidebar,
         color: COLORS.text,
         height: "100vh",
@@ -57,64 +58,100 @@ export default function Sidebar() {
         display: "flex",
         flexDirection: "column",
         zIndex: 50,
-        fontSize: 13,
         fontFamily: "Inter, system-ui, -apple-system, sans-serif",
+        backdropFilter: "blur(50px)",
+        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
       }}
     >
       {/* Top: Logo */}
       <div
         style={{
-          padding: "14px 12px",
+          padding: collapsed ? "24px 12px" : "24px 20px",
           display: "flex",
           alignItems: "center",
-          gap: 10,
+          gap: 12,
+          borderBottom: `1px solid ${COLORS.borderColor}`,
         }}
       >
-        <div style={{ fontSize: 24 }}>✓</div>
+        <div style={{ fontSize: 24, fontWeight: "bold" }}>✓</div>
         {!collapsed && (
-          <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Taskerai</h2>
+          <h2
+            style={{
+              fontSize: 18,
+              fontWeight: 600,
+              margin: 0,
+              letterSpacing: "1px",
+            }}
+          >
+            TASKERAI
+          </h2>
         )}
       </div>
 
-      {/* User Profile Section */}
+      {/* Navigation Items */}
+      <nav style={{ flex: 1, padding: "20px 0", overflowY: "auto" }}>
+        <NavigationMenu collapsed={collapsed} />
+      </nav>
+
+      {/* Divider before user section */}
+      <div style={{ borderTop: `1px solid ${COLORS.borderColor}` }} />
+
+      {/* User Profile Section - At Bottom */}
       {user && (
         <div
           style={{
-            padding: "12px",
-            margin: "8px 12px",
-            background: "rgba(255,255,255,0.08)",
-            borderRadius: 8,
-            border: "1px solid rgba(255,255,255,0.1)",
+            padding: collapsed ? "16px 12px" : "16px 20px",
             display: "flex",
             alignItems: "center",
-            gap: 10,
+            gap: 12,
+            borderTop: `1px solid ${COLORS.borderColor}`,
           }}
         >
           <div
             style={{
-              width: 40,
-              height: 40,
+              width: 48,
+              height: 48,
               borderRadius: "50%",
-              background: "#4A5E98",
+              background: "linear-gradient(135deg, #0044FF 0%, #0088FF 100%)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 20,
+              fontSize: 24,
               flexShrink: 0,
+              fontWeight: 600,
             }}
           >
-            👤
+            {user.firstName?.charAt(0).toUpperCase()}
           </div>
           {!collapsed && (
-            <div style={{ minWidth: 0 }}>
-              <p style={{ margin: 0, fontWeight: 600, fontSize: 13 }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontWeight: 500,
+                  fontSize: 14,
+                  color: COLORS.text,
+                }}
+              >
                 {`${user.firstName} ${user.lastName}` || "User"}
+              </p>
+              <p
+                style={{
+                  margin: "4px 0 0",
+                  fontSize: 12,
+                  color: COLORS.textMuted,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {user.role || "Owner"}
               </p>
               <p
                 style={{
                   margin: "2px 0 0",
                   fontSize: 11,
-                  opacity: 0.7,
+                  color: COLORS.textMuted,
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
@@ -126,11 +163,6 @@ export default function Sidebar() {
           )}
         </div>
       )}
-
-      {/* Navigation Items */}
-      <nav style={{ flex: 1, padding: "0" }}>
-        <NavigationMenu collapsed={collapsed} />
-      </nav>
     </aside>
   );
 }
