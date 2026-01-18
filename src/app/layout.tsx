@@ -1,30 +1,19 @@
-// app/layout.tsx
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import ClientLayout from "./ClientLayout";
+import { Inter } from "next/font/google";
 import "./globals.css";
+import ClientLayout from "./ClientLayout";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Taskerai",
-  description: "Your personal task manager",
+  title: "TaskerAI",
+  description: "AI Task Manager",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${inter.className} bg-[#01162B] text-white overflow-hidden`}>
         <ClientLayout>{children}</ClientLayout>
       </body>
     </html>

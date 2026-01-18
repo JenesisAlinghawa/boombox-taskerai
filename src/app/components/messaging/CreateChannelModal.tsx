@@ -1,10 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getCurrentUser } from "@/utils/sessionManager";
 
 interface Props {
+  isOpen: boolean;
   onClose: () => void;
+  onSubmit: (data: {
+    name: string;
+    description: string;
+    memberIds: number[];
+    profilePictureFile?: File;
+  }) => Promise<void>;
+  currentUserId: number;
 }
 
 const COLORS = {
@@ -17,39 +24,39 @@ const COLORS = {
   shadow: "#E1F1FD",
 };
 
-export default function CreateChannelModal({ onClose }: Props) {
+export default function CreateChannelModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  currentUserId,
+}: Props) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [users, setUsers] = useState<any[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
+    if (!isOpen) return;
+
     const fetchUsers = async () => {
       try {
-        const user = await getCurrentUser();
-        if (!user?.id) return;
-        setCurrentUser(user);
         const res = await fetch("/api/teams", {
           headers: {
-            "x-user-id": String(user.id),
+            "x-user-id": String(currentUserId),
           },
         });
         const data = await res.json();
-        // Extract team members and add the current user
+        // Extract team members
         const members = data?.team?.members?.map((m: any) => m.user) || [];
-        const userList = Array.from(
-          new Map([...members, user].map((u) => [u.id, u])).values()
-        );
-        setUsers(userList);
+        setUsers(members);
       } catch (err) {
         console.error("Failed to fetch users:", err);
       }
     };
     fetchUsers();
-  }, []);
+  }, [isOpen, currentUserId]);
 
   const handleCreate = async () => {
     if (!name.trim()) {
@@ -61,32 +68,23 @@ export default function CreateChannelModal({ onClose }: Props) {
     setError("");
 
     try {
-      if (!currentUser?.id) throw new Error("User not found");
-      const res = await fetch("/api/channels/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          description,
-          userIds: [currentUser.id, ...selectedUsers],
-        }),
+      await onSubmit({
+        name,
+        description,
+        memberIds: selectedUsers,
       });
-
-      if (res.ok) {
-        onClose();
-      } else {
-        const data = await res.json();
-        setError(data.error || "Failed to create channel");
-      }
-    } catch (err) {
-      setError("An error occurred");
-      console.error(err);
+      setName("");
+      setDescription("");
+      setSelectedUsers([]);
+      onClose();
+    } catch (err: any) {
+      setError(err?.message || "Failed to create channel");
     } finally {
       setLoading(false);
     }
   };
 
-  return (
+  return isOpen ? (
     <div
       style={{
         position: "fixed",
@@ -194,42 +192,39 @@ export default function CreateChannelModal({ onClose }: Props) {
               padding: "8px",
             }}
           >
-            {users.map((user) => {
-              const isCurrentUser = user.id === currentUser?.id;
-              return (
-                <label
-                  key={user.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    padding: "8px",
-                    cursor: "pointer",
-                    fontSize: "13px",
+            {users.map((user) => (
+              <label
+                key={user.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "8px",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedUsers.includes(user.id)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedUsers([...selectedUsers, user.id]);
+                    } else {
+                      setSelectedUsers(
+                        selectedUsers.filter((id) => id !== user.id),
+                      );
+                    }
                   }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedUsers.includes(user.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedUsers([...selectedUsers, user.id]);
-                      } else {
-                        setSelectedUsers(
-                          selectedUsers.filter((id) => id !== user.id)
-                        );
-                      }
-                    }}
-                    style={{ marginRight: "8px", cursor: "pointer" }}
-                  />
-                  {user.name}{" "}
-                  {isCurrentUser && (
-                    <span style={{ color: COLORS.primary, marginLeft: "4px" }}>
-                      (You)
-                    </span>
-                  )}
-                </label>
-              );
-            })}
+                  style={{ marginRight: "8px", cursor: "pointer" }}
+                />
+                {user.name}{" "}
+                {user.id === currentUserId && (
+                  <span style={{ color: COLORS.primary, marginLeft: "4px" }}>
+                    (You)
+                  </span>
+                )}
+              </label>
+            ))}
           </div>
         </div>
 
@@ -279,5 +274,5 @@ export default function CreateChannelModal({ onClose }: Props) {
         </div>
       </div>
     </div>
-  );
+  ) : null;
 }

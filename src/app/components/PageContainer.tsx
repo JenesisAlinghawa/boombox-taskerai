@@ -1,41 +1,41 @@
+"use client";
+
 import React from "react";
 
 interface PageContainerProps {
-  title: string;
-  children?: React.ReactNode;
+  children: React.ReactNode;
+  title?: string;
 }
 
-export function PageContainer({ title, children }: PageContainerProps) {
+export const PageContainer = ({ children, title }: PageContainerProps) => {
   return (
-    <div
+    <div 
       style={{
-        background: "rgba(0, 68, 255, 0.20)",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
-        borderRadius: 12,
-        boxShadow: "1px 1px 2px 0px rgba(255, 255, 255, 0.1)",
-        backdropFilter: "blur(50px)",
-        padding: "24px",
-        minHeight: "calc(100vh - 40px)",
-        height: "calc(100vh - 40px)",
+        height: "100%", // Matches the main/sidebar height
+        width: "100%",
         display: "flex",
         flexDirection: "column",
-        fontFamily: "Inter, system-ui, -apple-system, sans-serif",
-        color: "#fff",
+        background: "rgba(0, 68, 255, 0.20)", // Fill: 0044FF @ 20%
+        backdropFilter: "blur(50px)",         // Background blur: 50
+        WebkitBackdropFilter: "blur(50px)",
+        border: "1px solid rgba(255, 255, 255, 0.10)", // Stroke: FFFFFF @ 10%
+        borderRadius: 12,                     // Corner radius: 12
+        boxShadow: "1px 1px 2px rgba(255, 255, 255, 0.10)", // Drop shadow
+        padding: "24px",
+        overflow: "hidden"
       }}
     >
-      <h1
-        style={{
-          margin: "0 0 24px 0",
-          fontSize: 16,
-          fontWeight: 500,
-          opacity: 0.9,
-        }}
-      >
-        {title}
-      </h1>
-      <div style={{ flex: 1, overflow: "auto" }}>
+      {title && (
+        <div className="mb-6">
+          <h1 className="text-white text-2xl font-bold uppercase tracking-[0.2em]">
+            {title}
+          </h1>
+        </div>
+      )}
+      
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
         {children}
       </div>
     </div>
   );
-}
+};

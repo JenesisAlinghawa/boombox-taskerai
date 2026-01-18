@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { SidebarHeader } from "./SidebarHeader";
 import { NavigationMenu } from "./NavigationMenu";
 import { SidebarFooter } from "./SidebarFooter";
@@ -13,12 +13,15 @@ export function SidePanel() {
   const rightGap = 10;
   const verticalGap = 10;
 
-  React.useEffect(() => {
+  useEffect(() => {
     const main = document.querySelector("main");
     if (main) {
+      // Pushes main content area to create the 10px gutter around the screen
       main.style.margin = `${verticalGap}px ${rightGap}px ${verticalGap}px ${leftGap + width + rightGap}px`;
       main.style.transition = "margin 0.3s ease";
-      main.style.minHeight = `calc(100vh - ${verticalGap * 2}px)`;
+      main.style.height = `calc(100vh - ${verticalGap * 2}px)`;
+      main.style.display = "flex";
+      main.style.flexDirection = "column";
     }
   }, [width]);
 
@@ -35,12 +38,13 @@ export function SidePanel() {
         zIndex: 50,
         display: "flex",
         flexDirection: "column",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
+        border: "1px solid rgba(255, 255, 255, 0.10)", // 10% Stroke
         borderRadius: 12,
-        boxShadow: "1px 1px 2px 2px rgba(255, 255, 255, 0.1)",
-        backdropFilter: "blur(50px)",
-        fontFamily: "Inter, system-ui, -apple-system, sans-serif",
+        boxShadow: "1px 1px 2px rgba(255, 255, 255, 0.10)", // Shadow Spec
+        backdropFilter: "blur(5px)", // Blur: 5
+        WebkitBackdropFilter: "blur(5px)",
         transition: "width 0.3s ease",
+        overflow: "hidden"
       }}
     >
       <SidebarHeader collapsed={collapsed} setCollapsed={setCollapsed} />

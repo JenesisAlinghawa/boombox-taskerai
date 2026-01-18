@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import TaskStatusChart from "@/app/components/TaskStatusChart";
 import { getCurrentUser } from "@/utils/sessionManager";
 import { PageContainer } from "@/app/components/PageContainer";
+import { PageContentCon } from "@/app/components/PageContentCon";
 
-// Colors and Theme properties from screenshots
+// Theme properties aligned with your spec
 const COLORS = {
   primary: "#5d8bb1",
   todo: "#8b5cf6",
@@ -14,22 +15,6 @@ const COLORS = {
   stuck: "#ef4444",
   done: "#10b981",
   muted: "rgba(255, 255, 255, 0.6)",
-  // Appearance Panel Specs:
-  cardBg: "rgba(0, 0, 0, 0.40)",      // Fill: 000000 at 40%
-  cardStroke: "rgba(255, 255, 255, 0.10)", // Stroke: FFFFFF at 10%
-  shadowColor: "rgba(255, 255, 255, 0.10)", // Drop shadow color from image
-};
-
-// Reusable style object matching your screenshots
-const glassContainerStyle: React.CSSProperties = {
-  background: COLORS.cardBg,
-  backdropFilter: "blur(5px)",        // Background blur: 5
-  WebkitBackdropFilter: "blur(5px)",
-  border: `1px solid ${COLORS.cardStroke}`, // Stroke Weight: 1, Position: Inside
-  borderRadius: 12,                   // Corner radius: 12
-  padding: 24,
-  boxShadow: "1px 1px 2px 0px rgba(255, 255, 255, 0.10)", // X:1, Y:1, Blur:2
-  color: "#ffffff",
 };
 
 interface TeamMemberProgress {
@@ -46,6 +31,7 @@ export default function DashboardPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [teamProgress, setTeamProgress] = useState<TeamMemberProgress[]>([]);
 
+  // Load User Session
   useEffect(() => {
     const loadUser = async () => {
       try {
@@ -58,6 +44,7 @@ export default function DashboardPage() {
     loadUser();
   }, []);
 
+  // Fetch Tasks for current user
   useEffect(() => {
     if (!currentUser) return;
     fetch("/api/tasks", { headers: { "x-user-id": String(currentUser.id) } })
@@ -74,6 +61,7 @@ export default function DashboardPage() {
       .catch(() => {});
   }, [currentUser]);
 
+  // Fetch Team Progress
   useEffect(() => {
     if (!currentUser) return;
     fetch("/api/teams", { headers: { "x-user-id": String(currentUser.id) } })
@@ -117,105 +105,112 @@ export default function DashboardPage() {
 
   return (
     <PageContainer title="DASHBOARD">
-      <div style={{ maxWidth: "1600px", margin: "0 auto" }}>
+      <div className="max-w-[1600px] mx-auto space-y-8">
         
         {/* Stat Cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 16, marginBottom: 32 }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { label: "To do tasks", value: stats.todo },
             { label: "In progress tasks", value: stats.inProgress },
             { label: "Completed tasks", value: stats.done },
             { label: "Overdue tasks", value: stats.stuck },
           ].map((stat, i) => (
-            <div key={i} style={glassContainerStyle}>
-              <p style={{ fontSize: 13, color: COLORS.muted, margin: 0, marginBottom: 8 }}>{stat.label}</p>
-              <div style={{ fontSize: 32, fontWeight: 600 }}>{stat.value}</div>
-            </div>
+            <PageContentCon key={i} className="flex flex-col justify-center min-h-[120px]">
+              <p className="text-[13px] text-white/50 mb-2 uppercase tracking-tight">{stat.label}</p>
+              <div className="text-3xl font-bold">{stat.value}</div>
+            </PageContentCon>
           ))}
         </div>
 
         {/* Charts Grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(500px, 1fr))", gap: 20, marginBottom: 24 }}>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           
           {/* Pie Chart Card */}
-          <div 
-            style={{ ...glassContainerStyle, cursor: "pointer" }} 
-            onClick={() => router.push("/dashboard/analytics")}
-          >
-            <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 20px 0" }}>Overall task overview</h3>
-            <div style={{ display: "flex", alignItems: "center", gap: 40, justifyContent: "center" }}>
+          <PageContentCon 
+            className="cursor-pointer hover:bg-black/50 transition-colors">
+            <h3 className="text-sm font-semibold mb-6 uppercase tracking-widest text-white/80">Overall task overview</h3>
+            <div className="flex flex-col md:flex-row items-center justify-around gap-8">
               {total > 0 ? (
-                <svg width="180" height="180" viewBox="0 0 200 200">
-                  <g transform="translate(100,100)">
-                    {(() => {
-                      const radius = 90;
-                      const segments = statusData.filter(s => s.value > 0);
-                      const gap = segments.length > 1 ? 0.04 : 0;
-                      let cumulative = -Math.PI / 2;
+                <div className="relative w-[200px] h-[200px]">
+                   <svg width="200" height="200" viewBox="0 0 200 200" className="transform -rotate-90">
+                    <g transform="translate(100,100)">
+                      {(() => {
+                        const radius = 90;
+                        const segments = statusData.filter(s => s.value > 0);
+                        let cumulative = 0;
 
-                      return segments.map((segment, i) => {
-                        const portion = segment.value / total;
-                        const angle = portion * Math.PI * 2;
-                        
-                        if (portion >= 0.99) {
-                          return <circle key={i} r={radius} fill={segment.color} stroke={COLORS.cardStroke} strokeWidth="1" />;
-                        }
+                        return segments.map((segment, i) => {
+                          const portion = segment.value / total;
+                          const angle = portion * Math.PI * 2;
+                          
+                          if (portion >= 0.99) {
+                            return <circle key={i} r={radius} fill={segment.color} />;
+                          }
 
-                        const x1 = radius * Math.cos(cumulative + gap/2);
-                        const y1 = radius * Math.sin(cumulative + gap/2);
-                        const x2 = radius * Math.cos(cumulative + angle - gap/2);
-                        const y2 = radius * Math.sin(cumulative + angle - gap/2);
-                        const path = `M ${x1} ${y1} A ${radius} ${radius} 0 ${angle > Math.PI ? 1 : 0} 1 ${x2} ${y2} L 0 0 Z`;
-                        cumulative += angle;
-                        return <path key={i} d={path} fill={segment.color} stroke={COLORS.cardStroke} strokeWidth="1" />;
-                      });
-                    })()}
-                  </g>
-                </svg>
+                          const x1 = radius * Math.cos(cumulative);
+                          const y1 = radius * Math.sin(cumulative);
+                          const x2 = radius * Math.cos(cumulative + angle);
+                          const y2 = radius * Math.sin(cumulative + angle);
+                          const path = `M ${x1} ${y1} A ${radius} ${radius} 0 ${angle > Math.PI ? 1 : 0} 1 ${x2} ${y2} L 0 0 Z`;
+                          
+                          cumulative += angle;
+                          return <path key={i} d={path} fill={segment.color} className="stroke-black/20" strokeWidth="1" />;
+                        });
+                      })()}
+                    </g>
+                  </svg>
+                </div>
               ) : (
-                <div style={{ width: 180, height: 180, borderRadius: "50%", border: "1px dashed rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.muted }}>No tasks</div>
+                <div className="w-[180px] h-[180px] rounded-full border border-dashed border-white/20 flex items-center justify-center text-white/40">
+                  No tasks
+                </div>
               )}
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              
+              <div className="flex flex-col gap-3">
                 {statusData.map((item, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-                    <div style={{ width: 12, height: 12, borderRadius: 3, background: item.color }} />
-                    <span style={{ color: COLORS.muted }}>{item.label} <strong style={{ color: "#fff" }}>{item.percent}%</strong></span>
+                  <div key={i} className="flex items-center gap-3 text-sm">
+                    <div className="w-3 h-3 rounded-[2px]" style={{ background: item.color }} />
+                    <span className="text-white/60">{item.label}</span>
+                    <span className="font-bold ml-auto">{item.percent}%</span>
                   </div>
                 ))}
               </div>
             </div>
-          </div>
+          </PageContentCon>
 
           {/* Team Progress Card */}
-          <div style={glassContainerStyle}>
-            <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 20px 0" }}>Overall team progress overview</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 16, maxHeight: 320, overflowY: "auto" }}>
+          <PageContentCon>
+            <h3 className="text-sm font-semibold mb-6 uppercase tracking-widest text-white/80">Overall team progress overview</h3>
+            <div className="flex flex-col gap-5 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
               {teamProgress.length === 0 ? (
-                <div style={{ textAlign: "center", color: COLORS.muted, padding: "40px 0" }}>No team members yet</div>
+                <div className="text-center py-10 text-white/30 italic">No team members yet</div>
               ) : (
                 teamProgress.map((member) => (
-                  <div key={member.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: COLORS.primary, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
+                  <div key={member.id} className="flex items-center gap-4">
+                    <div className="w-9 h-9 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-xs font-bold shrink-0">
                       {member.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                        <span style={{ fontSize: 13 }}>{member.name}</span>
-                        <span style={{ fontSize: 12, color: COLORS.muted }}>{member.done}/{member.total}</span>
+                    <div className="flex-1">
+                      <div className="flex justify-between mb-1">
+                        <span className="text-xs font-medium">{member.name}</span>
+                        <span className="text-[10px] text-white/40">{member.done}/{member.total} Tasks</span>
                       </div>
-                      <div style={{ height: 6, background: "rgba(255,255,255,0.1)", borderRadius: 3, overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${member.progress}%`, background: COLORS.done, borderRadius: 3, transition: "width 0.4s ease" }} />
+                      <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-green-500 transition-all duration-700" 
+                          style={{ width: `${member.progress}%` }} 
+                        />
                       </div>
                     </div>
                   </div>
                 ))
               )}
             </div>
-          </div>
+          </PageContentCon>
         </div>
 
-        {/* Bar Chart */}
-        <div style={glassContainerStyle}>
+        {/* Bar Chart Full Width */}
+        <PageContentCon className="w-full">
           <TaskStatusChart
             title="Overall task status"
             data={[
@@ -225,7 +220,7 @@ export default function DashboardPage() {
               { status: "Done", count: stats.done, color: COLORS.done },
             ]}
           />
-        </div>
+        </PageContentCon>
       </div>
     </PageContainer>
   );

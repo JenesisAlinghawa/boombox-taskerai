@@ -22,9 +22,10 @@ import {
   Loader,
 } from "lucide-react";
 import { getCurrentUser } from "@/utils/sessionManager";
-import { ChannelCreationModal } from "@/components/ChannelCreationModal";
+import CreateChannelModal from "@/app/components/messaging/CreateChannelModal";
 import { MessageBubble } from "@/app/components/MessageBubble";
-import Chatbot from "@/app/components/ui/Chatbot";
+import { PageContainer } from "@/app/components/PageContainer";
+import { PageContentCon } from "@/app/components/PageContentCon";
 import { io, Socket } from "socket.io-client";
 
 interface User {
@@ -97,6 +98,7 @@ export default function MessagesPage() {
   const [editingChannelId, setEditingChannelId] = useState<number | null>(null);
   const [editingChannelName, setEditingChannelName] = useState("");
   const [editingChannelDesc, setEditingChannelDesc] = useState("");
+  const [activeUserIds, setActiveUserIds] = useState<string[]>([]);
 
   const canViewUserTaskProgress = (currentUserRole: string): boolean => {
     const highRoles = ["ADMIN", "MANAGER", "LEAD"];
@@ -130,6 +132,11 @@ export default function MessagesPage() {
       });
     });
 
+    // Listen for active users list
+    socket.on("users:active", (userIds: string[]) => {
+      setActiveUserIds(userIds);
+    });
+
     // Listen for new messages from other users
     socket.on("message:new", (newMessage: Message) => {
       setMessages((prev) => [...prev, newMessage]);
@@ -138,7 +145,7 @@ export default function MessagesPage() {
     // Listen for edited messages
     socket.on("message:edited", (editedMessage: Message) => {
       setMessages((prev) =>
-        prev.map((msg) => (msg.id === editedMessage.id ? editedMessage : msg))
+        prev.map((msg) => (msg.id === editedMessage.id ? editedMessage : msg)),
       );
     });
 
@@ -146,8 +153,8 @@ export default function MessagesPage() {
     socket.on("message:deleted", (messageId: number) => {
       setMessages((prev) =>
         prev.map((msg) =>
-          msg.id === messageId ? { ...msg, isDeleted: true } : msg
-        )
+          msg.id === messageId ? { ...msg, isDeleted: true } : msg,
+        ),
       );
     });
 
@@ -165,10 +172,10 @@ export default function MessagesPage() {
                     { emoji: data.emoji, userId: data.userId },
                   ],
                 }
-              : msg
-          )
+              : msg,
+          ),
         );
-      }
+      },
     );
 
     socket.on("disconnect", () => {
@@ -222,8 +229,8 @@ export default function MessagesPage() {
       const query = messageSearch.toLowerCase();
       setFilteredMessages(
         messages.filter(
-          (msg) => msg.content.toLowerCase().includes(query) && !msg.isDeleted
-        )
+          (msg) => msg.content.toLowerCase().includes(query) && !msg.isDeleted,
+        ),
       );
     }
   }, [messages, messageSearch]);
@@ -281,7 +288,7 @@ export default function MessagesPage() {
           headers: {
             "x-user-id": String((user as any).id),
           },
-        }
+        },
       );
       if (channelsRes.ok) {
         const data = await channelsRes.json();
@@ -314,7 +321,7 @@ export default function MessagesPage() {
           headers: {
             "x-user-id": String(currentUser.id),
           },
-        }
+        },
       );
       if (res.ok) {
         const data = await res.json();
@@ -335,7 +342,7 @@ export default function MessagesPage() {
           headers: {
             "x-user-id": String(currentUser.id),
           },
-        }
+        },
       );
       if (res.ok) {
         const data = await res.json();
@@ -364,7 +371,7 @@ export default function MessagesPage() {
         const taskList = Array.isArray(data?.tasks) ? data.tasks : [];
 
         const userTasks = taskList.filter(
-          (t: any) => t.assigneeId === user.id || t.createdById === user.id
+          (t: any) => t.assigneeId === user.id || t.createdById === user.id,
         );
 
         const stats = {
@@ -404,7 +411,7 @@ export default function MessagesPage() {
               userId: currentUser.id,
               parentMessageId: replyingTo || undefined,
             }),
-          }
+          },
         );
 
         if (!res.ok) {
@@ -498,7 +505,7 @@ export default function MessagesPage() {
       const updatedMessages = messages.map((msg) =>
         msg.id === messageId
           ? { ...msg, content: newContent, isEdited: true }
-          : msg
+          : msg,
       );
       setMessages(updatedMessages);
 
@@ -526,7 +533,7 @@ export default function MessagesPage() {
       }
 
       const updatedMessages = messages.map((msg) =>
-        msg.id === messageId ? { ...msg, isDeleted: true } : msg
+        msg.id === messageId ? { ...msg, isDeleted: true } : msg,
       );
       setMessages(updatedMessages);
 
@@ -563,7 +570,7 @@ export default function MessagesPage() {
                 { emoji, userId: currentUser.id },
               ],
             }
-          : msg
+          : msg,
       );
       setMessages(updatedMessages);
 
@@ -584,10 +591,12 @@ export default function MessagesPage() {
   };
 
   const getStatusDisplay = (user: User) => {
-    if (user.active) return "Online";
+    // Check if user is in the active users list from Socket.io
+    const isOnline = activeUserIds.includes(String(user.id));
+    if (isOnline) return "Online";
     if (user.lastActive) {
       const minutes = Math.floor(
-        (Date.now() - new Date(user.lastActive).getTime()) / (1000 * 60)
+        (Date.now() - new Date(user.lastActive).getTime()) / (1000 * 60),
       );
       if (minutes < 1) return "Just now";
       if (minutes < 60) return `${minutes}m ago`;
@@ -596,10 +605,64 @@ export default function MessagesPage() {
     return "Offline";
   };
 
+  // Helper function to format timestamp
+  const formatMessageTime = (date: string): string => {
+    const messageDate = new Date(date);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (messageDate.toDateString() === today.toDateString()) {
+      return messageDate.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+    } else if (messageDate.toDateString() === yesterday.toDateString()) {
+      return `Yesterday ${messageDate.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      })}`;
+    } else {
+      return messageDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+    }
+  };
+
+  // Helper function to determine if a message should show timestamp
+  // Shows timestamp ONLY if user replies 7+ minutes after their own last message
+  const shouldShowTimestamp = (
+    currentMsg: Message,
+    currentIndex: number,
+    allMessages: Message[],
+  ): boolean => {
+    if (currentIndex === 0) return false; // Never show timestamp for first message
+
+    // Find the previous message from the SAME sender
+    for (let i = currentIndex - 1; i >= 0; i--) {
+      if (allMessages[i].sender.id === currentMsg.sender.id) {
+        // Found previous message from same sender
+        const currentTime = new Date(currentMsg.createdAt).getTime();
+        const prevTime = new Date(allMessages[i].createdAt).getTime();
+        const gapMinutes = (currentTime - prevTime) / (1000 * 60);
+        return gapMinutes >= 7; // Show timestamp ONLY if 7+ minute gap
+      }
+    }
+
+    // No previous message from this sender, don't show timestamp
+    return false;
+  };
+
   const handleEditChannel = async (
     channelId: number,
     newName: string,
-    newDesc: string
+    newDesc: string,
   ) => {
     if (!newName.trim()) return;
     try {
@@ -616,8 +679,8 @@ export default function MessagesPage() {
           channels.map((ch) =>
             ch.id === channelId
               ? { ...ch, name: newName, description: newDesc }
-              : ch
-          )
+              : ch,
+          ),
         );
         if (selectedChannel?.id === channelId) {
           setSelectedChannel({
@@ -653,13 +716,13 @@ export default function MessagesPage() {
   };
 
   const filteredChannels = channels.filter((ch) =>
-    ch.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ch.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const filteredDMs = dmConversations.filter((user) =>
     `${user.firstName} ${user.lastName}`
       .toLowerCase()
-      .includes(searchQuery.toLowerCase())
+      .includes(searchQuery.toLowerCase()),
   );
 
   const getReplyingToMessage = (): Message | undefined => {
@@ -675,568 +738,586 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100 gap-4 p-4">
-      {/* LEFT SIDEBAR - Channels & Conversations */}
-      <div className="w-72 bg-white border border-gray-300 rounded-xl flex flex-col shadow-lg overflow-hidden">
-        {/* Header */}
-        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-          <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
-        </div>
-
-        {/* Search Bar */}
-        <div className="px-4 py-3 border-b border-gray-200">
-          <div className="relative">
-            <Search size={16} className="absolute left-3 top-3 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search chats..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm"
-            />
+    <PageContainer title="MESSAGES">
+      <div className="flex h-[calc(100vh-120px)] gap-4 p-0 !bg-transparent">
+        {/* LEFT SIDEBAR - Channels & Conversations */}
+        <PageContentCon className="w-72 flex flex-col overflow-hidden !p-0 !bg-white text-black">
+          {/* Header */}
+          <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
           </div>
-        </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto">
-          {/* Channels Section */}
-          <div className="p-4 space-y-4">
-            <div>
-              <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-widest mb-3 px-2">
-                Channels
-              </h3>
-              <button
-                onClick={() => setIsChannelModalOpen(true)}
-                className="w-full mb-3 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-medium text-sm shadow-sm hover:shadow-md"
-              >
-                + New Channel
-              </button>
-              <div className="space-y-2">
-                {filteredChannels.map((channel) => (
-                  <button
-                    key={channel.id}
-                    onClick={() => {
-                      setSelectedChannel(channel);
-                      setSelectedDMUser(null);
-                      setMessageSearch("");
-                    }}
-                    className={`w-full text-left px-3 py-2.5 rounded-lg transition-all text-sm flex items-center gap-2 font-medium ${
-                      selectedChannel?.id === channel.id
-                        ? "bg-blue-100 text-blue-900 border border-blue-300"
-                        : "text-gray-700 hover:bg-gray-100"
-                    }`}
-                  >
-                    <Users size={16} />
-                    {channel.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div className="h-px bg-gray-200" />
-
-            {/* Active Conversations */}
-            <div>
-              <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-widest mb-3 px-2 flex items-center justify-between">
-                Conversations
-                <span className="ml-auto bg-gray-200 text-gray-700 text-xs rounded-full px-2 py-0.5 font-normal">
-                  {dmConversations.length}
-                </span>
-              </h3>
-              <div className="space-y-2">
-                {filteredDMs.map((user) => (
-                  <button
-                    key={user.id}
-                    onClick={() => {
-                      setSelectedDMUser(user);
-                      setSelectedChannel(null);
-                      setMessageSearch("");
-                    }}
-                    className={`w-full text-left px-3 py-2.5 rounded-lg transition-all flex items-center gap-3 ${
-                      selectedDMUser?.id === user.id
-                        ? "bg-blue-100 border border-blue-300"
-                        : "hover:bg-gray-100"
-                    }`}
-                  >
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
-                      {user.profilePicture ? (
-                        <img
-                          src={user.profilePicture}
-                          alt={user.firstName}
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      ) : (
-                        `${user.firstName[0]}${user.lastName[0]}`
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {user.firstName} {user.lastName}
-                      </p>
-                      <p className="text-xs text-gray-500 truncate">
-                        {getStatusDisplay(user)}
-                      </p>
-                    </div>
-                    {user.active && (
-                      <span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
-                    )}
-                  </button>
-                ))}
-              </div>
+          {/* Search Bar */}
+          <div className="px-4 py-3 border-b border-gray-200">
+            <div className="relative">
+              <Search
+                size={16}
+                className="absolute left-3 top-3 text-gray-400"
+              />
+              <input
+                type="text"
+                placeholder="Search chats..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm"
+              />
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* CENTER - Chat Area */}
-      <div className="flex-1 bg-white border border-gray-300 rounded-xl flex flex-col shadow-lg overflow-hidden">
-        {selectedChannel || selectedDMUser ? (
-          <>
-            {/* Chat Header */}
-            <div className="h-20 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-300 flex items-center justify-between px-6 shadow-sm">
-              <div className="flex items-center gap-4">
-                {selectedChannel && (
-                  <div>
-                    <h2 className="font-bold text-gray-900 text-lg">
-                      # {selectedChannel.name}
-                    </h2>
-                    <p className="text-xs text-gray-600">
-                      {selectedChannel.members.length} members
-                    </p>
-                  </div>
-                )}
-                {selectedDMUser && (
-                  <>
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-sm shadow-md">
-                      {selectedDMUser.profilePicture ? (
-                        <img
-                          src={selectedDMUser.profilePicture}
-                          alt={selectedDMUser.firstName}
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      ) : (
-                        `${selectedDMUser.firstName[0]}${selectedDMUser.lastName[0]}`
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto">
+            {/* Channels Section */}
+            <div className="p-4 space-y-4">
+              <div>
+                <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-widest mb-3 px-2">
+                  Channels
+                </h3>
+                <button
+                  onClick={() => setIsChannelModalOpen(true)}
+                  className="w-full mb-3 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-medium text-sm shadow-sm hover:shadow-md"
+                >
+                  + New Channel
+                </button>
+                <div className="space-y-2">
+                  {filteredChannels.map((channel) => (
+                    <button
+                      key={channel.id}
+                      onClick={() => {
+                        setSelectedChannel(channel);
+                        setSelectedDMUser(null);
+                        setMessageSearch("");
+                      }}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg transition-all text-sm flex items-center gap-2 font-medium ${
+                        selectedChannel?.id === channel.id
+                          ? "bg-blue-100 text-blue-900 border border-blue-300"
+                          : "text-gray-700 hover:bg-gray-100"
+                      }`}
+                    >
+                      <Users size={16} />
+                      {channel.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="h-px bg-gray-200" />
+
+              {/* Active Conversations */}
+              <div>
+                <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-widest mb-3 px-2 flex items-center justify-between">
+                  Conversations
+                  <span className="ml-auto bg-gray-200 text-gray-700 text-xs rounded-full px-2 py-0.5 font-normal">
+                    {dmConversations.length}
+                  </span>
+                </h3>
+                <div className="space-y-2">
+                  {filteredDMs.map((user) => (
+                    <button
+                      key={user.id}
+                      onClick={() => {
+                        setSelectedDMUser(user);
+                        setSelectedChannel(null);
+                        setMessageSearch("");
+                      }}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg transition-all flex items-center gap-3 ${
+                        selectedDMUser?.id === user.id
+                          ? "bg-blue-100 border border-blue-300"
+                          : "hover:bg-gray-100"
+                      }`}
+                    >
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                        {user.profilePicture ? (
+                          <img
+                            src={user.profilePicture}
+                            alt={user.firstName}
+                            className="w-full h-full rounded-full object-cover"
+                          />
+                        ) : (
+                          `${user.firstName[0]}${user.lastName[0]}`
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {user.firstName} {user.lastName}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {getStatusDisplay(user)}
+                        </p>
+                      </div>
+                      {activeUserIds.includes(String(user.id)) && (
+                        <span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
                       )}
-                    </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </PageContentCon>
+
+        {/* CENTER - Chat Area */}
+        <PageContentCon className="flex-1 flex flex-col overflow-hidden !p-0 !bg-white text-black">
+          {selectedChannel || selectedDMUser ? (
+            <>
+              {/* Chat Header */}
+              <div className="h-20 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-300 flex items-center justify-between px-6 shadow-sm">
+                <div className="flex items-center gap-4">
+                  {selectedChannel && (
                     <div>
                       <h2 className="font-bold text-gray-900 text-lg">
-                        {selectedDMUser.firstName} {selectedDMUser.lastName}
+                        # {selectedChannel.name}
                       </h2>
                       <p className="text-xs text-gray-600">
-                        {getStatusDisplay(selectedDMUser)}
+                        {selectedChannel.members.length} members
                       </p>
                     </div>
-                  </>
-                )}
-              </div>
-
-              {/* Channel Edit/Delete Buttons */}
-              {selectedChannel &&
-                currentUser?.id === selectedChannel.creatorId && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        setEditingChannelId(selectedChannel.id);
-                        setEditingChannelName(selectedChannel.name);
-                        setEditingChannelDesc(
-                          selectedChannel.description || ""
-                        );
-                      }}
-                      className="p-2 text-gray-600 hover:bg-blue-100 rounded-lg transition-colors"
-                      title="Edit channel"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteChannel(selectedChannel.id)}
-                      className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                      title="Delete channel"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                )}
-            </div>
-
-            {/* Channel Edit Modal */}
-            {editingChannelId === selectedChannel?.id && (
-              <div className="px-6 py-3 bg-blue-50 border-b border-blue-200 flex gap-2 items-center">
-                <input
-                  type="text"
-                  value={editingChannelName}
-                  onChange={(e) => setEditingChannelName(e.target.value)}
-                  placeholder="Channel name"
-                  className="flex-1 px-3 py-1.5 border border-blue-300 rounded text-sm focus:ring-2 focus:ring-blue-600"
-                />
-                <input
-                  type="text"
-                  value={editingChannelDesc}
-                  onChange={(e) => setEditingChannelDesc(e.target.value)}
-                  placeholder="Description"
-                  className="flex-1 px-3 py-1.5 border border-blue-300 rounded text-sm focus:ring-2 focus:ring-blue-600"
-                />
-                <button
-                  onClick={() =>
-                    handleEditChannel(
-                      selectedChannel!.id,
-                      editingChannelName,
-                      editingChannelDesc
-                    )
-                  }
-                  className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-                >
-                  Save
-                </button>
-                <button
-                  onClick={() => setEditingChannelId(null)}
-                  className="px-3 py-1.5 bg-gray-300 text-gray-800 rounded text-sm hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
-              </div>
-            )}
-
-            {/* Message Search Bar */}
-            <div className="px-6 py-3 border-b border-gray-200 bg-gray-50">
-              <div className="relative">
-                <Search
-                  size={16}
-                  className="absolute left-3 top-3 text-gray-400"
-                />
-                <input
-                  type="text"
-                  placeholder="Search messages..."
-                  value={messageSearch}
-                  onChange={(e) => setMessageSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm"
-                />
-              </div>
-            </div>
-
-            {/* Messages Container - Using flex-col-reverse for scroll-to-bottom */}
-            <div
-              ref={messagesContainerRef}
-              className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50 flex flex-col-reverse"
-            >
-              <div ref={messagesEndRef} />
-              {filteredMessages.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-gray-500 text-center">
-                    <p className="text-lg font-medium mb-2">
-                      {messageSearch
-                        ? "No messages match your search"
-                        : "No messages yet"}
-                    </p>
-                    <p className="text-sm">Start the conversation!</p>
-                  </div>
-                </div>
-              ) : (
-                [...filteredMessages].reverse().map((msg) => (
-                  <div key={msg.id}>
-                    {msg.parentMessageId && (
-                      <div className="text-xs text-gray-600 italic mb-2 px-3">
-                        <Reply size={12} className="inline mr-1" />
-                        {messages
-                          .find((m) => m.id === msg.parentMessageId)
-                          ?.content.slice(0, 40)}
-                        ...
+                  )}
+                  {selectedDMUser && (
+                    <>
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-sm shadow-md">
+                        {selectedDMUser.profilePicture ? (
+                          <img
+                            src={selectedDMUser.profilePicture}
+                            alt={selectedDMUser.firstName}
+                            className="w-full h-full rounded-full object-cover"
+                          />
+                        ) : (
+                          `${selectedDMUser.firstName[0]}${selectedDMUser.lastName[0]}`
+                        )}
                       </div>
-                    )}
-                    <MessageBubble
-                      message={msg}
-                      isCurrentUser={msg.sender.id === currentUser?.id}
-                      onEdit={handleEditMessage}
-                      onDelete={handleDeleteMessage}
-                      onReply={(msgId: number) => setReplyingTo(msgId)}
-                      onAddReaction={handleAddReaction}
-                      currentUserId={currentUser?.id || 0}
-                    />
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Reply Context */}
-            {replyingTo && getReplyingToMessage() && (
-              <div className="px-6 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Reply size={16} className="text-blue-600" />
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-700">
-                      Replying to {getReplyingToMessage()?.sender.firstName}
-                    </p>
-                    <p className="text-sm text-gray-600 truncate">
-                      {getReplyingToMessage()?.content}
-                    </p>
-                  </div>
+                      <div>
+                        <h2 className="font-bold text-gray-900 text-lg">
+                          {selectedDMUser.firstName} {selectedDMUser.lastName}
+                        </h2>
+                        <p className="text-xs text-gray-600">
+                          {getStatusDisplay(selectedDMUser)}
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </div>
+
+                {/* Channel Edit/Delete Buttons */}
+                {selectedChannel &&
+                  currentUser?.id === selectedChannel.creatorId && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingChannelId(selectedChannel.id);
+                          setEditingChannelName(selectedChannel.name);
+                          setEditingChannelDesc(
+                            selectedChannel.description || "",
+                          );
+                        }}
+                        className="p-2 text-gray-600 hover:bg-blue-100 rounded-lg transition-colors"
+                        title="Edit channel"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteChannel(selectedChannel.id)}
+                        className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                        title="Delete channel"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  )}
+              </div>
+
+              {/* Channel Edit Modal */}
+              {editingChannelId === selectedChannel?.id && (
+                <div className="px-6 py-3 bg-blue-50 border-b border-blue-200 flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={editingChannelName}
+                    onChange={(e) => setEditingChannelName(e.target.value)}
+                    placeholder="Channel name"
+                    className="flex-1 px-3 py-1.5 border border-blue-300 rounded text-sm focus:ring-2 focus:ring-blue-600"
+                  />
+                  <input
+                    type="text"
+                    value={editingChannelDesc}
+                    onChange={(e) => setEditingChannelDesc(e.target.value)}
+                    placeholder="Description"
+                    className="flex-1 px-3 py-1.5 border border-blue-300 rounded text-sm focus:ring-2 focus:ring-blue-600"
+                  />
+                  <button
+                    onClick={() =>
+                      handleEditChannel(
+                        selectedChannel!.id,
+                        editingChannelName,
+                        editingChannelDesc,
+                      )
+                    }
+                    className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingChannelId(null)}
+                    className="px-3 py-1.5 bg-gray-300 text-gray-800 rounded text-sm hover:bg-gray-400"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+
+              {/* Message Search Bar */}
+              <div className="px-6 py-3 border-b border-gray-200 bg-gray-50">
+                <div className="relative">
+                  <Search
+                    size={16}
+                    className="absolute left-3 top-3 text-gray-400"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search messages..."
+                    value={messageSearch}
+                    onChange={(e) => setMessageSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Messages Container - Using flex-col-reverse for scroll-to-bottom */}
+              <div
+                ref={messagesContainerRef}
+                className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50 flex flex-col-reverse"
+              >
+                <div ref={messagesEndRef} />
+                {filteredMessages.length === 0 ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-gray-500 text-center">
+                      <p className="text-lg font-medium mb-2">
+                        {messageSearch
+                          ? "No messages match your search"
+                          : "No messages yet"}
+                      </p>
+                      <p className="text-sm">Start the conversation!</p>
+                    </div>
+                  </div>
+                ) : (
+                  [...filteredMessages].reverse().map((msg, index) => {
+                    const reversedMessages = [...filteredMessages].reverse();
+                    const showTimestamp = shouldShowTimestamp(
+                      msg,
+                      index,
+                      reversedMessages,
+                    );
+
+                    return (
+                      <div key={msg.id}>
+                        {showTimestamp && (
+                          <div className="flex items-center justify-center my-3">
+                            <div className="bg-gray-200 h-px flex-1" />
+                            <p className="text-xs text-gray-500 px-3 font-medium">
+                              {formatMessageTime(msg.createdAt)}
+                            </p>
+                            <div className="bg-gray-200 h-px flex-1" />
+                          </div>
+                        )}
+                        {msg.parentMessageId && (
+                          <div className="text-xs text-gray-600 italic mb-2 px-3">
+                            <Reply size={12} className="inline mr-1" />
+                            {messages
+                              .find((m) => m.id === msg.parentMessageId)
+                              ?.content.slice(0, 40)}
+                            ...
+                          </div>
+                        )}
+                        <MessageBubble
+                          message={msg}
+                          isCurrentUser={msg.sender.id === currentUser?.id}
+                          onEdit={handleEditMessage}
+                          onDelete={handleDeleteMessage}
+                          onReply={(msgId: number) => setReplyingTo(msgId)}
+                          onAddReaction={handleAddReaction}
+                          currentUserId={currentUser?.id || 0}
+                        />
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Reply Context */}
+              {replyingTo && getReplyingToMessage() && (
+                <div className="px-6 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Reply size={16} className="text-blue-600" />
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-gray-700">
+                        Replying to {getReplyingToMessage()?.sender.firstName}
+                      </p>
+                      <p className="text-sm text-gray-600 truncate">
+                        {getReplyingToMessage()?.content}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setReplyingTo(null)}
+                    className="p-1 hover:bg-blue-100 rounded transition-colors"
+                  >
+                    <X size={16} className="text-gray-600" />
+                  </button>
+                </div>
+              )}
+
+              {/* Message Input */}
+              <div className="border-t border-gray-300 px-6 py-4 bg-white flex items-end gap-3 shadow-sm rounded-b-xl">
+                <button className="p-2.5 hover:bg-gray-100 rounded-xl transition-colors text-gray-600 flex-shrink-0">
+                  <Paperclip size={20} />
+                </button>
+                <textarea
+                  value={messageInput}
+                  onChange={(e) => {
+                    setMessageInput(e.target.value);
+                    // Auto-grow textarea height based on content
+                    e.target.style.height = "auto";
+                    const newHeight = Math.min(e.target.scrollHeight, 150);
+                    e.target.style.height = newHeight + "px";
+                  }}
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      sendMessage();
+                    }
+                  }}
+                  placeholder="Type your message..."
+                  disabled={sendingMessage}
+                  rows={1}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm text-gray-900 placeholder-gray-500 disabled:opacity-50 resize-none overflow-hidden"
+                />
                 <button
-                  onClick={() => setReplyingTo(null)}
-                  className="p-1 hover:bg-blue-100 rounded transition-colors"
+                  onClick={sendMessage}
+                  disabled={sendingMessage || !messageInput.trim()}
+                  className="px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all text-sm font-medium flex items-center gap-2 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <X size={16} className="text-gray-600" />
+                  {sendingMessage ? (
+                    <>
+                      <Loader size={16} className="animate-spin" />
+                      Sending
+                    </>
+                  ) : (
+                    <>
+                      Send
+                      <Send size={16} />
+                    </>
+                  )}
                 </button>
               </div>
-            )}
-
-            {/* Message Input */}
-            <div className="border-t border-gray-300 px-6 py-4 bg-white flex items-end gap-3 shadow-sm rounded-b-xl">
-              <button className="p-2.5 hover:bg-gray-100 rounded-xl transition-colors text-gray-600 flex-shrink-0">
-                <Paperclip size={20} />
-              </button>
-              <textarea
-                value={messageInput}
-                onChange={(e) => {
-                  setMessageInput(e.target.value);
-                  // Auto-grow textarea height based on content
-                  e.target.style.height = "auto";
-                  const newHeight = Math.min(e.target.scrollHeight, 150);
-                  e.target.style.height = newHeight + "px";
-                }}
-                onKeyPress={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                  }
-                }}
-                placeholder="Type your message..."
-                disabled={sendingMessage}
-                rows={1}
-                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm text-gray-900 placeholder-gray-500 disabled:opacity-50 resize-none overflow-hidden"
-              />
-              <button
-                onClick={sendMessage}
-                disabled={sendingMessage || !messageInput.trim()}
-                className="px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all text-sm font-medium flex items-center gap-2 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {sendingMessage ? (
-                  <>
-                    <Loader size={16} className="animate-spin" />
-                    Sending
-                  </>
-                ) : (
-                  <>
-                    Send
-                    <Send size={16} />
-                  </>
-                )}
-              </button>
+            </>
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-gray-600 text-center">
+                <p className="text-lg font-medium mb-2">
+                  Select a conversation
+                </p>
+                <p className="text-sm text-gray-500">
+                  Choose a channel or direct message to start
+                </p>
+              </div>
             </div>
-          </>
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-gray-600 text-center">
-              <p className="text-lg font-medium mb-2">Select a conversation</p>
-              <p className="text-sm text-gray-500">
-                Choose a channel or direct message to start
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+          )}
+        </PageContentCon>
 
-      {/* RIGHT SIDEBAR - Conversation/Channel Profile */}
-      {(selectedChannel || selectedDMUser) && currentUser && (
-        <div className="w-80 bg-white border border-gray-300 rounded-xl flex flex-col shadow-lg overflow-hidden">
-          {/* Profile Section */}
-          <div className="p-6 border-b border-gray-300 bg-gradient-to-b from-blue-50 to-white">
-            <h3 className="text-sm font-bold text-gray-900 mb-6">
-              {selectedDMUser ? "User Profile" : "Channel Info"}
-            </h3>
-            <div className="text-center">
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4 shadow-lg border-4 border-white">
-                {selectedDMUser ? (
-                  selectedDMUser.profilePicture ? (
+        {/* RIGHT SIDEBAR - Conversation/Channel Profile */}
+        {(selectedChannel || selectedDMUser) && currentUser && (
+          <PageContentCon className="w-80 flex flex-col overflow-hidden !p-0 !bg-white text-black">
+            {/* Profile Section */}
+            <div className="p-6 border-b border-gray-300 bg-gradient-to-b from-blue-50 to-white">
+              <h3 className="text-sm font-bold text-gray-900 mb-6">
+                {selectedDMUser ? "User Profile" : "Channel Info"}
+              </h3>
+              <div className="text-center">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4 shadow-lg border-4 border-white">
+                  {selectedDMUser ? (
+                    selectedDMUser.profilePicture ? (
+                      <img
+                        src={selectedDMUser.profilePicture}
+                        alt={selectedDMUser.firstName}
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    ) : (
+                      `${selectedDMUser.firstName[0]}${selectedDMUser.lastName[0]}`
+                    )
+                  ) : selectedChannel?.profilePicture ? (
                     <img
-                      src={selectedDMUser.profilePicture}
-                      alt={selectedDMUser.firstName}
+                      src={selectedChannel.profilePicture}
+                      alt={selectedChannel.name}
                       className="w-full h-full rounded-full object-cover"
                     />
                   ) : (
-                    `${selectedDMUser.firstName[0]}${selectedDMUser.lastName[0]}`
-                  )
-                ) : selectedChannel?.profilePicture ? (
-                  <img
-                    src={selectedChannel.profilePicture}
-                    alt={selectedChannel.name}
-                    className="w-full h-full rounded-full object-cover"
-                  />
+                    <Users size={40} />
+                  )}
+                </div>
+                {selectedDMUser ? (
+                  <>
+                    <p className="text-lg font-bold text-gray-900">
+                      {selectedDMUser.firstName} {selectedDMUser.lastName}
+                    </p>
+                    <p className="text-sm text-gray-600 capitalize mt-1">
+                      {selectedDMUser.role}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-2">
+                      {selectedDMUser.email}
+                    </p>
+                    <div className="mt-4 flex items-center justify-center gap-2">
+                      <span
+                        className={`w-3 h-3 rounded-full ${
+                          activeUserIds.includes(String(selectedDMUser.id))
+                            ? "bg-green-500"
+                            : "bg-gray-400"
+                        }`}
+                      />
+                      <span className="text-xs font-medium text-gray-700">
+                        {getStatusDisplay(selectedDMUser)}
+                      </span>
+                    </div>
+                  </>
                 ) : (
-                  <Users size={40} />
+                  <>
+                    <p className="text-lg font-bold text-gray-900">
+                      {selectedChannel?.name}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-3 flex items-center justify-center gap-2">
+                      <Users size={14} />
+                      {selectedChannel?.members.length || 0} members
+                    </p>
+                    <p className="text-xs text-gray-500 mt-2">
+                      {selectedChannel?.description || "No description"}
+                    </p>
+                  </>
                 )}
               </div>
-              {selectedDMUser ? (
-                <>
-                  <p className="text-lg font-bold text-gray-900">
-                    {selectedDMUser.firstName} {selectedDMUser.lastName}
-                  </p>
-                  <p className="text-sm text-gray-600 capitalize mt-1">
-                    {selectedDMUser.role}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-2">
-                    {selectedDMUser.email}
-                  </p>
-                  <div className="mt-4 flex items-center justify-center gap-2">
-                    <span
-                      className={`w-3 h-3 rounded-full ${
-                        selectedDMUser.active ? "bg-green-500" : "bg-gray-400"
-                      }`}
-                    />
-                    <span className="text-xs font-medium text-gray-700">
-                      {getStatusDisplay(selectedDMUser)}
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <p className="text-lg font-bold text-gray-900">
-                    {selectedChannel?.name}
-                  </p>
-                  <p className="text-xs text-gray-600 mt-3 flex items-center justify-center gap-2">
-                    <Users size={14} />
-                    {selectedChannel?.members.length || 0} members
-                  </p>
-                  <p className="text-xs text-gray-500 mt-2">
-                    {selectedChannel?.description || "No description"}
-                  </p>
-                </>
-              )}
             </div>
-          </div>
 
-          {/* Task Progress */}
-          {selectedDMUser && canViewUserTaskProgress(currentUser.role) && (
-            <div className="p-6 border-b border-gray-300 bg-white overflow-y-auto flex-1">
-              <h3 className="text-sm font-bold text-gray-900 mb-6">
-                Task Progress
-              </h3>
-              {loadingUserTasks ? (
-                <div className="text-center text-gray-600 text-sm py-8">
-                  <p className="text-gray-500">Loading task data...</p>
-                </div>
-              ) : selectedUserTaskStats.total === 0 ? (
-                <div className="text-center text-gray-600 text-sm py-8">
-                  <p className="text-gray-500">No tasks assigned</p>
-                </div>
-              ) : (
-                <>
-                  <div className="flex justify-center mb-6">
-                    <div className="w-32 h-32 rounded-full bg-gradient-conic from-blue-500 via-green-500 to-red-500 p-1.5 flex items-center justify-center shadow-lg">
-                      <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
-                        <div className="text-center">
-                          <p className="text-xs text-gray-600 font-medium">
-                            Overall
-                          </p>
-                          <p className="text-2xl font-bold text-gray-900">
-                            {selectedUserTaskStats.total > 0
-                              ? Math.round(
-                                  (selectedUserTaskStats.done /
-                                    selectedUserTaskStats.total) *
-                                    100
-                                )
-                              : 0}
-                            %
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+            {/* Task Progress */}
+            {selectedDMUser && canViewUserTaskProgress(currentUser.role) && (
+              <div className="p-6 border-b border-gray-300 bg-white overflow-y-auto flex-1">
+                <h3 className="text-sm font-bold text-gray-900 mb-6">
+                  Task Progress
+                </h3>
+                {loadingUserTasks ? (
+                  <div className="text-center text-gray-600 text-sm py-8">
+                    <p className="text-gray-500">Loading task data...</p>
                   </div>
-                  <div className="space-y-3">
-                    <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-2 text-sm font-medium text-gray-900">
-                          <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                          Working on it
-                        </span>
-                        <span className="text-sm font-bold text-blue-600">
-                          {selectedUserTaskStats.inProgress}
-                        </span>
-                      </div>
-                      <div className="mt-2 w-full bg-gray-300 rounded-full h-2">
-                        <div
-                          className="bg-blue-500 h-2 rounded-full transition-all"
-                          style={{
-                            width: `${
-                              selectedUserTaskStats.total > 0
-                                ? Math.round(
-                                    (selectedUserTaskStats.inProgress /
-                                      selectedUserTaskStats.total) *
-                                      100
-                                  )
-                                : 0
-                            }%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-2 text-sm font-medium text-gray-900">
-                          <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                          Done
-                        </span>
-                        <span className="text-sm font-bold text-green-600">
-                          {selectedUserTaskStats.done}
-                        </span>
-                      </div>
-                      <div className="mt-2 w-full bg-gray-300 rounded-full h-2">
-                        <div
-                          className="bg-green-500 h-2 rounded-full transition-all"
-                          style={{
-                            width: `${
-                              selectedUserTaskStats.total > 0
+                ) : selectedUserTaskStats.total === 0 ? (
+                  <div className="text-center text-gray-600 text-sm py-8">
+                    <p className="text-gray-500">No tasks assigned</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-center mb-6">
+                      <div className="w-32 h-32 rounded-full bg-gradient-conic from-blue-500 via-green-500 to-red-500 p-1.5 flex items-center justify-center shadow-lg">
+                        <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+                          <div className="text-center">
+                            <p className="text-xs text-gray-600 font-medium">
+                              Overall
+                            </p>
+                            <p className="text-2xl font-bold text-gray-900">
+                              {selectedUserTaskStats.total > 0
                                 ? Math.round(
                                     (selectedUserTaskStats.done /
                                       selectedUserTaskStats.total) *
-                                      100
+                                      100,
                                   )
-                                : 0
-                            }%`,
-                          }}
-                        />
+                                : 0}
+                              %
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                      <p className="text-xs font-medium text-gray-700">
-                        Total Tasks:{" "}
-                        <span className="font-bold text-gray-900">
-                          {selectedUserTaskStats.total}
-                        </span>
-                      </p>
+                    <div className="space-y-3">
+                      <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                            <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                            Working on it
+                          </span>
+                          <span className="text-sm font-bold text-blue-600">
+                            {selectedUserTaskStats.inProgress}
+                          </span>
+                        </div>
+                        <div className="mt-2 w-full bg-gray-300 rounded-full h-2">
+                          <div
+                            className="bg-blue-500 h-2 rounded-full transition-all"
+                            style={{
+                              width: `${
+                                selectedUserTaskStats.total > 0
+                                  ? Math.round(
+                                      (selectedUserTaskStats.inProgress /
+                                        selectedUserTaskStats.total) *
+                                        100,
+                                    )
+                                  : 0
+                              }%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                            <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                            Done
+                          </span>
+                          <span className="text-sm font-bold text-green-600">
+                            {selectedUserTaskStats.done}
+                          </span>
+                        </div>
+                        <div className="mt-2 w-full bg-gray-300 rounded-full h-2">
+                          <div
+                            className="bg-green-500 h-2 rounded-full transition-all"
+                            style={{
+                              width: `${
+                                selectedUserTaskStats.total > 0
+                                  ? Math.round(
+                                      (selectedUserTaskStats.done /
+                                        selectedUserTaskStats.total) *
+                                        100,
+                                    )
+                                  : 0
+                              }%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <p className="text-xs font-medium text-gray-700">
+                          Total Tasks:{" "}
+                          <span className="font-bold text-gray-900">
+                            {selectedUserTaskStats.total}
+                          </span>
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+                  </>
+                )}
+              </div>
+            )}
+          </PageContentCon>
+        )}
 
-      {/* Error Toast */}
-      {error && (
-        <div className="fixed bottom-4 right-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 shadow-lg z-50">
-          <AlertCircle size={20} className="text-red-600 flex-shrink-0" />
-          <p className="text-red-800 text-sm">{error}</p>
-        </div>
-      )}
+        {/* Error Toast */}
+        {error && (
+          <div className="fixed bottom-4 right-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 shadow-lg z-50">
+            <AlertCircle size={20} className="text-red-600 flex-shrink-0" />
+            <p className="text-red-800 text-sm">{error}</p>
+          </div>
+        )}
 
-      {/* Channel Creation Modal */}
-      <ChannelCreationModal
-        isOpen={isChannelModalOpen}
-        onClose={() => setIsChannelModalOpen(false)}
-        onSubmit={createChannel}
-        currentUserId={currentUser?.id || 0}
-      />
-
-      {/* TaskerBot Chatbot */}
-      <Chatbot
-        teamMembers={dmConversations.map((user) => ({
-          id: user.id,
-          name: `${user.firstName} ${user.lastName}`,
-          email: user.email,
-        }))}
-      />
-    </div>
+        {/* Channel Creation Modal */}
+        <CreateChannelModal
+          isOpen={isChannelModalOpen}
+          onClose={() => setIsChannelModalOpen(false)}
+          onSubmit={createChannel}
+          currentUserId={currentUser?.id || 0}
+        />
+      </div>{" "}
+    </PageContainer>
   );
 }

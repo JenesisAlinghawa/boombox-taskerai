@@ -1,60 +1,43 @@
-// app/ClientLayout.tsx
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
 import { usePathname } from "next/navigation";
 import { SidePanel } from "@/app/components/sidebar/SidePanel";
 
-export default function ClientLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  // Initialize cleanup routine on app start
-  useEffect(() => {
-    const initCleanup = async () => {
-      try {
-        // Only initialize once on app start
-        const response = await fetch("/api/system/cleanup-init", {
-          method: "POST",
-        });
-        if (response.ok) {
-          console.log("[ClientLayout] Cleanup routine initialized");
-        }
-      } catch (error) {
-        console.error("[ClientLayout] Failed to initialize cleanup:", error);
-      }
-    };
-
-    initCleanup();
-  }, []); // Empty dependency array = run once on mount
-
-  // List all auth routes — add more if you create them later
-  const isAuthPage =
-    pathname === "/auth/login" ||
-    pathname === "/auth/register" ||
-    pathname === "/auth/forgot-password" ||
-    pathname === "/auth/reset" ||
-    pathname === "/auth/verify" ||
-    pathname.startsWith("/auth/");
+  const isAuthPage = 
+    pathname === "/" || 
+    pathname.startsWith("/auth/login") || pathname.startsWith("/auth/forgotPassword") || 
+    pathname.startsWith("/auth/register");
 
   return (
-    <>
-      {/* Only show sidebar if NOT on auth page - SidePanel persists across navigation */}
-      {!isAuthPage && <SidePanel />}
+    <div className="relative min-h-screen w-full overflow-hidden">
+      {/* Background Image Wrapper */}
+      <div 
+        className="fixed inset-0 z-[-1] bg-cover bg-center bg-no-repeat"
+        style={{ 
+          backgroundImage: "url('/assets/images/taskerBg.jpg')", 
+          backgroundColor: "#01162B" 
+        }} 
+      />
 
-      <main
-        style={{
-          background: "#f8fbff",
-          minHeight: "100vh",
-          flex: 1,
-          overflow: "hidden",
-        }}
-      >
-        {children}
-      </main>
-    </>
+      <div className="flex h-screen w-full">
+        {/* Conditional Rendering: SidePanel only shows if NOT an auth page */}
+        {!isAuthPage && <SidePanel />}
+
+        <main
+          style={{
+            position: "relative",
+            flex: 1,
+            background: "transparent", 
+            overflow: "hidden"
+          }}
+        >
+          {children}
+        </main>
+      </div>
+    </div>
   );
 }
