@@ -33,7 +33,7 @@ export default function TaskStatusChart({ data, title }: TaskStatusChartProps) {
           background: COLORS.cardBg,
           border: "1px solid rgba(0,0,0,0.1)",
           filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
-          padding: 20,
+          padding: "20px 20px 20px 20px",
           borderRadius: 8,
           marginBottom: 24,
           textAlign: "center",
@@ -78,7 +78,7 @@ export default function TaskStatusChart({ data, title }: TaskStatusChartProps) {
         background: COLORS.cardBg,
         border: "1px solid rgba(0,0,0,0.1)",
         filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
-        padding: 20,
+        padding: "20px 20px 20px 20px",
         borderRadius: 8,
         marginBottom: 24,
       }}

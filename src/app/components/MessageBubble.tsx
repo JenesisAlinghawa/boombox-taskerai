@@ -44,7 +44,6 @@ export function MessageBubble({
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(message.content);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showActions, setShowActions] = useState(false);
 
   const handleEditSave = () => {
     if (editedContent.trim()) {
@@ -55,241 +54,277 @@ export function MessageBubble({
 
   const handleDelete = () => {
     onDelete(message.id);
-    setShowActions(false);
+  };
+
+  const formatTime = (date: string) => {
+    return new Date(date).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
   };
 
   if (message.isDeleted) {
     return (
-      <div
-        className={`flex gap-3 ${
-          isCurrentUser ? "justify-end" : "justify-start"
-        }`}
-      >
-        <p className="text-xs text-gray-400 italic">Message unsent</p>
+      <div style={{ display: "flex", gap: "12px", marginBottom: "4px" }}>
+        <p
+          style={{
+            fontSize: "12px",
+            color: "rgba(255,255,255,0.4)",
+            fontStyle: "italic",
+          }}
+        >
+          Message unsent
+        </p>
       </div>
     );
   }
 
   return (
     <div
-      className={`flex gap-3 group ${
-        isCurrentUser ? "justify-end" : "justify-start"
-      }`}
+      style={{
+        display: "flex",
+        gap: "12px",
+        marginBottom: "4px",
+        flexDirection: isCurrentUser ? "row-reverse" : "row",
+      }}
     >
-      {/* Avatar - Left side for others */}
-      {!isCurrentUser && (
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 shadow-sm">
-          {message.sender.profilePicture ? (
-            <img
-              src={message.sender.profilePicture}
-              alt={message.sender.firstName}
-              className="w-full h-full rounded-full object-cover"
-            />
-          ) : (
-            `${message.sender.firstName[0]}${message.sender.lastName[0]}`
-          )}
-        </div>
-      )}
+      {/* Avatar */}
+      <div
+        style={{
+          width: "32px",
+          height: "32px",
+          borderRadius: "50%",
+          background: "linear-gradient(135deg, #798CC3 0%, #5a6fa3 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "12px",
+          color: "#fff",
+          fontWeight: "600",
+          flexShrink: 0,
+          position: "relative",
+        }}
+      >
+        {message.sender.profilePicture ? (
+          <img
+            src={message.sender.profilePicture}
+            alt={message.sender.firstName}
+            style={{
+              width: "100%",
+              height: "100%",
+              borderRadius: "50%",
+              objectFit: "cover",
+            }}
+          />
+        ) : (
+          `${message.sender.firstName[0]}${message.sender.lastName[0]}`
+        )}
+      </div>
 
       {/* Message Content */}
       <div
-        className={`flex flex-col max-w-2xl ${
-          isCurrentUser ? "items-end" : "items-start"
-        }`}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: isCurrentUser ? "flex-end" : "flex-start",
+          maxWidth: "600px",
+        }}
       >
-        {/* Sender Name - Show for received messages only */}
-        {!isCurrentUser && (
-          <p className="text-xs font-semibold text-gray-700 mb-1 px-3">
-            {message.sender.firstName}
-          </p>
-        )}
-
-        {/* Message Bubble */}
+        {/* Name + Timestamp Row */}
         <div
-          className={`px-4 py-2.5 rounded-2xl shadow-sm border relative group/bubble break-words w-fit max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg ${
-            isCurrentUser
-              ? "bg-blue-600 text-white rounded-br-none border-blue-600"
-              : "bg-white text-gray-900 rounded-bl-none border-gray-200"
-          }`}
+          style={{
+            display: "flex",
+            gap: "8px",
+            alignItems: "center",
+            marginBottom: "4px",
+            flexDirection: isCurrentUser ? "row-reverse" : "row",
+          }}
         >
-          {isEditing ? (
-            <div className="flex gap-2 items-center">
-              <input
-                type="text"
-                value={editedContent}
-                onChange={(e) => setEditedContent(e.target.value)}
-                className="flex-1 px-2 py-1 text-sm rounded border border-gray-300 text-gray-900"
-                autoFocus
-              />
-              <button
-                onClick={handleEditSave}
-                className="p-1 hover:bg-opacity-80 transition-all"
-                title="Save"
-              >
-                <CheckCircle size={16} />
-              </button>
-              <button
-                onClick={() => {
-                  setEditedContent(message.content);
-                  setIsEditing(false);
-                }}
-                className="p-1 hover:bg-opacity-80 transition-all"
-                title="Cancel"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          ) : (
-            <>
-              <p className="text-sm font-medium break-words whitespace-pre-wrap">
-                {message.content}
-              </p>
-              {message.isEdited && (
-                <p
-                  className={`text-xs mt-1 ${
-                    isCurrentUser ? "text-blue-100" : "text-gray-500"
-                  }`}
-                >
-                  (edited)
-                </p>
-              )}
-
-              {/* Attachments */}
-              {message.attachments && message.attachments.length > 0 && (
-                <div className="mt-2 space-y-1">
-                  {message.attachments.map((attachment, idx) => (
-                    <a
-                      key={idx}
-                      href={attachment}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`text-xs underline block truncate ${
-                        isCurrentUser ? "text-blue-100" : "text-blue-600"
-                      }`}
-                    >
-                      📎 {attachment.split("/").pop()?.slice(0, 20) || "File"}
-                    </a>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Action Buttons - Show on hover */}
-          {!isEditing && (
-            <div className="absolute -bottom-8 left-0 flex gap-0.5 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
-              <button
-                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className="p-1 bg-white text-gray-600 rounded shadow-sm hover:bg-gray-50 transition-colors border border-gray-300"
-                title="React"
-              >
-                <Smile size={12} />
-              </button>
-              <button
-                onClick={() => onReply(message.id)}
-                className="p-1 bg-white text-gray-600 rounded shadow-sm hover:bg-gray-50 transition-colors border border-gray-300"
-                title="Reply"
-              >
-                <Reply size={12} />
-              </button>
-              {isCurrentUser && (
-                <>
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="p-1 bg-white text-gray-600 rounded shadow-sm hover:bg-gray-50 transition-colors border border-gray-300"
-                    title="Edit"
-                  >
-                    <Edit2 size={12} />
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    className="p-1 bg-white text-red-600 rounded shadow-sm hover:bg-red-50 transition-colors border border-red-300"
-                    title="Delete"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </>
-              )}
-            </div>
-          )}
+          <span
+            style={{
+              fontSize: "12px",
+              fontWeight: "600",
+              color: "#fff",
+              fontFamily: "var(--font-inria-sans)",
+            }}
+          >
+            {message.sender.firstName}
+          </span>
+          <span
+            style={{
+              fontSize: "11px",
+              color: "rgba(255,255,255,0.5)",
+              fontFamily: "var(--font-inria-sans)",
+            }}
+          >
+            {formatTime(message.createdAt)}
+          </span>
         </div>
 
-        {/* Emoji Picker */}
-        {showEmojiPicker && (
-          <div className="mt-2 flex gap-1 bg-white p-2 rounded-lg shadow-md border border-gray-200">
-            {EMOJI_REACTIONS.map((emoji) => (
-              <button
-                key={emoji}
-                onClick={() => {
-                  onAddReaction(message.id, emoji);
-                  setShowEmojiPicker(false);
-                }}
-                className="p-1 hover:bg-gray-100 rounded transition-colors text-lg"
-              >
-                {emoji}
-              </button>
-            ))}
+        {/* Message Text */}
+        {isEditing ? (
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <input
+              type="text"
+              value={editedContent}
+              onChange={(e) => setEditedContent(e.target.value)}
+              style={{
+                flex: 1,
+                padding: "6px 10px",
+                fontSize: "12px",
+                borderRadius: "6px",
+                border: "1px solid rgba(255,255,255,0.2)",
+                backgroundColor: "rgba(255,255,255,0.05)",
+                color: "#fff",
+                fontFamily: "var(--font-inria-sans)",
+              }}
+              autoFocus
+            />
+            <button
+              onClick={handleEditSave}
+              style={{
+                padding: "4px",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: "#fff",
+              }}
+              title="Save"
+            >
+              <CheckCircle size={14} />
+            </button>
+            <button
+              onClick={() => {
+                setEditedContent(message.content);
+                setIsEditing(false);
+              }}
+              style={{
+                padding: "4px",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: "#fff",
+              }}
+              title="Cancel"
+            >
+              <X size={14} />
+            </button>
           </div>
+        ) : (
+          <>
+            <p
+              style={{
+                fontSize: "14px",
+                color: "rgba(255,255,255,0.8)",
+                margin: 0,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                fontFamily: "var(--font-inria-sans)",
+                lineHeight: "1.4",
+              }}
+            >
+              {message.content}
+            </p>
+            {message.isEdited && (
+              <p
+                style={{
+                  fontSize: "11px",
+                  color: "rgba(255,255,255,0.5)",
+                  marginTop: "4px",
+                  fontFamily: "var(--font-inria-sans)",
+                }}
+              >
+                (edited)
+              </p>
+            )}
+
+            {/* Attachments */}
+            {message.attachments && message.attachments.length > 0 && (
+              <div
+                style={{
+                  marginTop: "8px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "6px",
+                }}
+              >
+                {message.attachments.map((attachment, idx) => (
+                  <a
+                    key={idx}
+                    href={attachment}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      fontSize: "12px",
+                      color: "#60a5fa",
+                      textDecoration: "underline",
+                      display: "block",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      fontFamily: "var(--font-inria-sans)",
+                    }}
+                  >
+                    📎 {attachment.split("/").pop()?.slice(0, 20) || "File"}
+                  </a>
+                ))}
+              </div>
+            )}
+          </>
         )}
 
-        {/* Reactions - Display directly below bubble, overlapping like Discord */}
+        {/* Reactions */}
         {message.reactions && message.reactions.length > 0 && (
-          <div className="-mt-3 flex flex-wrap gap-1 px-2 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg">
+          <div
+            style={{
+              marginTop: "8px",
+              display: "flex",
+              gap: "6px",
+              flexWrap: "wrap",
+            }}
+          >
             {Array.from(
-              new Map(message.reactions.map((r) => [r.emoji, r])).values()
+              new Map(message.reactions.map((r) => [r.emoji, r])).values(),
             ).map((reaction) => {
               const count =
                 message.reactions?.filter((r) => r.emoji === reaction.emoji)
                   .length || 0;
               const hasReacted = message.reactions?.some(
-                (r) => r.emoji === reaction.emoji && r.userId === currentUserId
+                (r) => r.emoji === reaction.emoji && r.userId === currentUserId,
               );
               return (
                 <button
                   key={reaction.emoji}
                   onClick={() => onAddReaction(message.id, reaction.emoji)}
-                  className={`px-1.5 py-0.5 rounded-full text-xs flex items-center gap-0.5 transition-all whitespace-nowrap ${
-                    hasReacted
-                      ? "bg-blue-100 border border-blue-300 text-gray-900"
-                      : "bg-gray-100 border border-gray-300 hover:bg-gray-200 text-gray-900"
-                  }`}
+                  style={{
+                    padding: "4px 8px",
+                    borderRadius: "12px",
+                    fontSize: "11px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    border:
+                      "1px solid " +
+                      (hasReacted
+                        ? "rgba(96, 165, 250, 0.5)"
+                        : "rgba(107, 114, 128, 0.3)"),
+                    background: hasReacted
+                      ? "rgba(96, 165, 250, 0.2)"
+                      : "rgba(107, 114, 128, 0.1)",
+                    color: "#fff",
+                    cursor: "pointer",
+                    fontFamily: "var(--font-inria-sans)",
+                  }}
                 >
-                  <span className="text-sm">{reaction.emoji}</span>
-                  <span className="text-xs font-semibold">{count}</span>
+                  <span style={{ fontSize: "12px" }}>{reaction.emoji}</span>
+                  <span>{count}</span>
                 </button>
               );
             })}
           </div>
         )}
-
-        {/* Timestamp */}
-        <p
-          className={`text-xs mt-1 px-2 opacity-70 ${
-            isCurrentUser ? "text-blue-200" : "text-gray-500"
-          }`}
-        >
-          {new Date(message.createdAt).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: true,
-          })}
-        </p>
       </div>
-
-      {/* Avatar - Right side for current user */}
-      {isCurrentUser && (
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 shadow-sm">
-          {message.sender.profilePicture ? (
-            <img
-              src={message.sender.profilePicture}
-              alt={message.sender.firstName}
-              className="w-full h-full rounded-full object-cover"
-            />
-          ) : (
-            `${message.sender.firstName[0]}${message.sender.lastName[0]}`
-          )}
-        </div>
-      )}
     </div>
   );
 }

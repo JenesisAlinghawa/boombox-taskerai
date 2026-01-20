@@ -33,7 +33,12 @@ export const saveUserSession = (user: User) => {
  */
 export const getCurrentUser = async (userId?: string | number): Promise<User | null> => {
   try {
-    const id = userId || (typeof window !== "undefined" ? localStorage.getItem("userId") : null) || "1";
+    const id = userId || (typeof window !== "undefined" ? localStorage.getItem("userId") : null);
+    
+    // If no userId is found, user is not logged in
+    if (!id) {
+      return null;
+    }
     
     const response = await fetch("/api/session", {
       headers: { "x-user-id": String(id) },
@@ -47,7 +52,7 @@ export const getCurrentUser = async (userId?: string | number): Promise<User | n
     console.error("Failed to fetch user session:", error);
   }
 
-  // Fallback to localStorage
+  // Fallback to localStorage only if it exists
   if (typeof window !== "undefined") {
     const stored = localStorage.getItem("user");
     return stored ? JSON.parse(stored) : null;

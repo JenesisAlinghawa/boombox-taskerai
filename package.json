@@ -2,10 +2,11 @@
   "name": "boombox",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "ts-node server.ts",
     "build": "next build",
-    "start": "next start",
+    "start": "ts-node server.ts",
     "lint": "next lint"
   },
   "dependencies": {
@@ -39,6 +40,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.4.6",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
     "typescript": "^5"
   }
 }

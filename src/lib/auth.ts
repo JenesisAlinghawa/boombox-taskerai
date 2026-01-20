@@ -122,6 +122,36 @@ export function canPromoteUsers(role: Role): boolean {
 }
 
 /**
+ * Gets the role hierarchy level (higher number = higher privilege)
+ * Used to determine if one user can assign another user to tasks
+ * 
+ * @param role - User role
+ * @returns number - Hierarchy level (1-5)
+ */
+export function getRoleHierarchyLevel(role: Role): number {
+  const hierarchy: { [key in Role]: number } = {
+    EMPLOYEE: 1,
+    TEAM_LEAD: 2,
+    MANAGER: 3,
+    CO_OWNER: 4,
+    OWNER: 5,
+  };
+  return hierarchy[role] || 0;
+}
+
+/**
+ * Checks if one role can assign users of another role to tasks
+ * A user can only assign users at their own level or below
+ * 
+ * @param assignerRole - Role of the user doing the assignment
+ * @param assigneeRole - Role of the user being assigned
+ * @returns boolean - true if assignment is allowed
+ */
+export function canAssignRole(assignerRole: Role, assigneeRole: Role): boolean {
+  return getRoleHierarchyLevel(assignerRole) >= getRoleHierarchyLevel(assigneeRole);
+}
+
+/**
  * Checks if user can promote to a specific role
  * 
  * @param userRole - Current user's role

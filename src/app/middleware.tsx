@@ -1,27 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export function middleware(request: NextRequest) {
-  // Check for an "auth" cookie (customize as needed)
-  const isLoggedIn = request.cookies.get("auth");
+  // Get the pathname
+  const pathname = request.nextUrl.pathname;
 
-  // Allow access to the login page and static files
+  // Allow access to auth pages and static files
   if (
-    request.nextUrl.pathname.startsWith("/login") ||
-    request.nextUrl.pathname.startsWith("/_next") ||
-    request.nextUrl.pathname.startsWith("/api") ||
-    request.nextUrl.pathname.startsWith("/favicon.ico")
+    pathname === "/" ||
+    pathname.startsWith("/auth/") ||
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/favicon.ico")
   ) {
     return NextResponse.next();
   }
 
-  // If not logged in, redirect to /login
-  if (!isLoggedIn) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    return NextResponse.redirect(loginUrl);
-  }
+  // For all other routes, we'll rely on client-side authentication checks
+  // The client pages will redirect to login if no session is found
+  // This is because middleware runs server-side and doesn't have access to localStorage
 
-  // Otherwise, continue
   return NextResponse.next();
 }
 

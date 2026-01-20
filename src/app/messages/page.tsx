@@ -22,6 +22,7 @@ import {
   Loader,
 } from "lucide-react";
 import { getCurrentUser } from "@/utils/sessionManager";
+import { useAuthProtection } from "@/app/hooks/useAuthProtection";
 import CreateChannelModal from "@/app/components/messaging/CreateChannelModal";
 import { MessageBubble } from "@/app/components/MessageBubble";
 import { PageContainer } from "@/app/components/PageContainer";
@@ -62,7 +63,227 @@ interface Message {
 
 type ViewType = "channels" | "dms";
 
+// Channel List Item Component
+const ChannelListItem = React.memo(
+  ({
+    channel,
+    onSelect,
+  }: {
+    channel: Channel;
+    onSelect: (channel: Channel) => void;
+  }) => {
+    const [showTooltip, setShowTooltip] = React.useState(false);
+
+    return (
+      <div
+        onClick={() => onSelect(channel)}
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "4px 4px 4px 4px",
+          cursor: "pointer",
+          borderRadius: "8px",
+          background: "transparent",
+          position: "relative",
+          width: "fit-content",
+        }}
+      >
+        <div
+          style={{
+            width: "40px",
+            height: "40px",
+            borderRadius: "50%",
+            background: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "16px",
+            color: "#798CC3",
+            fontWeight: "600",
+            flexShrink: 0,
+            position: "relative",
+          }}
+        >
+          {channel.profilePicture ? (
+            <img
+              src={channel.profilePicture}
+              alt={channel.name}
+              style={{
+                width: "100%",
+                height: "100%",
+                borderRadius: "50%",
+                objectFit: "cover",
+              }}
+            />
+          ) : (
+            channel.name[0].toUpperCase()
+          )}
+        </div>
+        {showTooltip && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: "100%",
+              left: "50%",
+              transform: "translateX(-50%)",
+              marginBottom: "8px",
+              background: "rgba(0, 0, 0, 0.9)",
+              color: "#fff",
+              padding: "6px 10px 6px 10px",
+              borderRadius: "6px",
+              fontSize: "13px",
+              fontFamily: "var(--font-inria-sans)",
+              whiteSpace: "nowrap",
+              zIndex: 1000,
+              pointerEvents: "none",
+              animation: "fadeIn 0.2s",
+            }}
+          >
+            {channel.name}
+            <div
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: "50%",
+                transform: "translateX(-50%)",
+                borderLeft: "4px solid transparent",
+                borderRight: "4px solid transparent",
+                borderTop: "4px solid rgba(0, 0, 0, 0.9)",
+              }}
+            />
+          </div>
+        )}
+      </div>
+    );
+  },
+);
+
+// User List Item Component
+const UserListItem = React.memo(
+  ({
+    user,
+    isOnline,
+    onSelect,
+  }: {
+    user: User;
+    isOnline: boolean;
+    onSelect: (user: User) => void;
+  }) => {
+    const [showTooltip, setShowTooltip] = React.useState(false);
+
+    return (
+      <div
+        onClick={() => onSelect(user)}
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "4px 4px 4px 4px",
+          cursor: "pointer",
+          borderRadius: "8px",
+          background: "transparent",
+          position: "relative",
+          width: "fit-content",
+        }}
+      >
+        <div
+          style={{
+            position: "relative",
+            width: "40px",
+            height: "40px",
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              width: "40px",
+              height: "40px",
+              borderRadius: "50%",
+              background: "#fff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "16px",
+              color: "#798CC3",
+              fontWeight: "600",
+              position: "relative",
+            }}
+          >
+            {user.profilePicture ? (
+              <img
+                src={user.profilePicture}
+                alt={user.firstName}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                }}
+              />
+            ) : (
+              `${user.firstName[0]}${user.lastName[0]}`
+            )}
+          </div>
+          <div
+            style={{
+              position: "absolute",
+              bottom: "-2px",
+              right: "-2px",
+              width: "14px",
+              height: "14px",
+              borderRadius: "50%",
+              background: isOnline ? "#10b981" : "#6b7280",
+              border: "2px solid rgba(13, 27, 42, 1)",
+              boxShadow: "0 0 0 2px rgba(30, 41, 59, 0.8)",
+            }}
+          />
+        </div>
+        {showTooltip && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: "100%",
+              left: "50%",
+              transform: "translateX(-50%)",
+              marginBottom: "8px",
+              background: "rgba(0, 0, 0, 0.9)",
+              color: "#fff",
+              padding: "6px 10px 6px 10px",
+              borderRadius: "6px",
+              fontSize: "13px",
+              fontFamily: "var(--font-inria-sans)",
+              whiteSpace: "nowrap",
+              zIndex: 1000,
+              pointerEvents: "none",
+              animation: "fadeIn 0.2s",
+            }}
+          >
+            {user.firstName} {user.lastName}
+            <div
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: "50%",
+                transform: "translateX(-50%)",
+                borderLeft: "4px solid transparent",
+                borderRight: "4px solid transparent",
+                borderTop: "4px solid rgba(0, 0, 0, 0.9)",
+              }}
+            />
+          </div>
+        )}
+      </div>
+    );
+  },
+);
+
 export default function MessagesPage() {
+  useAuthProtection(); // Protect this route
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeView, setActiveView] = useState<ViewType>("channels");
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
@@ -105,16 +326,22 @@ export default function MessagesPage() {
     return highRoles.includes(currentUserRole);
   };
 
+  // Debug: Log activeUserIds changes
+  useEffect(() => {
+    console.log("⚡ activeUserIds updated:", activeUserIds);
+  }, [activeUserIds]);
+
   useEffect(() => {
     loadInitialData();
   }, []);
 
-  // Initialize Socket.io connection
   useEffect(() => {
     if (!currentUser) return;
 
-    // Connect to Socket.io server
+    console.log("Initializing socket connection...");
     socketRef.current = io(undefined, {
+      path: "/socket.io/",
+      transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
@@ -125,31 +352,36 @@ export default function MessagesPage() {
 
     socket.on("connect", () => {
       console.log("Socket.io connected");
-      // Emit user identification
       socket.emit("user:join", {
-        userId: currentUser.id,
+        userId: String(currentUser.id),
         userName: `${currentUser.firstName} ${currentUser.lastName}`,
       });
     });
 
-    // Listen for active users list
+    socket.on("connect_error", (error) => {
+      console.error("Socket connection error:", error);
+    });
+
     socket.on("users:active", (userIds: string[]) => {
+      console.log("Active users received:", userIds);
+      console.log("Current user ID:", String(currentUser.id));
+      console.log(
+        "Is current user online?",
+        userIds.includes(String(currentUser.id)),
+      );
       setActiveUserIds(userIds);
     });
 
-    // Listen for new messages from other users
     socket.on("message:new", (newMessage: Message) => {
       setMessages((prev) => [...prev, newMessage]);
     });
 
-    // Listen for edited messages
     socket.on("message:edited", (editedMessage: Message) => {
       setMessages((prev) =>
         prev.map((msg) => (msg.id === editedMessage.id ? editedMessage : msg)),
       );
     });
 
-    // Listen for deleted messages
     socket.on("message:deleted", (messageId: number) => {
       setMessages((prev) =>
         prev.map((msg) =>
@@ -158,7 +390,6 @@ export default function MessagesPage() {
       );
     });
 
-    // Listen for reactions
     socket.on(
       "message:reaction",
       (data: { messageId: number; emoji: string; userId: number }) => {
@@ -213,7 +444,6 @@ export default function MessagesPage() {
         });
       }
     } else {
-      // Clear messages when nothing is selected
       setMessages([]);
     }
   }, [selectedChannel, selectedDMUser, currentUser]);
@@ -280,33 +510,54 @@ export default function MessagesPage() {
         window.location.href = "/auth/login";
         return;
       }
+
       setCurrentUser(user as User);
 
-      const channelsRes = await fetch(
-        `/api/channels?userId=${(user as any).id}`,
-        {
-          headers: {
-            "x-user-id": String((user as any).id),
-          },
-        },
-      );
-      if (channelsRes.ok) {
-        const data = await channelsRes.json();
-        setChannels(data.channels || []);
-      }
+      // Set loading to false immediately so UI shows
+      setLoading(false);
 
-      const dmsRes = await fetch("/api/direct-messages", {
-        headers: {
-          "x-user-id": String((user as any).id),
-        },
-      });
-      if (dmsRes.ok) {
-        const data = await dmsRes.json();
-        setDmConversations(data.conversations || []);
+      // Fetch channels and DMs in parallel with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      try {
+        const [channelsRes, dmsRes] = await Promise.all([
+          fetch(`/api/channels?userId=${(user as any).id}`, {
+            headers: {
+              "x-user-id": String((user as any).id),
+            },
+            signal: controller.signal,
+          }),
+          fetch("/api/direct-messages", {
+            headers: {
+              "x-user-id": String((user as any).id),
+            },
+            signal: controller.signal,
+          }),
+        ]);
+
+        clearTimeout(timeoutId);
+
+        if (channelsRes.ok) {
+          const data = await channelsRes.json();
+          setChannels(data.channels || []);
+        }
+
+        if (dmsRes.ok) {
+          const data = await dmsRes.json();
+          const conversations = (data.conversations || []).filter(
+            (u: any) => u && u.firstName && u.lastName,
+          );
+          setDmConversations(conversations);
+        }
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        if (fetchErr.name !== "AbortError") {
+          setError("Failed to load channels and conversations");
+        }
       }
     } catch (err) {
       setError("Failed to load data");
-    } finally {
       setLoading(false);
     }
   };
@@ -314,9 +565,9 @@ export default function MessagesPage() {
   const fetchChannelMessages = async () => {
     if (!selectedChannel || !currentUser) return;
     try {
-      setMessages([]); // Clear messages while loading
+      setMessages([]);
       const res = await fetch(
-        `/api/messages?channelId=${selectedChannel.id}&limit=100`,
+        `/api/messages?channelId=${selectedChannel.id}&limit=50`,
         {
           headers: {
             "x-user-id": String(currentUser.id),
@@ -335,7 +586,7 @@ export default function MessagesPage() {
   const fetchDMMessages = async () => {
     if (!selectedDMUser || !currentUser) return;
     try {
-      setMessages([]); // Clear messages while loading
+      setMessages([]);
       const res = await fetch(
         `/api/direct-messages?userId=${selectedDMUser.id}`,
         {
@@ -398,7 +649,6 @@ export default function MessagesPage() {
 
     setSendingMessage(true);
     try {
-      // Send regular message (channel or DM)
       if (selectedChannel && currentUser) {
         const res = await fetch(
           `/api/channels/${selectedChannel.id}/messages`,
@@ -428,7 +678,6 @@ export default function MessagesPage() {
         const newMessage = data.message;
         setMessages([...messages, newMessage]);
 
-        // Emit real-time event to other clients
         if (socketRef.current) {
           socketRef.current.emit("message:send", {
             channelId: selectedChannel.id,
@@ -468,7 +717,6 @@ export default function MessagesPage() {
         const newMessage = data.message;
         setMessages([...messages, newMessage]);
 
-        // Emit real-time event
         if (socketRef.current) {
           socketRef.current.emit("message:send", {
             recipientId: selectedDMUser.id,
@@ -488,101 +736,10 @@ export default function MessagesPage() {
     }
   };
 
-  const handleEditMessage = async (messageId: number, newContent: string) => {
-    if (!newContent.trim()) return;
-
-    try {
-      const res = await fetch(`/api/messages/${messageId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: newContent }),
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to edit message");
-      }
-
-      const updatedMessages = messages.map((msg) =>
-        msg.id === messageId
-          ? { ...msg, content: newContent, isEdited: true }
-          : msg,
-      );
-      setMessages(updatedMessages);
-
-      // Emit real-time event
-      if (socketRef.current) {
-        socketRef.current.emit("message:edit", {
-          messageId,
-          content: newContent,
-        });
-      }
-    } catch (err) {
-      console.error("Error editing message:", err);
-      setError("Failed to edit message");
-    }
-  };
-
-  const handleDeleteMessage = async (messageId: number) => {
-    try {
-      const res = await fetch(`/api/messages/${messageId}`, {
-        method: "DELETE",
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to delete message");
-      }
-
-      const updatedMessages = messages.map((msg) =>
-        msg.id === messageId ? { ...msg, isDeleted: true } : msg,
-      );
-      setMessages(updatedMessages);
-
-      // Emit real-time event
-      if (socketRef.current) {
-        socketRef.current.emit("message:delete", { messageId });
-      }
-    } catch (err) {
-      console.error("Error deleting message:", err);
-      setError("Failed to delete message");
-    }
-  };
-
-  const handleAddReaction = async (messageId: number, emoji: string) => {
-    if (!currentUser) return;
-
-    try {
-      const res = await fetch(`/api/messages/${messageId}/react`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reaction: emoji }),
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to add reaction");
-      }
-
-      const updatedMessages = messages.map((msg) =>
-        msg.id === messageId
-          ? {
-              ...msg,
-              reactions: [
-                ...(msg.reactions || []),
-                { emoji, userId: currentUser.id },
-              ],
-            }
-          : msg,
-      );
-      setMessages(updatedMessages);
-
-      // Emit real-time event
-      if (socketRef.current) {
-        socketRef.current.emit("message:reaction", {
-          messageId,
-          emoji,
-        });
-      }
-    } catch (err) {
-      console.error("Error adding reaction:", err);
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey && !sendingMessage) {
+      e.preventDefault();
+      sendMessage();
     }
   };
 
@@ -591,7 +748,6 @@ export default function MessagesPage() {
   };
 
   const getStatusDisplay = (user: User) => {
-    // Check if user is in the active users list from Socket.io
     const isOnline = activeUserIds.includes(String(user.id));
     if (isOnline) return "Online";
     if (user.lastActive) {
@@ -605,7 +761,6 @@ export default function MessagesPage() {
     return "Offline";
   };
 
-  // Helper function to format timestamp
   const formatMessageTime = (date: string): string => {
     const messageDate = new Date(date);
     const today = new Date();
@@ -635,28 +790,106 @@ export default function MessagesPage() {
     }
   };
 
-  // Helper function to determine if a message should show timestamp
-  // Shows timestamp ONLY if user replies 7+ minutes after their own last message
   const shouldShowTimestamp = (
     currentMsg: Message,
     currentIndex: number,
     allMessages: Message[],
   ): boolean => {
-    if (currentIndex === 0) return false; // Never show timestamp for first message
+    if (currentIndex === 0) return false;
 
-    // Find the previous message from the SAME sender
     for (let i = currentIndex - 1; i >= 0; i--) {
       if (allMessages[i].sender.id === currentMsg.sender.id) {
-        // Found previous message from same sender
         const currentTime = new Date(currentMsg.createdAt).getTime();
         const prevTime = new Date(allMessages[i].createdAt).getTime();
         const gapMinutes = (currentTime - prevTime) / (1000 * 60);
-        return gapMinutes >= 7; // Show timestamp ONLY if 7+ minute gap
+        return gapMinutes >= 7;
       }
     }
 
-    // No previous message from this sender, don't show timestamp
     return false;
+  };
+
+  const addReaction = async (messageId: number, emoji: string) => {
+    if (!currentUser || (!selectedChannel && !selectedDMUser)) return;
+
+    try {
+      const endpoint = selectedChannel
+        ? `/api/channels/${selectedChannel.id}/messages/${messageId}/reactions`
+        : `/api/direct-messages/${messageId}/reactions`;
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji, userId: currentUser.id }),
+      });
+
+      if (!res.ok) throw new Error("Failed to add reaction");
+
+      const data = await res.json();
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === messageId ? data.message : msg)),
+      );
+    } catch (err) {
+      console.error("Error adding reaction:", err);
+    }
+  };
+
+  const deleteMessage = async (messageId: number) => {
+    if (!confirm("Delete this message?")) return;
+    if (!currentUser || (!selectedChannel && !selectedDMUser)) return;
+
+    try {
+      const endpoint = selectedChannel
+        ? `/api/channels/${selectedChannel.id}/messages/${messageId}`
+        : `/api/direct-messages/${messageId}`;
+
+      const res = await fetch(endpoint, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!res.ok) throw new Error("Failed to delete message");
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId ? { ...msg, isDeleted: true } : msg,
+        ),
+      );
+    } catch (err) {
+      console.error("Error deleting message:", err);
+      alert("Failed to delete message");
+    }
+  };
+
+  const editMessage = async (messageId: number, newContent: string) => {
+    if (
+      !newContent.trim() ||
+      !currentUser ||
+      (!selectedChannel && !selectedDMUser)
+    )
+      return;
+
+    try {
+      const endpoint = selectedChannel
+        ? `/api/channels/${selectedChannel.id}/messages/${messageId}`
+        : `/api/direct-messages/${messageId}`;
+
+      const res = await fetch(endpoint, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: newContent }),
+      });
+
+      if (!res.ok) throw new Error("Failed to edit message");
+
+      const data = await res.json();
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === messageId ? data.message : msg)),
+      );
+    } catch (err) {
+      console.error("Error editing message:", err);
+      alert("Failed to edit message");
+    }
   };
 
   const handleEditChannel = async (
@@ -682,6 +915,7 @@ export default function MessagesPage() {
               : ch,
           ),
         );
+
         if (selectedChannel?.id === channelId) {
           setSelectedChannel({
             ...selectedChannel,
@@ -698,6 +932,7 @@ export default function MessagesPage() {
 
   const handleDeleteChannel = async (channelId: number) => {
     if (!confirm("Are you sure you want to delete this channel?")) return;
+
     try {
       const res = await fetch(`/api/channels/${channelId}`, {
         method: "DELETE",
@@ -725,599 +960,740 @@ export default function MessagesPage() {
       .includes(searchQuery.toLowerCase()),
   );
 
-  const getReplyingToMessage = (): Message | undefined => {
-    return messages.find((msg) => msg.id === replyingTo);
-  };
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <p className="text-gray-600">Loading messages...</p>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100vh",
+        }}
+      >
+        <Loader className="animate-spin" size={40} />
       </div>
     );
   }
 
   return (
     <PageContainer title="MESSAGES">
-      <div className="flex h-[calc(100vh-120px)] gap-4 p-0 !bg-transparent">
-        {/* LEFT SIDEBAR - Channels & Conversations */}
-        <PageContentCon className="w-72 flex flex-col overflow-hidden !p-0 !bg-white text-black">
-          {/* Header */}
-          <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-            <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
-          </div>
-
-          {/* Search Bar */}
-          <div className="px-4 py-3 border-b border-gray-200">
-            <div className="relative">
-              <Search
-                size={16}
-                className="absolute left-3 top-3 text-gray-400"
-              />
-              <input
-                type="text"
-                placeholder="Search chats..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm"
-              />
-            </div>
-          </div>
-
-          {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto">
+      <style>{`
+        ::-webkit-scrollbar {
+          width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.2);
+          border-radius: 2px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.3);
+        }
+      `}</style>
+      <div style={{ display: "flex", height: "100%", gap: "12px" }}>
+        {/* Left Sidebar */}
+        <div
+          style={{
+            width: "80px",
+            flexShrink: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: "16px",
+          }}
+        >
+          {/* Channels Container */}
+          <PageContentCon
+            style={{
+              height: "auto",
+              minHeight: "200px",
+              maxHeight: "320px",
+              overflow: "visible",
+              display: "flex",
+              flexDirection: "column",
+              paddingTop: "16px",
+              paddingLeft: "16px",
+              paddingRight: "16px",
+              paddingBottom: "16px",
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: "12px",
+              backdropFilter: "blur(4px)",
+            }}
+          >
             {/* Channels Section */}
-            <div className="p-4 space-y-4">
-              <div>
-                <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-widest mb-3 px-2">
-                  Channels
-                </h3>
-                <button
-                  onClick={() => setIsChannelModalOpen(true)}
-                  className="w-full mb-3 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-medium text-sm shadow-sm hover:shadow-md"
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                height: "100%",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: "16px",
+                  paddingBottom: "12px",
+                  borderBottom: "1px solid rgba(255,255,255,0.1)",
+                }}
+              >
+                <h2
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: "400",
+                    margin: 0,
+                    color: "#fff",
+                    fontFamily: "var(--font-inria-sans)",
+                    letterSpacing: "0.3px",
+                  }}
                 >
-                  + New Channel
+                  Channels
+                </h2>
+                <button
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "rgba(255,255,255,0.6)",
+                    padding: "0px 0px 0px 0px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <MoreVertical size={20} />
                 </button>
-                <div className="space-y-2">
-                  {filteredChannels.map((channel) => (
-                    <button
-                      key={channel.id}
-                      onClick={() => {
-                        setSelectedChannel(channel);
-                        setSelectedDMUser(null);
-                        setMessageSearch("");
-                      }}
-                      className={`w-full text-left px-3 py-2.5 rounded-lg transition-all text-sm flex items-center gap-2 font-medium ${
-                        selectedChannel?.id === channel.id
-                          ? "bg-blue-100 text-blue-900 border border-blue-300"
-                          : "text-gray-700 hover:bg-gray-100"
-                      }`}
-                    >
-                      <Users size={16} />
-                      {channel.name}
-                    </button>
-                  ))}
-                </div>
               </div>
-
-              {/* Divider */}
-              <div className="h-px bg-gray-200" />
-
-              {/* Active Conversations */}
-              <div>
-                <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-widest mb-3 px-2 flex items-center justify-between">
-                  Conversations
-                  <span className="ml-auto bg-gray-200 text-gray-700 text-xs rounded-full px-2 py-0.5 font-normal">
-                    {dmConversations.length}
-                  </span>
-                </h3>
-                <div className="space-y-2">
-                  {filteredDMs.map((user) => (
-                    <button
-                      key={user.id}
-                      onClick={() => {
-                        setSelectedDMUser(user);
-                        setSelectedChannel(null);
-                        setMessageSearch("");
-                      }}
-                      className={`w-full text-left px-3 py-2.5 rounded-lg transition-all flex items-center gap-3 ${
-                        selectedDMUser?.id === user.id
-                          ? "bg-blue-100 border border-blue-300"
-                          : "hover:bg-gray-100"
-                      }`}
-                    >
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
-                        {user.profilePicture ? (
-                          <img
-                            src={user.profilePicture}
-                            alt={user.firstName}
-                            className="w-full h-full rounded-full object-cover"
-                          />
-                        ) : (
-                          `${user.firstName[0]}${user.lastName[0]}`
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {user.firstName} {user.lastName}
-                        </p>
-                        <p className="text-xs text-gray-500 truncate">
-                          {getStatusDisplay(user)}
-                        </p>
-                      </div>
-                      {activeUserIds.includes(String(user.id)) && (
-                        <span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
-                      )}
-                    </button>
-                  ))}
-                </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                  overflowY: "auto",
+                  overflowX: "visible",
+                  flex: 1,
+                }}
+              >
+                {filteredChannels.map((channel) => (
+                  <ChannelListItem
+                    key={channel.id}
+                    channel={channel}
+                    onSelect={(ch) => {
+                      setSelectedChannel(ch);
+                      setSelectedDMUser(null);
+                    }}
+                  />
+                ))}
               </div>
             </div>
-          </div>
-        </PageContentCon>
+          </PageContentCon>
 
-        {/* CENTER - Chat Area */}
-        <PageContentCon className="flex-1 flex flex-col overflow-hidden !p-0 !bg-white text-black">
+          {/* Conversations Container */}
+          <PageContentCon
+            style={{
+              flex: 1,
+              minHeight: "200px",
+              maxHeight: "420px",
+              overflow: "visible",
+              display: "flex",
+              flexDirection: "column",
+              paddingTop: "16px",
+              paddingLeft: "16px",
+              paddingRight: "16px",
+              paddingBottom: "16px",
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: "12px",
+              backdropFilter: "blur(4px)",
+            }}
+          >
+            {/* Conversation Section */}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                height: "100%",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: "16px",
+                  paddingBottom: "12px",
+                  borderBottom: "1px solid rgba(255,255,255,0.1)",
+                }}
+              >
+                <h2
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: "400",
+                    margin: 0,
+                    color: "#fff",
+                    fontFamily: "var(--font-inria-sans)",
+                    letterSpacing: "0.3px",
+                  }}
+                >
+                  TEAM
+                </h2>
+                <button
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "transparent",
+                    padding: "0px 0px 0px 0px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <MoreVertical size={20} />
+                </button>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                  overflowY: "auto",
+                  overflowX: "visible",
+                  flex: 1,
+                }}
+              >
+                {filteredDMs
+                  .filter((u) => u && u.firstName && u.lastName)
+                  .map((user) => {
+                    const isOnline = activeUserIds.includes(String(user.id));
+                    console.log(
+                      `User ${user.firstName} (ID: ${user.id}) - Online: ${isOnline}`,
+                    );
+                    return (
+                      <UserListItem
+                        key={user.id}
+                        user={user}
+                        isOnline={isOnline}
+                        onSelect={(u) => {
+                          setSelectedDMUser(u);
+                          setSelectedChannel(null);
+                        }}
+                      />
+                    );
+                  })}
+              </div>
+            </div>
+          </PageContentCon>
+        </div>
+
+        {/* Main Chat Area */}
+        <PageContentCon
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+        >
           {selectedChannel || selectedDMUser ? (
             <>
-              {/* Chat Header */}
-              <div className="h-20 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-300 flex items-center justify-between px-6 shadow-sm">
-                <div className="flex items-center gap-4">
-                  {selectedChannel && (
-                    <div>
-                      <h2 className="font-bold text-gray-900 text-lg">
-                        # {selectedChannel.name}
-                      </h2>
-                      <p className="text-xs text-gray-600">
-                        {selectedChannel.members.length} members
-                      </p>
-                    </div>
-                  )}
-                  {selectedDMUser && (
-                    <>
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-sm shadow-md">
-                        {selectedDMUser.profilePicture ? (
-                          <img
-                            src={selectedDMUser.profilePicture}
-                            alt={selectedDMUser.firstName}
-                            className="w-full h-full rounded-full object-cover"
-                          />
-                        ) : (
-                          `${selectedDMUser.firstName[0]}${selectedDMUser.lastName[0]}`
-                        )}
-                      </div>
-                      <div>
-                        <h2 className="font-bold text-gray-900 text-lg">
-                          {selectedDMUser.firstName} {selectedDMUser.lastName}
-                        </h2>
-                        <p className="text-xs text-gray-600">
-                          {getStatusDisplay(selectedDMUser)}
-                        </p>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Channel Edit/Delete Buttons */}
-                {selectedChannel &&
-                  currentUser?.id === selectedChannel.creatorId && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setEditingChannelId(selectedChannel.id);
-                          setEditingChannelName(selectedChannel.name);
-                          setEditingChannelDesc(
-                            selectedChannel.description || "",
-                          );
-                        }}
-                        className="p-2 text-gray-600 hover:bg-blue-100 rounded-lg transition-colors"
-                        title="Edit channel"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteChannel(selectedChannel.id)}
-                        className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                        title="Delete channel"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  )}
-              </div>
-
-              {/* Channel Edit Modal */}
-              {editingChannelId === selectedChannel?.id && (
-                <div className="px-6 py-3 bg-blue-50 border-b border-blue-200 flex gap-2 items-center">
-                  <input
-                    type="text"
-                    value={editingChannelName}
-                    onChange={(e) => setEditingChannelName(e.target.value)}
-                    placeholder="Channel name"
-                    className="flex-1 px-3 py-1.5 border border-blue-300 rounded text-sm focus:ring-2 focus:ring-blue-600"
-                  />
-                  <input
-                    type="text"
-                    value={editingChannelDesc}
-                    onChange={(e) => setEditingChannelDesc(e.target.value)}
-                    placeholder="Description"
-                    className="flex-1 px-3 py-1.5 border border-blue-300 rounded text-sm focus:ring-2 focus:ring-blue-600"
-                  />
-                  <button
-                    onClick={() =>
-                      handleEditChannel(
-                        selectedChannel!.id,
-                        editingChannelName,
-                        editingChannelDesc,
-                      )
-                    }
-                    className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => setEditingChannelId(null)}
-                    className="px-3 py-1.5 bg-gray-300 text-gray-800 rounded text-sm hover:bg-gray-400"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
-
-              {/* Message Search Bar */}
-              <div className="px-6 py-3 border-b border-gray-200 bg-gray-50">
-                <div className="relative">
-                  <Search
-                    size={16}
-                    className="absolute left-3 top-3 text-gray-400"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Search messages..."
-                    value={messageSearch}
-                    onChange={(e) => setMessageSearch(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Messages Container - Using flex-col-reverse for scroll-to-bottom */}
+              {/* Header */}
               <div
-                ref={messagesContainerRef}
-                className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50 flex flex-col-reverse"
+                style={{
+                  paddingBottom: "16px",
+                  borderBottom: "1px solid rgba(255,255,255,0.1)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  justifyContent: "space-between",
+                }}
               >
-                <div ref={messagesEndRef} />
-                {filteredMessages.length === 0 ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-gray-500 text-center">
-                      <p className="text-lg font-medium mb-2">
-                        {messageSearch
-                          ? "No messages match your search"
-                          : "No messages yet"}
-                      </p>
-                      <p className="text-sm">Start the conversation!</p>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: "50%",
+                      background: "#798CC3",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 14,
+                      color: "#fff",
+                      fontWeight: "600",
+                    }}
+                  >
+                    {selectedDMUser
+                      ? `${selectedDMUser.firstName[0]}${selectedDMUser.lastName[0]}`
+                      : selectedChannel
+                        ? selectedChannel.name[0].toUpperCase()
+                        : ""}
+                  </div>
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "16px",
+                        fontWeight: "400",
+                        color: "#fff",
+                        fontFamily: "var(--font-inria-sans)",
+                      }}
+                    >
+                      {selectedDMUser
+                        ? `${selectedDMUser.firstName} ${selectedDMUser.lastName}`
+                        : selectedChannel
+                          ? selectedChannel.name
+                          : ""}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "rgba(255,255,255,0.6)",
+                        fontFamily: "var(--font-inria-sans)",
+                      }}
+                    >
+                      {selectedDMUser
+                        ? getStatusDisplay(selectedDMUser)
+                        : selectedChannel
+                          ? selectedChannel.description || "No description"
+                          : ""}
                     </div>
                   </div>
-                ) : (
-                  [...filteredMessages].reverse().map((msg, index) => {
-                    const reversedMessages = [...filteredMessages].reverse();
-                    const showTimestamp = shouldShowTimestamp(
-                      msg,
-                      index,
-                      reversedMessages,
-                    );
-
-                    return (
-                      <div key={msg.id}>
-                        {showTimestamp && (
-                          <div className="flex items-center justify-center my-3">
-                            <div className="bg-gray-200 h-px flex-1" />
-                            <p className="text-xs text-gray-500 px-3 font-medium">
-                              {formatMessageTime(msg.createdAt)}
-                            </p>
-                            <div className="bg-gray-200 h-px flex-1" />
-                          </div>
-                        )}
-                        {msg.parentMessageId && (
-                          <div className="text-xs text-gray-600 italic mb-2 px-3">
-                            <Reply size={12} className="inline mr-1" />
-                            {messages
-                              .find((m) => m.id === msg.parentMessageId)
-                              ?.content.slice(0, 40)}
-                            ...
-                          </div>
-                        )}
-                        <MessageBubble
-                          message={msg}
-                          isCurrentUser={msg.sender.id === currentUser?.id}
-                          onEdit={handleEditMessage}
-                          onDelete={handleDeleteMessage}
-                          onReply={(msgId: number) => setReplyingTo(msgId)}
-                          onAddReaction={handleAddReaction}
-                          currentUserId={currentUser?.id || 0}
-                        />
-                      </div>
-                    );
-                  })
-                )}
+                </div>
               </div>
 
-              {/* Reply Context */}
-              {replyingTo && getReplyingToMessage() && (
-                <div className="px-6 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Reply size={16} className="text-blue-600" />
-                    <div className="flex-1">
-                      <p className="text-xs font-semibold text-gray-700">
-                        Replying to {getReplyingToMessage()?.sender.firstName}
-                      </p>
-                      <p className="text-sm text-gray-600 truncate">
-                        {getReplyingToMessage()?.content}
-                      </p>
+              {/* Messages */}
+              <div
+                style={{
+                  flex: 1,
+                  overflowY: "auto",
+                  padding: "16px 20px 16px 20px",
+                  marginTop: "16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                }}
+              >
+                {filteredMessages.map((msg, index) => {
+                  const showTimestamp = shouldShowTimestamp(
+                    msg,
+                    index,
+                    filteredMessages,
+                  );
+                  return (
+                    <div key={msg.id}>
+                      {showTimestamp && (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            margin: "16px 0",
+                            gap: "12px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              flex: 1,
+                              height: "1px",
+                              background: "rgba(255,255,255,0.1)",
+                            }}
+                          />
+                          <p
+                            style={{
+                              fontSize: "11px",
+                              color: "rgba(255,255,255,0.5)",
+                              margin: 0,
+                              fontFamily: "var(--font-inria-sans)",
+                            }}
+                          >
+                            {formatMessageTime(msg.createdAt)}
+                          </p>
+                          <div
+                            style={{
+                              flex: 1,
+                              height: "1px",
+                              background: "rgba(255,255,255,0.1)",
+                            }}
+                          />
+                        </div>
+                      )}
+                      <MessageBubble
+                        message={msg}
+                        isCurrentUser={msg.sender.id === currentUser?.id}
+                        onAddReaction={(messageId, emoji) =>
+                          addReaction(messageId, emoji)
+                        }
+                        onDelete={(messageId) => deleteMessage(messageId)}
+                        onEdit={(messageId, newContent) =>
+                          editMessage(messageId, newContent)
+                        }
+                        onReply={(messageId) => setReplyingTo(messageId)}
+                        currentUserId={currentUser?.id || 0}
+                      />
                     </div>
-                  </div>
-                  <button
-                    onClick={() => setReplyingTo(null)}
-                    className="p-1 hover:bg-blue-100 rounded transition-colors"
+                  );
+                })}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Input Area */}
+              <div
+                style={{
+                  paddingTop: "16px",
+                  borderTop: "1px solid rgba(255,255,255,0.1)",
+                }}
+              >
+                {replyingTo && (
+                  <div
+                    style={{
+                      padding: "12px 12px 12px 12px",
+                      background: "rgba(255,255,255,0.05)",
+                      borderRadius: "8px",
+                      marginBottom: "12px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
                   >
-                    <X size={16} className="text-gray-600" />
+                    <Reply size={16} />
+                    <span
+                      style={{
+                        fontSize: "12px",
+                        opacity: 0.7,
+                        fontFamily: "var(--font-inria-sans)",
+                      }}
+                    >
+                      Replying to message
+                    </span>
+                    <button
+                      onClick={() => setReplyingTo(null)}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        color: "#fff",
+                        marginLeft: "auto",
+                      }}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                )}
+                <div
+                  style={{ display: "flex", gap: "12px", alignItems: "center" }}
+                >
+                  <button
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "rgba(255,255,255,0.6)",
+                      padding: "0px 0px 0px 0px",
+                    }}
+                  >
+                    <Paperclip size={20} />
+                  </button>
+                  <input
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Type a message..."
+                    style={{
+                      flex: 1,
+                      padding: "12px 16px 12px 16px",
+                      borderRadius: "24px",
+                      background: "rgba(255,255,255,0.08)",
+                      border: "1px solid rgba(255,255,255,0.15)",
+                      color: "#fff",
+                      fontSize: "14px",
+                      outline: "none",
+                      fontFamily: "var(--font-inria-sans)",
+                    }}
+                  />
+                  <button
+                    onClick={sendMessage}
+                    disabled={sendingMessage}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      cursor: sendingMessage ? "not-allowed" : "pointer",
+                      color: "#fff",
+                      opacity: sendingMessage ? 0.5 : 1,
+                    }}
+                  >
+                    <Send size={20} />
                   </button>
                 </div>
-              )}
-
-              {/* Message Input */}
-              <div className="border-t border-gray-300 px-6 py-4 bg-white flex items-end gap-3 shadow-sm rounded-b-xl">
-                <button className="p-2.5 hover:bg-gray-100 rounded-xl transition-colors text-gray-600 flex-shrink-0">
-                  <Paperclip size={20} />
-                </button>
-                <textarea
-                  value={messageInput}
-                  onChange={(e) => {
-                    setMessageInput(e.target.value);
-                    // Auto-grow textarea height based on content
-                    e.target.style.height = "auto";
-                    const newHeight = Math.min(e.target.scrollHeight, 150);
-                    e.target.style.height = newHeight + "px";
-                  }}
-                  onKeyPress={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      sendMessage();
-                    }
-                  }}
-                  placeholder="Type your message..."
-                  disabled={sendingMessage}
-                  rows={1}
-                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm text-gray-900 placeholder-gray-500 disabled:opacity-50 resize-none overflow-hidden"
-                />
-                <button
-                  onClick={sendMessage}
-                  disabled={sendingMessage || !messageInput.trim()}
-                  className="px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all text-sm font-medium flex items-center gap-2 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {sendingMessage ? (
-                    <>
-                      <Loader size={16} className="animate-spin" />
-                      Sending
-                    </>
-                  ) : (
-                    <>
-                      Send
-                      <Send size={16} />
-                    </>
-                  )}
-                </button>
               </div>
             </>
           ) : (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-gray-600 text-center">
-                <p className="text-lg font-medium mb-2">
-                  Select a conversation
-                </p>
-                <p className="text-sm text-gray-500">
-                  Choose a channel or direct message to start
-                </p>
-              </div>
+            <div
+              style={{
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "rgba(255,255,255,0.5)",
+              }}
+            >
+              Select a channel or conversation
             </div>
           )}
         </PageContentCon>
 
-        {/* RIGHT SIDEBAR - Conversation/Channel Profile */}
-        {(selectedChannel || selectedDMUser) && currentUser && (
-          <PageContentCon className="w-80 flex flex-col overflow-hidden !p-0 !bg-white text-black">
-            {/* Profile Section */}
-            <div className="p-6 border-b border-gray-300 bg-gradient-to-b from-blue-50 to-white">
-              <h3 className="text-sm font-bold text-gray-900 mb-6">
-                {selectedDMUser ? "User Profile" : "Channel Info"}
-              </h3>
-              <div className="text-center">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4 shadow-lg border-4 border-white">
-                  {selectedDMUser ? (
-                    selectedDMUser.profilePicture ? (
-                      <img
-                        src={selectedDMUser.profilePicture}
-                        alt={selectedDMUser.firstName}
-                        className="w-full h-full rounded-full object-cover"
-                      />
-                    ) : (
-                      `${selectedDMUser.firstName[0]}${selectedDMUser.lastName[0]}`
-                    )
-                  ) : selectedChannel?.profilePicture ? (
-                    <img
-                      src={selectedChannel.profilePicture}
-                      alt={selectedChannel.name}
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  ) : (
-                    <Users size={40} />
-                  )}
+        {/* Right Sidebar */}
+        <PageContentCon
+          style={{ width: "240px", flexShrink: 0, overflow: "auto" }}
+        >
+          {selectedChannel || selectedDMUser ? (
+            <div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  marginBottom: 20,
+                  padding: "16px 16px 16px 16px",
+                  borderRadius: "12px",
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                }}
+              >
+                <div
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: "50%",
+                    background: "#798CC3",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 18,
+                    color: "#fff",
+                    fontWeight: "600",
+                  }}
+                >
+                  {selectedDMUser
+                    ? `${selectedDMUser.firstName[0]}${selectedDMUser.lastName[0]}`
+                    : selectedChannel
+                      ? selectedChannel.name[0].toUpperCase()
+                      : ""}
                 </div>
+                <div>
+                  <div
+                    style={{
+                      fontSize: "16px",
+                      fontWeight: "400",
+                      color: "#fff",
+                      fontFamily: "var(--font-inria-sans)",
+                    }}
+                  >
+                    {selectedDMUser
+                      ? `${selectedDMUser.firstName} ${selectedDMUser.lastName}`
+                      : selectedChannel
+                        ? selectedChannel.name
+                        : ""}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      color: "rgba(255,255,255,0.6)",
+                      fontFamily: "var(--font-inria-sans)",
+                    }}
+                  >
+                    {selectedDMUser
+                      ? getStatusDisplay(selectedDMUser)
+                      : selectedChannel
+                        ? selectedChannel.description || "No description"
+                        : ""}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <input
+                  type="text"
+                  placeholder="Search in chat"
+                  value={messageSearch}
+                  onChange={(e) => setMessageSearch(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px 8px 12px",
+                    borderRadius: 8,
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    color: "#fff",
+                    fontSize: "var(--font-size-subdescription)",
+                    outline: "none",
+                    fontFamily: "var(--font-inria-sans)",
+                  }}
+                />
+              </div>
+
+              <div>
+                <h4
+                  style={{
+                    fontSize: "var(--font-size-description)",
+                    fontWeight: "400",
+                    margin: "0 0 16px 0",
+                    color: "#fff",
+                    fontFamily: "var(--font-inria-sans)",
+                  }}
+                >
+                  {selectedDMUser ? "Task Progress" : "Members"}
+                </h4>
                 {selectedDMUser ? (
-                  <>
-                    <p className="text-lg font-bold text-gray-900">
-                      {selectedDMUser.firstName} {selectedDMUser.lastName}
-                    </p>
-                    <p className="text-sm text-gray-600 capitalize mt-1">
-                      {selectedDMUser.role}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-2">
-                      {selectedDMUser.email}
-                    </p>
-                    <div className="mt-4 flex items-center justify-center gap-2">
-                      <span
-                        className={`w-3 h-3 rounded-full ${
-                          activeUserIds.includes(String(selectedDMUser.id))
-                            ? "bg-green-500"
-                            : "bg-gray-400"
-                        }`}
-                      />
-                      <span className="text-xs font-medium text-gray-700">
-                        {getStatusDisplay(selectedDMUser)}
-                      </span>
+                  loadingUserTasks ? (
+                    <div
+                      style={{
+                        textAlign: "center",
+                        color: "rgba(255,255,255,0.5)",
+                        fontSize: "var(--font-size-subdescription)",
+                        fontFamily: "var(--font-inria-sans)",
+                      }}
+                    >
+                      Loading...
                     </div>
-                  </>
+                  ) : (
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(2, 1fr)",
+                        gap: 12,
+                      }}
+                    >
+                      {[
+                        {
+                          label: "To do",
+                          value: selectedUserTaskStats.todo,
+                          color: "#FF6B6B",
+                        },
+                        {
+                          label: "In Progress",
+                          value: selectedUserTaskStats.inProgress,
+                          color: "#4ECDC4",
+                        },
+                        {
+                          label: "Stuck",
+                          value: selectedUserTaskStats.stuck,
+                          color: "#FFE66D",
+                        },
+                        {
+                          label: "Done",
+                          value: selectedUserTaskStats.done,
+                          color: "#95E1D3",
+                        },
+                      ].map((stat, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            textAlign: "center",
+                            padding: "12px 12px 12px 12px",
+                            borderRadius: "8px",
+                            background: "rgba(255,255,255,0.05)",
+                            border: "1px solid rgba(255,255,255,0.1)",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: "24px",
+                              fontWeight: "600",
+                              color: stat.color,
+                              fontFamily: "var(--font-inria-sans)",
+                            }}
+                          >
+                            {stat.value}
+                          </div>
+                          <p
+                            style={{
+                              fontSize: "12px",
+                              color: "rgba(255,255,255,0.7)",
+                              margin: "8px 0 0 0",
+                              fontFamily: "var(--font-inria-sans)",
+                            }}
+                          >
+                            {stat.label}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )
                 ) : (
-                  <>
-                    <p className="text-lg font-bold text-gray-900">
-                      {selectedChannel?.name}
-                    </p>
-                    <p className="text-xs text-gray-600 mt-3 flex items-center justify-center gap-2">
-                      <Users size={14} />
-                      {selectedChannel?.members.length || 0} members
-                    </p>
-                    <p className="text-xs text-gray-500 mt-2">
-                      {selectedChannel?.description || "No description"}
-                    </p>
-                  </>
+                  <div
+                    style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                  >
+                    {selectedChannel &&
+                      selectedChannel.members
+                        ?.filter(
+                          (m) =>
+                            m && m.user && m.user.firstName && m.user.lastName,
+                        )
+                        .map((m) => (
+                          <div
+                            key={m.user.id}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: "50%",
+                                background: "#798CC3",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: 11,
+                                color: "#fff",
+                                fontWeight: "500",
+                              }}
+                            >
+                              {m.user.firstName[0]}
+                              {m.user.lastName[0]}
+                            </div>
+                            <span
+                              style={{
+                                fontSize: "var(--font-size-subdescription)",
+                                color: "#fff",
+                                fontFamily: "var(--font-inria-sans)",
+                              }}
+                            >
+                              {m.user.firstName} {m.user.lastName}
+                            </span>
+                          </div>
+                        ))}
+                  </div>
                 )}
               </div>
             </div>
+          ) : (
+            <div
+              style={{
+                height: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "rgba(255,255,255,0.5)",
+              }}
+            >
+              Select a channel or conversation
+            </div>
+          )}
+        </PageContentCon>
+      </div>
 
-            {/* Task Progress */}
-            {selectedDMUser && canViewUserTaskProgress(currentUser.role) && (
-              <div className="p-6 border-b border-gray-300 bg-white overflow-y-auto flex-1">
-                <h3 className="text-sm font-bold text-gray-900 mb-6">
-                  Task Progress
-                </h3>
-                {loadingUserTasks ? (
-                  <div className="text-center text-gray-600 text-sm py-8">
-                    <p className="text-gray-500">Loading task data...</p>
-                  </div>
-                ) : selectedUserTaskStats.total === 0 ? (
-                  <div className="text-center text-gray-600 text-sm py-8">
-                    <p className="text-gray-500">No tasks assigned</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex justify-center mb-6">
-                      <div className="w-32 h-32 rounded-full bg-gradient-conic from-blue-500 via-green-500 to-red-500 p-1.5 flex items-center justify-center shadow-lg">
-                        <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
-                          <div className="text-center">
-                            <p className="text-xs text-gray-600 font-medium">
-                              Overall
-                            </p>
-                            <p className="text-2xl font-bold text-gray-900">
-                              {selectedUserTaskStats.total > 0
-                                ? Math.round(
-                                    (selectedUserTaskStats.done /
-                                      selectedUserTaskStats.total) *
-                                      100,
-                                  )
-                                : 0}
-                              %
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                        <div className="flex items-center justify-between">
-                          <span className="flex items-center gap-2 text-sm font-medium text-gray-900">
-                            <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                            Working on it
-                          </span>
-                          <span className="text-sm font-bold text-blue-600">
-                            {selectedUserTaskStats.inProgress}
-                          </span>
-                        </div>
-                        <div className="mt-2 w-full bg-gray-300 rounded-full h-2">
-                          <div
-                            className="bg-blue-500 h-2 rounded-full transition-all"
-                            style={{
-                              width: `${
-                                selectedUserTaskStats.total > 0
-                                  ? Math.round(
-                                      (selectedUserTaskStats.inProgress /
-                                        selectedUserTaskStats.total) *
-                                        100,
-                                    )
-                                  : 0
-                              }%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                      <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                        <div className="flex items-center justify-between">
-                          <span className="flex items-center gap-2 text-sm font-medium text-gray-900">
-                            <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                            Done
-                          </span>
-                          <span className="text-sm font-bold text-green-600">
-                            {selectedUserTaskStats.done}
-                          </span>
-                        </div>
-                        <div className="mt-2 w-full bg-gray-300 rounded-full h-2">
-                          <div
-                            className="bg-green-500 h-2 rounded-full transition-all"
-                            style={{
-                              width: `${
-                                selectedUserTaskStats.total > 0
-                                  ? Math.round(
-                                      (selectedUserTaskStats.done /
-                                        selectedUserTaskStats.total) *
-                                        100,
-                                    )
-                                  : 0
-                              }%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                      <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                        <p className="text-xs font-medium text-gray-700">
-                          Total Tasks:{" "}
-                          <span className="font-bold text-gray-900">
-                            {selectedUserTaskStats.total}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </PageContentCon>
-        )}
-
-        {/* Error Toast */}
-        {error && (
-          <div className="fixed bottom-4 right-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 shadow-lg z-50">
-            <AlertCircle size={20} className="text-red-600 flex-shrink-0" />
-            <p className="text-red-800 text-sm">{error}</p>
-          </div>
-        )}
-
-        {/* Channel Creation Modal */}
-        <CreateChannelModal
-          isOpen={isChannelModalOpen}
-          onClose={() => setIsChannelModalOpen(false)}
-          onSubmit={createChannel}
-          currentUserId={currentUser?.id || 0}
-        />
-      </div>{" "}
+      <CreateChannelModal
+        isOpen={isChannelModalOpen}
+        onClose={() => setIsChannelModalOpen(false)}
+        onSubmit={createChannel}
+        currentUserId={currentUser?.id || 0}
+      />
     </PageContainer>
   );
 }

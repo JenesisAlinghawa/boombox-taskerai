@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import TaskStatusChart from "@/app/components/TaskStatusChart";
 import { getCurrentUser } from "@/utils/sessionManager";
+import { useAuthProtection } from "@/app/hooks/useAuthProtection";
 import { PageContainer } from "@/app/components/PageContainer";
 import { PageContentCon } from "@/app/components/PageContentCon";
 
@@ -27,7 +28,13 @@ interface TeamMemberProgress {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [stats, setStats] = useState({ todo: 0, inProgress: 0, stuck: 0, done: 0 });
+  useAuthProtection(); // Protect this route
+  const [stats, setStats] = useState({
+    todo: 0,
+    inProgress: 0,
+    stuck: 0,
+    done: 0,
+  });
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [teamProgress, setTeamProgress] = useState<TeamMemberProgress[]>([]);
 
@@ -53,7 +60,8 @@ export default function DashboardPage() {
         const taskList = Array.isArray(data?.tasks) ? data.tasks : [];
         setStats({
           todo: taskList.filter((t: any) => t.status === "todo").length,
-          inProgress: taskList.filter((t: any) => t.status === "inprogress").length,
+          inProgress: taskList.filter((t: any) => t.status === "inprogress")
+            .length,
           stuck: taskList.filter((t: any) => t.status === "stuck").length,
           done: taskList.filter((t: any) => t.status === "completed").length,
         });
@@ -71,11 +79,17 @@ export default function DashboardPage() {
         const members = data.team.members;
         Promise.all(
           members.map((member: any) =>
-            fetch("/api/tasks", { headers: { "x-user-id": String(member.userId) } })
+            fetch("/api/tasks", {
+              headers: { "x-user-id": String(member.userId) },
+            })
               .then((r) => r.json())
               .then((taskData) => {
-                const tasks = Array.isArray(taskData?.tasks) ? taskData.tasks : [];
-                const done = tasks.filter((t: any) => t.status === "completed" || t.status === "done").length;
+                const tasks = Array.isArray(taskData?.tasks)
+                  ? taskData.tasks
+                  : [];
+                const done = tasks.filter(
+                  (t: any) => t.status === "completed" || t.status === "done",
+                ).length;
                 const total = tasks.length;
                 return {
                   id: member.userId,
@@ -85,8 +99,14 @@ export default function DashboardPage() {
                   progress: total > 0 ? Math.round((done / total) * 100) : 0,
                 };
               })
-              .catch(() => ({ id: member.userId, name: member.user?.name || "Unknown", done: 0, total: 0, progress: 0 }))
-          )
+              .catch(() => ({
+                id: member.userId,
+                name: member.user?.name || "Unknown",
+                done: 0,
+                total: 0,
+                progress: 0,
+              })),
+          ),
         ).then(setTeamProgress);
       });
   }, [currentUser]);
@@ -95,18 +115,21 @@ export default function DashboardPage() {
 
   const statusData = [
     { label: "To do", value: stats.todo, color: COLORS.todo },
-    { label: "Working on it", value: stats.inProgress, color: COLORS.inProgress },
+    {
+      label: "Working on it",
+      value: stats.inProgress,
+      color: COLORS.inProgress,
+    },
     { label: "Done", value: stats.done, color: COLORS.done },
     { label: "Stuck", value: stats.stuck, color: COLORS.stuck },
-  ].map(item => ({
+  ].map((item) => ({
     ...item,
-    percent: total > 0 ? ((item.value / total) * 100).toFixed(1) : "0"
+    percent: total > 0 ? ((item.value / total) * 100).toFixed(1) : "0",
   }));
 
   return (
     <PageContainer title="DASHBOARD">
       <div className="max-w-[1600px] mx-auto space-y-8">
-        
         {/* Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
@@ -115,8 +138,13 @@ export default function DashboardPage() {
             { label: "Completed tasks", value: stats.done },
             { label: "Overdue tasks", value: stats.stuck },
           ].map((stat, i) => (
-            <PageContentCon key={i} className="flex flex-col justify-center min-h-[120px]">
-              <p className="text-[13px] text-white/50 mb-2 uppercase tracking-tight">{stat.label}</p>
+            <PageContentCon
+              key={i}
+              className="flex flex-col justify-center min-h-[120px]"
+            >
+              <p className="text-[13px] text-white/50 mb-2 uppercase tracking-tight">
+                {stat.label}
+              </p>
               <div className="text-3xl font-bold">{stat.value}</div>
             </PageContentCon>
           ))}
@@ -124,27 +152,34 @@ export default function DashboardPage() {
 
         {/* Charts Grid */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          
           {/* Pie Chart Card */}
-          <PageContentCon 
-            className="cursor-pointer hover:bg-black/50 transition-colors">
-            <h3 className="text-sm font-semibold mb-6 uppercase tracking-widest text-white/80">Overall task overview</h3>
+          <PageContentCon className="cursor-pointer hover:bg-black/50 transition-colors">
+            <h3 className="text-sm font-semibold mb-6 uppercase tracking-widest text-white/80">
+              Overall task overview
+            </h3>
             <div className="flex flex-col md:flex-row items-center justify-around gap-8">
               {total > 0 ? (
                 <div className="relative w-[200px] h-[200px]">
-                   <svg width="200" height="200" viewBox="0 0 200 200" className="transform -rotate-90">
+                  <svg
+                    width="200"
+                    height="200"
+                    viewBox="0 0 200 200"
+                    className="transform -rotate-90"
+                  >
                     <g transform="translate(100,100)">
                       {(() => {
                         const radius = 90;
-                        const segments = statusData.filter(s => s.value > 0);
+                        const segments = statusData.filter((s) => s.value > 0);
                         let cumulative = 0;
 
                         return segments.map((segment, i) => {
                           const portion = segment.value / total;
                           const angle = portion * Math.PI * 2;
-                          
+
                           if (portion >= 0.99) {
-                            return <circle key={i} r={radius} fill={segment.color} />;
+                            return (
+                              <circle key={i} r={radius} fill={segment.color} />
+                            );
                           }
 
                           const x1 = radius * Math.cos(cumulative);
@@ -152,9 +187,17 @@ export default function DashboardPage() {
                           const x2 = radius * Math.cos(cumulative + angle);
                           const y2 = radius * Math.sin(cumulative + angle);
                           const path = `M ${x1} ${y1} A ${radius} ${radius} 0 ${angle > Math.PI ? 1 : 0} 1 ${x2} ${y2} L 0 0 Z`;
-                          
+
                           cumulative += angle;
-                          return <path key={i} d={path} fill={segment.color} className="stroke-black/20" strokeWidth="1" />;
+                          return (
+                            <path
+                              key={i}
+                              d={path}
+                              fill={segment.color}
+                              className="stroke-black/20"
+                              strokeWidth="1"
+                            />
+                          );
                         });
                       })()}
                     </g>
@@ -165,11 +208,14 @@ export default function DashboardPage() {
                   No tasks
                 </div>
               )}
-              
+
               <div className="flex flex-col gap-3">
                 {statusData.map((item, i) => (
                   <div key={i} className="flex items-center gap-3 text-sm">
-                    <div className="w-3 h-3 rounded-[2px]" style={{ background: item.color }} />
+                    <div
+                      className="w-3 h-3 rounded-[2px]"
+                      style={{ background: item.color }}
+                    />
                     <span className="text-white/60">{item.label}</span>
                     <span className="font-bold ml-auto">{item.percent}%</span>
                   </div>
@@ -180,25 +226,38 @@ export default function DashboardPage() {
 
           {/* Team Progress Card */}
           <PageContentCon>
-            <h3 className="text-sm font-semibold mb-6 uppercase tracking-widest text-white/80">Overall team progress overview</h3>
+            <h3 className="text-sm font-semibold mb-6 uppercase tracking-widest text-white/80">
+              Overall team progress overview
+            </h3>
             <div className="flex flex-col gap-5 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
               {teamProgress.length === 0 ? (
-                <div className="text-center py-10 text-white/30 italic">No team members yet</div>
+                <div className="text-center py-10 text-white/30 italic">
+                  No team members yet
+                </div>
               ) : (
                 teamProgress.map((member) => (
                   <div key={member.id} className="flex items-center gap-4">
                     <div className="w-9 h-9 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-xs font-bold shrink-0">
-                      {member.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
+                      {member.name
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .toUpperCase()
+                        .slice(0, 2)}
                     </div>
                     <div className="flex-1">
                       <div className="flex justify-between mb-1">
-                        <span className="text-xs font-medium">{member.name}</span>
-                        <span className="text-[10px] text-white/40">{member.done}/{member.total} Tasks</span>
+                        <span className="text-xs font-medium">
+                          {member.name}
+                        </span>
+                        <span className="text-[10px] text-white/40">
+                          {member.done}/{member.total} Tasks
+                        </span>
                       </div>
                       <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-green-500 transition-all duration-700" 
-                          style={{ width: `${member.progress}%` }} 
+                        <div
+                          className="h-full bg-green-500 transition-all duration-700"
+                          style={{ width: `${member.progress}%` }}
                         />
                       </div>
                     </div>
@@ -215,7 +274,11 @@ export default function DashboardPage() {
             title="Overall task status"
             data={[
               { status: "To do", count: stats.todo, color: COLORS.todo },
-              { status: "Working on it", count: stats.inProgress, color: COLORS.inProgress },
+              {
+                status: "Working on it",
+                count: stats.inProgress,
+                color: COLORS.inProgress,
+              },
               { status: "Stuck", count: stats.stuck, color: COLORS.stuck },
               { status: "Done", count: stats.done, color: COLORS.done },
             ]}

@@ -41,9 +41,11 @@ app.prepare().then(() => {
     console.log(`[Socket.io] User connected: ${socket.id}`);
 
     // User joins with authentication
-    socket.on("user:join", (data: { userId: string; userName: string }) => {
-      activeUsers.set(data.userId, socket.id);
-      console.log(`[Socket.io] User ${data.userId} (${data.userName}) authenticated`);
+    socket.on("user:join", (data: { userId: number | string; userName: string }) => {
+      const userId = String(data.userId);
+      activeUsers.set(userId, socket.id);
+      console.log(`[Socket.io] User ${userId} (${data.userName}) authenticated`);
+      console.log(`[Socket.io] Current active users:`, Array.from(activeUsers.keys()));
 
       // Broadcast updated user list
       io.emit("users:active", Array.from(activeUsers.keys()));
@@ -111,13 +113,18 @@ app.prepare().then(() => {
 
     // Handle user disconnect
     socket.on("disconnect", () => {
-      const userId = Array.from(activeUsers.entries()).find(
-        ([_, socketId]) => socketId === socket.id
-      )?.[0];
+      let disconnectedUserId: string | undefined;
+      for (const [userId, socketId] of activeUsers.entries()) {
+        if (socketId === socket.id) {
+          disconnectedUserId = userId;
+          break;
+        }
+      }
 
-      if (userId) {
-        activeUsers.delete(userId);
-        console.log(`[Socket.io] User ${userId} disconnected`);
+      if (disconnectedUserId) {
+        activeUsers.delete(disconnectedUserId);
+        console.log(`[Socket.io] User ${disconnectedUserId} disconnected`);
+        console.log(`[Socket.io] Remaining active users:`, Array.from(activeUsers.keys()));
         io.emit("users:active", Array.from(activeUsers.keys()));
       }
     });

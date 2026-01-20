@@ -13,6 +13,7 @@ import {
   BarChart2,
   FileText,
   Settings,
+  AlignCenter,
 } from "lucide-react";
 
 interface NavigationMenuProps {
@@ -97,20 +98,22 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
 
   const buttonStyle = (active: boolean): React.CSSProperties => ({
     width: "100%",
-    padding: "10px",
-    background: active ? "rgba(59,130,246,0.15)" : "transparent",
+    padding: "10px 16px 10px 16px", // Reduced left padding (12px instead of 16px + extra from nav)
+    background: active
+      ? "linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.25) 100%)"
+      : "transparent",
     color: active ? "#a0d8ef" : "#ffffff",
     border: "none",
     borderRadius: 8,
     display: "flex",
     alignItems: "center",
-    justifyContent: collapsed ? "center" : "flex-start",
+    gap: 12,
     fontSize: 12,
+    fontWeight: active ? 600 : 500,
     cursor: "pointer",
-    transition: "background-color 0.2s, color 0.2s",
+    transition: "all 0.2s",
     position: "relative",
     overflow: "hidden",
-    gap: collapsed ? 0 : 12,
   });
 
   return (
@@ -119,49 +122,72 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
         flex: 1,
         display: "flex",
         flexDirection: "column",
-        fontFamily: "Inria-sans system-ui, -apple-system, sans-serif",
+        fontFamily: "Inter, system-ui, -apple-system, sans-serif",
       }}
     >
       <nav
         style={{
-          padding: collapsed ? "12px" : "12px 16px",
+          padding: "12px 0", // Removed horizontal padding to eliminate double indentation
           display: "flex",
           flexDirection: "column",
           gap: 8,
-          alignItems: collapsed ? "center" : "flex-start",
         }}
       >
         {mainMenuItems.map((item) => {
           const active = isActive(item.href);
           const Icon = item.icon;
           const isMessages = item.href === "/messages";
-
           return (
             <Link
               key={item.label}
               href={item.href}
-              style={{ textDecoration: "none", width: "100%" }}
+              style={{
+                textDecoration: "none",
+                width:"85%",
+                margin: "0 auto",
+                display: "block",
+              }}
             >
               <button
                 style={buttonStyle(active)}
                 title={collapsed ? item.label : undefined}
               >
-                <Icon size={20} strokeWidth={1.5} />
-                {!collapsed && item.label}
+                {active && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: 3,
+                    }}
+                  />
+                )}
+                <div style={{ width: 20, display: "flex", justifyContent: "flex-start" }}>
+                  <Icon size={20} strokeWidth={1.5} />
+                </div>
+                {!collapsed && <span>{item.label}</span>}
 
                 {isMessages && unreadMessages > 0 && (
                   <div
                     style={{
-                      position: "absolute",
-                      top: 4,
-                      right: collapsed ? 4 : 12,
-                      width: 12,
-                      height: 12,
+                      marginLeft: "auto",
+                      minWidth: 16,
+                      height: 16,
                       borderRadius: "50%",
                       background: "#ef4444",
-                      border: "2px solid #42527F",
+                      border: "2px solid rgba(0, 68, 255, 0.23)",
+                      color: "#fff",
+                      fontSize: 10,
+                      fontWeight: 600,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "0 4px",
                     }}
-                  />
+                  >
+                    {unreadMessages > 99 ? "99+" : unreadMessages}
+                  </div>
                 )}
               </button>
             </Link>
@@ -171,18 +197,17 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
 
       <div
         style={{
-          margin: collapsed ? "0 12px" : "0 16px",
+          margin: "0 16px",
           borderTop: "1px solid rgba(255,255,255,0.1)",
         }}
       />
 
       <nav
         style={{
-          padding: collapsed ? "12px" : "12px 16px",
+          padding: "12px 0", // Removed horizontal padding to eliminate double indentation
           display: "flex",
           flexDirection: "column",
           gap: 8,
-          alignItems: collapsed ? "center" : "flex-start",
         }}
       >
         {otherMenuItems.map((item) => {
@@ -193,14 +218,31 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
             <Link
               key={item.label}
               href={item.href}
-              style={{ textDecoration: "none", width: "100%" }}
+              style={{
+                textDecoration: "none",
+                width:"80%",
+                margin: "0 auto",
+                display: "block",}}
             >
               <button
                 style={buttonStyle(active)}
                 title={collapsed ? item.label : undefined}
               >
-                <Icon size={20} strokeWidth={1.5} />
-                {!collapsed && item.label}
+                {active && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: 3,
+                    }}
+                  />
+                )}
+                <div style={{ width: 20, display: "flex", justifyContent: "flex-start" }}>
+                  <Icon size={20} strokeWidth={1.5} />
+                </div>
+                {!collapsed && <span>{item.label}</span>}
               </button>
             </Link>
           );

@@ -2,8 +2,16 @@
 
 import React, { useEffect, useState } from "react";
 import { getCurrentUser } from "@/utils/sessionManager";
+import { useAuthProtection } from "@/app/hooks/useAuthProtection";
+import { PageContainer } from "@/app/components/PageContainer";
+import { PageContentCon } from "@/app/components/PageContentCon";
 
-type User = { id: number; name?: string | null; email: string };
+type User = {
+  id: number;
+  name?: string | null;
+  email: string;
+  active?: boolean;
+};
 
 type Comment = {
   id: number;
@@ -64,6 +72,7 @@ const statusLabels: { [key: string]: string } = {
 };
 
 export default function TasksPage() {
+  useAuthProtection(); // Protect this route
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -114,19 +123,16 @@ export default function TasksPage() {
 
   useEffect(() => {
     if (!currentUser) return;
-    // Fetch all active users for task assignment instead of just team members
-    fetch("/api/users", {
+    // Fetch all active users for task assignment
+    // Use /api/users/assignable endpoint which is available to all authenticated users
+    fetch("/api/users/assignable", {
       headers: {
         "x-user-id": String(currentUser.id),
       },
     })
       .then((r) => r.json())
       .then((d) => {
-        // Filter to only active users (exclude inactive/pending approval)
-        const activeUsers = (d?.users || []).filter(
-          (u: User) => u.active !== false
-        );
-        setUsers(activeUsers);
+        setUsers(d?.users || []);
       })
       .catch(console.error);
   }, [currentUser]);
@@ -198,7 +204,7 @@ export default function TasksPage() {
       console.error("Error deleting task:", err);
       alert(
         "Failed to delete task: " +
-          (err instanceof Error ? err.message : "Unknown error")
+          (err instanceof Error ? err.message : "Unknown error"),
       );
     }
   };
@@ -211,7 +217,7 @@ export default function TasksPage() {
       if (!res.ok) {
         const error = await res.json().catch(() => ({}));
         throw new Error(
-          error.error || `Failed to load task details (${res.status})`
+          error.error || `Failed to load task details (${res.status})`,
         );
       }
       const data = await res.json();
@@ -223,7 +229,7 @@ export default function TasksPage() {
       alert(
         `Error: ${
           err instanceof Error ? err.message : "Failed to load task details"
-        }`
+        }`,
       );
     }
   };
@@ -262,7 +268,7 @@ export default function TasksPage() {
   const handleEditComment = async (
     commentId: number,
     taskId: number,
-    newContent: string
+    newContent: string,
   ) => {
     if (!newContent.trim()) return;
     try {
@@ -274,7 +280,7 @@ export default function TasksPage() {
       if (!res.ok) throw new Error("Failed to update comment");
       const data = await res.json();
       setComments((prev) =>
-        prev.map((c) => (c.id === commentId ? data.comment : c))
+        prev.map((c) => (c.id === commentId ? data.comment : c)),
       );
       setEditingCommentId(null);
     } catch (err) {
@@ -311,7 +317,7 @@ export default function TasksPage() {
 
   const handleDeleteAttachment = async (
     attachmentId: number,
-    taskId: number
+    taskId: number,
   ) => {
     if (!confirm("Delete this attachment?")) return;
     try {
@@ -320,7 +326,7 @@ export default function TasksPage() {
         {
           method: "DELETE",
           headers: getHeaders(),
-        }
+        },
       );
       if (!res.ok) throw new Error("Failed to delete attachment");
       setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
@@ -396,16 +402,16 @@ export default function TasksPage() {
   const groupedTasks = () => {
     const filtered = getFilteredAndSortedTasks();
     const selfTasks = filtered.filter(
-      (task) => task.createdById === currentUser?.id
+      (task) => task.createdById === currentUser?.id,
     );
     const assignedTasks = filtered.filter(
-      (task) => task.createdById !== currentUser?.id
+      (task) => task.createdById !== currentUser?.id,
     );
     return { selfTasks, assignedTasks };
   };
 
   return (
-    <div style={{ padding: 20, minHeight: "100vh", background: COLORS.bg }}>
+    <PageContainer title="TASKS">
       {/* Header */}
       <div
         style={{
@@ -424,7 +430,7 @@ export default function TasksPage() {
               color: COLORS.muted,
               cursor: "pointer",
               fontSize: 14,
-              padding: 0,
+              padding: "0px 0px 0px 0px",
             }}
           >
             ▼
@@ -434,7 +440,7 @@ export default function TasksPage() {
         <button
           onClick={() => setShowCreateModal(true)}
           style={{
-            padding: "10px 16px",
+            padding: "10px 16px 10px 16px",
             borderRadius: 6,
             background: "#3b82f6",
             color: "#fff",
@@ -462,7 +468,7 @@ export default function TasksPage() {
             display: "flex",
             alignItems: "center",
             gap: 8,
-            padding: "8px 14px",
+            padding: "8px 14px 8px 14px",
             borderRadius: 6,
             background: "rgba(0,0,0,0.03)",
             border: "1px solid rgba(0,0,0,0.1)",
@@ -491,7 +497,7 @@ export default function TasksPage() {
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
             style={{
-              padding: "8px 12px",
+              padding: "8px 12px 8px 12px",
               borderRadius: 6,
               background: "rgba(0,0,0,0.03)",
               color: COLORS.text,
@@ -510,7 +516,7 @@ export default function TasksPage() {
           <button
             onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
             style={{
-              padding: "8px 12px",
+              padding: "8px 12px 8px 12px",
               borderRadius: 6,
               background: "rgba(0,0,0,0.03)",
               color: COLORS.text,
@@ -563,7 +569,7 @@ export default function TasksPage() {
               >
                 <th
                   style={{
-                    padding: "12px 16px",
+                    padding: "12px 16px 12px 16px",
                     textAlign: "left",
                     fontWeight: 600,
                     color: COLORS.muted,
@@ -573,7 +579,7 @@ export default function TasksPage() {
                 </th>
                 <th
                   style={{
-                    padding: "12px 16px",
+                    padding: "12px 16px 12px 16px",
                     textAlign: "left",
                     fontWeight: 600,
                     color: COLORS.muted,
@@ -584,7 +590,7 @@ export default function TasksPage() {
                 </th>
                 <th
                   style={{
-                    padding: "12px 16px",
+                    padding: "12px 16px 12px 16px",
                     textAlign: "center",
                     fontWeight: 600,
                     color: COLORS.muted,
@@ -595,7 +601,7 @@ export default function TasksPage() {
                 </th>
                 <th
                   style={{
-                    padding: "12px 16px",
+                    padding: "12px 16px 12px 16px",
                     textAlign: "center",
                     fontWeight: 600,
                     color: COLORS.muted,
@@ -606,7 +612,7 @@ export default function TasksPage() {
                 </th>
                 <th
                   style={{
-                    padding: "12px 16px",
+                    padding: "12px 16px 12px 16px",
                     textAlign: "center",
                     fontWeight: 600,
                     color: COLORS.muted,
@@ -617,7 +623,7 @@ export default function TasksPage() {
                 </th>
                 <th
                   style={{
-                    padding: "12px 16px",
+                    padding: "12px 16px 12px 16px",
                     textAlign: "center",
                     fontWeight: 600,
                     color: COLORS.muted,
@@ -628,7 +634,7 @@ export default function TasksPage() {
                 </th>
                 <th
                   style={{
-                    padding: "12px 16px",
+                    padding: "12px 16px 12px 16px",
                     textAlign: "center",
                     fontWeight: 600,
                     color: COLORS.muted,
@@ -639,7 +645,7 @@ export default function TasksPage() {
                 </th>
                 <th
                   style={{
-                    padding: "12px 16px",
+                    padding: "12px 16px 12px 16px",
                     textAlign: "center",
                     fontWeight: 600,
                     color: COLORS.muted,
@@ -656,7 +662,7 @@ export default function TasksPage() {
                   <td
                     colSpan={8}
                     style={{
-                      padding: "40px 16px",
+                      padding: "40px 16px 40px 16px",
                       textAlign: "center",
                       color: COLORS.muted,
                     }}
@@ -678,7 +684,7 @@ export default function TasksPage() {
                         <td
                           colSpan={8}
                           style={{
-                            padding: "12px 16px",
+                            padding: "12px 16px 12px 16px",
                             fontWeight: 600,
                             color: COLORS.text,
                             fontSize: 12,
@@ -705,7 +711,7 @@ export default function TasksPage() {
                         >
                           <td
                             style={{
-                              padding: "12px 16px",
+                              padding: "12px 16px 12px 16px",
                               color: "#333",
                               cursor: "pointer",
                             }}
@@ -729,7 +735,7 @@ export default function TasksPage() {
                                     ? handleSaveField(
                                         task.id,
                                         "title",
-                                        editValue
+                                        editValue,
                                       )
                                     : setEditingCell(null)
                                 }
@@ -739,7 +745,7 @@ export default function TasksPage() {
                                       handleSaveField(
                                         task.id,
                                         "title",
-                                        editValue
+                                        editValue,
                                       );
                                     }
                                   } else if (e.key === "Escape") {
@@ -748,7 +754,7 @@ export default function TasksPage() {
                                 }}
                                 style={{
                                   width: "100%",
-                                  padding: "6px 8px",
+                                  padding: "6px 8px 6px 8px",
                                   borderRadius: 4,
                                   border: "1px solid #3b82f6",
                                   background: COLORS.cardBg,
@@ -785,7 +791,7 @@ export default function TasksPage() {
                           </td>
                           <td
                             style={{
-                              padding: "12px 16px",
+                              padding: "12px 16px 12px 16px",
                               color: COLORS.text,
                               cursor: "pointer",
                             }}
@@ -809,7 +815,7 @@ export default function TasksPage() {
                                     "assigneeId",
                                     e.target.value
                                       ? Number(e.target.value)
-                                      : null
+                                      : null,
                                   );
                                 }}
                                 onBlur={() => setEditingCell(null)}
@@ -820,7 +826,7 @@ export default function TasksPage() {
                                 }}
                                 style={{
                                   width: "100%",
-                                  padding: "6px 8px",
+                                  padding: "6px 8px 6px 8px",
                                   borderRadius: 4,
                                   border: "1px solid #3b82f6",
                                   background: COLORS.cardBg,
@@ -847,7 +853,7 @@ export default function TasksPage() {
                           </td>
                           <td
                             style={{
-                              padding: "12px 16px",
+                              padding: "12px 16px 12px 16px",
                               textAlign: "center",
                             }}
                             onClick={() => {
@@ -868,7 +874,7 @@ export default function TasksPage() {
                                   handleSaveField(
                                     task.id,
                                     "status",
-                                    e.target.value
+                                    e.target.value,
                                   );
                                 }}
                                 onBlur={() => setEditingCell(null)}
@@ -879,7 +885,7 @@ export default function TasksPage() {
                                 }}
                                 style={{
                                   width: "100%",
-                                  padding: "6px 8px",
+                                  padding: "6px 8px 6px 8px",
                                   borderRadius: 4,
                                   border: "1px solid #3b82f6",
                                   background: COLORS.cardBg,
@@ -896,7 +902,7 @@ export default function TasksPage() {
                               <div
                                 style={{
                                   display: "inline-block",
-                                  padding: "4px 10px",
+                                  padding: "4px 10px 4px 10px",
                                   borderRadius: 4,
                                   background:
                                     statusColors[task.status || "todo"],
@@ -912,7 +918,7 @@ export default function TasksPage() {
                           </td>
                           <td
                             style={{
-                              padding: "12px 16px",
+                              padding: "12px 16px 12px 16px",
                               textAlign: "center",
                               color: COLORS.text,
                               cursor: "pointer",
@@ -938,7 +944,7 @@ export default function TasksPage() {
                           </td>
                           <td
                             style={{
-                              padding: "12px 16px",
+                              padding: "12px 16px 12px 16px",
                               textAlign: "center",
                               color: COLORS.text,
                               cursor: "pointer",
@@ -964,7 +970,7 @@ export default function TasksPage() {
                           </td>
                           <td
                             style={{
-                              padding: "12px 16px",
+                              padding: "12px 16px 12px 16px",
                               textAlign: "center",
                               color: COLORS.text,
                             }}
@@ -986,7 +992,7 @@ export default function TasksPage() {
                                   handleSaveField(
                                     task.id,
                                     "priority",
-                                    e.target.value
+                                    e.target.value,
                                   );
                                 }}
                                 onBlur={() => setEditingCell(null)}
@@ -997,7 +1003,7 @@ export default function TasksPage() {
                                 }}
                                 style={{
                                   width: "100%",
-                                  padding: "6px 8px",
+                                  padding: "6px 8px 6px 8px",
                                   borderRadius: 4,
                                   border: "1px solid #3b82f6",
                                   background: COLORS.cardBg,
@@ -1031,7 +1037,7 @@ export default function TasksPage() {
                           </td>
                           <td
                             style={{
-                              padding: "12px 16px",
+                              padding: "12px 16px 12px 16px",
                               textAlign: "center",
                               color: COLORS.text,
                             }}
@@ -1045,7 +1051,7 @@ export default function TasksPage() {
                                   ? new Date(task.dueDate)
                                       .toISOString()
                                       .slice(0, 16)
-                                  : ""
+                                  : "",
                               );
                             }}
                           >
@@ -1060,7 +1066,7 @@ export default function TasksPage() {
                                   handleSaveField(
                                     task.id,
                                     "dueDate",
-                                    editValue || null
+                                    editValue || null,
                                   )
                                 }
                                 onKeyDown={(e) => {
@@ -1068,12 +1074,12 @@ export default function TasksPage() {
                                     handleSaveField(
                                       task.id,
                                       "dueDate",
-                                      editValue || null
+                                      editValue || null,
                                     );
                                   }
                                 }}
                                 style={{
-                                  padding: "6px 8px",
+                                  padding: "6px 8px 6px 8px",
                                   borderRadius: 4,
                                   border: "1px solid #3b82f6",
                                   background: COLORS.cardBg,
@@ -1089,7 +1095,7 @@ export default function TasksPage() {
                                     month: "short",
                                     day: "2-digit",
                                     year: "2-digit",
-                                  }
+                                  },
                                 )}
                               </span>
                             ) : (
@@ -1105,7 +1111,7 @@ export default function TasksPage() {
                           </td>
                           <td
                             style={{
-                              padding: "12px 16px",
+                              padding: "12px 16px 12px 16px",
                               textAlign: "center",
                             }}
                           >
@@ -1117,7 +1123,7 @@ export default function TasksPage() {
                                 color: COLORS.stuck,
                                 cursor: "pointer",
                                 fontSize: 14,
-                                padding: 4,
+                                padding: "4px 4px 4px 4px",
                               }}
                               title="Delete"
                             >
@@ -1141,7 +1147,7 @@ export default function TasksPage() {
                         <td
                           colSpan={8}
                           style={{
-                            padding: "12px 16px",
+                            padding: "12px 16px 12px 16px",
                             fontWeight: 600,
                             color: "#3b82f6",
                             fontSize: 12,
@@ -1168,7 +1174,7 @@ export default function TasksPage() {
                         >
                           <td
                             style={{
-                              padding: "12px 16px",
+                              padding: "12px 16px 12px 16px",
                               color: "#333",
                               cursor: "pointer",
                             }}
@@ -1192,7 +1198,7 @@ export default function TasksPage() {
                                     ? handleSaveField(
                                         task.id,
                                         "title",
-                                        editValue
+                                        editValue,
                                       )
                                     : setEditingCell(null)
                                 }
@@ -1202,7 +1208,7 @@ export default function TasksPage() {
                                       handleSaveField(
                                         task.id,
                                         "title",
-                                        editValue
+                                        editValue,
                                       );
                                     }
                                   } else if (e.key === "Escape") {
@@ -1211,7 +1217,7 @@ export default function TasksPage() {
                                 }}
                                 style={{
                                   width: "100%",
-                                  padding: "6px 8px",
+                                  padding: "6px 8px 6px 8px",
                                   borderRadius: 4,
                                   border: "1px solid #3b82f6",
                                   background: COLORS.cardBg,
@@ -1248,7 +1254,7 @@ export default function TasksPage() {
                           </td>
                           <td
                             style={{
-                              padding: "12px 16px",
+                              padding: "12px 16px 12px 16px",
                               color: COLORS.text,
                               cursor: "pointer",
                             }}
@@ -1272,7 +1278,7 @@ export default function TasksPage() {
                                     "assigneeId",
                                     e.target.value
                                       ? Number(e.target.value)
-                                      : null
+                                      : null,
                                   );
                                 }}
                                 onBlur={() => setEditingCell(null)}
@@ -1283,7 +1289,7 @@ export default function TasksPage() {
                                 }}
                                 style={{
                                   width: "100%",
-                                  padding: "6px 8px",
+                                  padding: "6px 8px 6px 8px",
                                   borderRadius: 4,
                                   border: "1px solid #3b82f6",
                                   background: COLORS.cardBg,
@@ -1310,7 +1316,7 @@ export default function TasksPage() {
                           </td>
                           <td
                             style={{
-                              padding: "12px 16px",
+                              padding: "12px 16px 12px 16px",
                               textAlign: "center",
                             }}
                             onClick={() => {
@@ -1331,7 +1337,7 @@ export default function TasksPage() {
                                   handleSaveField(
                                     task.id,
                                     "status",
-                                    e.target.value
+                                    e.target.value,
                                   );
                                 }}
                                 onBlur={() => setEditingCell(null)}
@@ -1342,7 +1348,7 @@ export default function TasksPage() {
                                 }}
                                 style={{
                                   width: "100%",
-                                  padding: "6px 8px",
+                                  padding: "6px 8px 6px 8px",
                                   borderRadius: 4,
                                   border: "1px solid #3b82f6",
                                   background: COLORS.cardBg,
@@ -1359,7 +1365,7 @@ export default function TasksPage() {
                               <div
                                 style={{
                                   display: "inline-block",
-                                  padding: "4px 10px",
+                                  padding: "4px 10px 4px 10px",
                                   borderRadius: 4,
                                   background:
                                     statusColors[task.status || "todo"],
@@ -1375,7 +1381,7 @@ export default function TasksPage() {
                           </td>
                           <td
                             style={{
-                              padding: "12px 16px",
+                              padding: "12px 16px 12px 16px",
                               textAlign: "center",
                               color: COLORS.text,
                               cursor: "pointer",
@@ -1401,7 +1407,7 @@ export default function TasksPage() {
                           </td>
                           <td
                             style={{
-                              padding: "12px 16px",
+                              padding: "12px 16px 12px 16px",
                               textAlign: "center",
                               color: COLORS.text,
                               cursor: "pointer",
@@ -1427,7 +1433,7 @@ export default function TasksPage() {
                           </td>
                           <td
                             style={{
-                              padding: "12px 16px",
+                              padding: "12px 16px 12px 16px",
                               textAlign: "center",
                               color: COLORS.text,
                             }}
@@ -1449,7 +1455,7 @@ export default function TasksPage() {
                                   handleSaveField(
                                     task.id,
                                     "priority",
-                                    e.target.value
+                                    e.target.value,
                                   );
                                 }}
                                 onBlur={() => setEditingCell(null)}
@@ -1460,7 +1466,7 @@ export default function TasksPage() {
                                 }}
                                 style={{
                                   width: "100%",
-                                  padding: "6px 8px",
+                                  padding: "6px 8px 6px 8px",
                                   borderRadius: 4,
                                   border: "1px solid #3b82f6",
                                   background: COLORS.cardBg,
@@ -1494,7 +1500,7 @@ export default function TasksPage() {
                           </td>
                           <td
                             style={{
-                              padding: "12px 16px",
+                              padding: "12px 16px 12px 16px",
                               textAlign: "center",
                               color: COLORS.text,
                             }}
@@ -1508,7 +1514,7 @@ export default function TasksPage() {
                                   ? new Date(task.dueDate)
                                       .toISOString()
                                       .slice(0, 16)
-                                  : ""
+                                  : "",
                               );
                             }}
                           >
@@ -1523,7 +1529,7 @@ export default function TasksPage() {
                                   handleSaveField(
                                     task.id,
                                     "dueDate",
-                                    editValue || null
+                                    editValue || null,
                                   )
                                 }
                                 onKeyDown={(e) => {
@@ -1531,12 +1537,12 @@ export default function TasksPage() {
                                     handleSaveField(
                                       task.id,
                                       "dueDate",
-                                      editValue || null
+                                      editValue || null,
                                     );
                                   }
                                 }}
                                 style={{
-                                  padding: "6px 8px",
+                                  padding: "6px 8px 6px 8px",
                                   borderRadius: 4,
                                   border: "1px solid #3b82f6",
                                   background: COLORS.cardBg,
@@ -1552,7 +1558,7 @@ export default function TasksPage() {
                                     month: "short",
                                     day: "2-digit",
                                     year: "2-digit",
-                                  }
+                                  },
                                 )}
                               </span>
                             ) : (
@@ -1568,7 +1574,7 @@ export default function TasksPage() {
                           </td>
                           <td
                             style={{
-                              padding: "12px 16px",
+                              padding: "12px 16px 12px 16px",
                               textAlign: "center",
                             }}
                           >
@@ -1580,7 +1586,7 @@ export default function TasksPage() {
                                 color: COLORS.stuck,
                                 cursor: "pointer",
                                 fontSize: 14,
-                                padding: 4,
+                                padding: "4px 4px 4px 4px",
                               }}
                               title="Delete"
                             >
@@ -1649,7 +1655,7 @@ export default function TasksPage() {
             </div>
 
             {/* Task Info */}
-            <div style={{ padding: 16 }}>
+            <div style={{ padding: "16px 16px 16px 16px" }}>
               <div style={{ marginBottom: 16 }}>
                 <div
                   style={{
@@ -1703,7 +1709,7 @@ export default function TasksPage() {
                 <div
                   style={{
                     display: "inline-block",
-                    padding: "4px 10px",
+                    padding: "4px 10px 4px 10px",
                     borderRadius: 4,
                     background: statusColors[taskDetails.status || "todo"],
                     color: "#fff",
@@ -1788,7 +1794,7 @@ export default function TasksPage() {
             <div
               style={{
                 borderTop: "1px solid rgba(0,0,0,0.1)",
-                padding: "16px",
+                padding: "16px 16px 16px 16px",
               }}
             >
               <h3
@@ -1818,7 +1824,7 @@ export default function TasksPage() {
                   disabled={uploadingAttachment}
                   style={{
                     flex: 1,
-                    padding: "6px 8px",
+                    padding: "6px 8px 6px 8px",
                     borderRadius: 4,
                     border: "1px solid rgba(0,0,0,0.1)",
                     background: COLORS.bg,
@@ -1869,7 +1875,7 @@ export default function TasksPage() {
                       key={attachment.id}
                       style={{
                         marginBottom: 10,
-                        padding: 10,
+                        padding: "10px 10px 10px 10px",
                         borderRadius: 4,
                         background: COLORS.bg,
                         borderLeft: "2px solid #3b82f6",
@@ -1910,7 +1916,7 @@ export default function TasksPage() {
                             }}
                           >
                             {new Date(
-                              attachment.createdAt
+                              attachment.createdAt,
                             ).toLocaleDateString()}
                           </div>
                         )}
@@ -1942,7 +1948,7 @@ export default function TasksPage() {
             <div
               style={{
                 borderTop: "1px solid rgba(0,0,0,0.1)",
-                padding: "16px",
+                padding: "16px 16px 16px 16px",
               }}
             >
               <h3
@@ -1987,7 +1993,7 @@ export default function TasksPage() {
                 <button
                   onClick={() => handleAddComment(selectedTaskId)}
                   style={{
-                    padding: "8px 12px",
+                    padding: "8px 12px 8px 12px",
                     borderRadius: 4,
                     background: "#3b82f6",
                     color: "#fff",
@@ -2020,7 +2026,7 @@ export default function TasksPage() {
                       key={comment.id}
                       style={{
                         marginBottom: 12,
-                        padding: 10,
+                        padding: "10px 10px 10px 10px",
                         borderRadius: 4,
                         background: COLORS.bg,
                         borderLeft: "2px solid #3b82f6",
@@ -2040,7 +2046,7 @@ export default function TasksPage() {
                                 handleEditComment(
                                   comment.id,
                                   selectedTaskId,
-                                  editingCommentValue
+                                  editingCommentValue,
                                 );
                               } else if (e.key === "Escape") {
                                 setEditingCommentId(null);
@@ -2048,7 +2054,7 @@ export default function TasksPage() {
                             }}
                             style={{
                               flex: 1,
-                              padding: "6px 8px",
+                              padding: "6px 8px 6px 8px",
                               borderRadius: 3,
                               border: "1px solid #3b82f6",
                               background: COLORS.cardBg,
@@ -2061,7 +2067,7 @@ export default function TasksPage() {
                               handleEditComment(
                                 comment.id,
                                 selectedTaskId,
-                                editingCommentValue
+                                editingCommentValue,
                               )
                             }
                             style={{
@@ -2109,7 +2115,7 @@ export default function TasksPage() {
                                 border: "none",
                                 color: "#3b82f6",
                                 cursor: "pointer",
-                                padding: 0,
+                                padding: "0px 0px 0px 0px",
                                 fontSize: 11,
                               }}
                             >
@@ -2124,7 +2130,7 @@ export default function TasksPage() {
                                 border: "none",
                                 color: COLORS.stuck,
                                 cursor: "pointer",
-                                padding: 0,
+                                padding: "0px 0px 0px 0px",
                                 fontSize: 11,
                               }}
                             >
@@ -2151,7 +2157,7 @@ export default function TasksPage() {
           onCreate={handleCreateTask}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }
 
@@ -2260,7 +2266,7 @@ function CreateTaskModal({
   };
 
   return (
-    <div
+    <button
       style={{
         position: "fixed",
         inset: 0,
@@ -2279,13 +2285,13 @@ function CreateTaskModal({
           width: "90%",
           maxWidth: 600,
           background: COLORS.cardBg,
-          padding: 24,
+          padding: "24px 24px 24px 24px",
           borderRadius: 12,
           boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
           border: "1px solid rgba(0,0,0,0.1)",
         }}
       >
-        <div
+        <PageContentCon
           style={{
             display: "flex",
             justifyContent: "space-between",
@@ -2314,12 +2320,12 @@ function CreateTaskModal({
               color: COLORS.muted,
               cursor: "pointer",
               fontSize: 20,
-              padding: 0,
+              padding: "0px 0px 0px 0px",
             }}
           >
             ✕
           </button>
-        </div>
+        </PageContentCon>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
@@ -2341,7 +2347,7 @@ function CreateTaskModal({
               onChange={(e) => setTitle(e.target.value)}
               style={{
                 width: "100%",
-                padding: 10,
+                padding: "10px 10px 10px 10px",
                 borderRadius: 6,
                 border: "1px solid rgba(0,0,0,0.1)",
                 background: "rgba(0,0,0,0.03)",
@@ -2371,7 +2377,7 @@ function CreateTaskModal({
               style={{
                 width: "100%",
                 minHeight: 80,
-                padding: 10,
+                padding: "10px 10px 10px 10px",
                 borderRadius: 6,
                 border: "1px solid rgba(0,0,0,0.1)",
                 background: "rgba(0,0,0,0.03)",
@@ -2406,7 +2412,7 @@ function CreateTaskModal({
                 }
                 style={{
                   width: "100%",
-                  padding: 10,
+                  padding: "10px 10px 10px 10px",
                   borderRadius: 6,
                   border: "1px solid rgba(0,0,0,0.1)",
                   background: "rgba(0,0,0,0.03)",
@@ -2442,7 +2448,7 @@ function CreateTaskModal({
                 onChange={(e) => setPriority(e.target.value)}
                 style={{
                   width: "100%",
-                  padding: 10,
+                  padding: "10px 10px 10px 10px",
                   borderRadius: 6,
                   border: "1px solid rgba(0,0,0,0.1)",
                   background: "rgba(0,0,0,0.03)",
@@ -2476,7 +2482,7 @@ function CreateTaskModal({
               onChange={(e) => setDueDate(e.target.value)}
               style={{
                 width: "100%",
-                padding: 10,
+                padding: "10px 10px 10px 10px",
                 borderRadius: 6,
                 border: "1px solid rgba(0,0,0,0.1)",
                 background: "rgba(0,0,0,0.03)",
@@ -2505,7 +2511,7 @@ function CreateTaskModal({
               style={{
                 width: "100%",
                 minHeight: 60,
-                padding: 10,
+                padding: "10px 10px 10px 10px",
                 borderRadius: 6,
                 border: "1px solid rgba(0,0,0,0.1)",
                 background: "rgba(0,0,0,0.03)",
@@ -2537,7 +2543,7 @@ function CreateTaskModal({
               }
               style={{
                 width: "100%",
-                padding: 10,
+                padding: "10px 10px 10px 10px",
                 borderRadius: 6,
                 border: "1px solid rgba(0,0,0,0.1)",
                 background: "rgba(0,0,0,0.03)",
@@ -2562,7 +2568,7 @@ function CreateTaskModal({
           {error && (
             <div
               style={{
-                padding: 12,
+                padding: "12px 12px 12px 12px",
                 borderRadius: 6,
                 background: "rgba(239, 68, 68, 0.1)",
                 color: COLORS.stuck,
@@ -2586,7 +2592,7 @@ function CreateTaskModal({
               type="button"
               onClick={onClose}
               style={{
-                padding: "10px 16px",
+                padding: "10px 16px 10px 16px",
                 borderRadius: 6,
                 background: "transparent",
                 color: COLORS.text,
@@ -2602,7 +2608,7 @@ function CreateTaskModal({
               type="submit"
               disabled={loading}
               style={{
-                padding: "10px 16px",
+                padding: "10px 16px 10px 16px",
                 borderRadius: 6,
                 background: loading ? "rgba(59, 130, 246, 0.5)" : "#3b82f6",
                 color: "#fff",
@@ -2617,6 +2623,6 @@ function CreateTaskModal({
           </div>
         </div>
       </form>
-    </div>
+    </button>
   );
 }

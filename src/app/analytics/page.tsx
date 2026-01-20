@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, Lock } from "lucide-react";
 import TaskStatusChart from "@/app/components/TaskStatusChart";
 import { getCurrentUser } from "@/utils/sessionManager";
+import { useAuthProtection } from "@/app/hooks/useAuthProtection";
+import { PageContainer } from "@/app/components/PageContainer";
+import { PageContentCon } from "@/app/components/PageContentCon";
 
 const COLORS = {
   bg: "#ffffff",
@@ -48,6 +51,7 @@ interface AnalyticsData {
 
 export default function AnalyticsPage() {
   const router = useRouter();
+  useAuthProtection(); // Protect this route
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,7 +61,7 @@ export default function AnalyticsPage() {
     done: 0,
   });
   const [aiRecommendations, setAiRecommendations] = useState<Recommendation[]>(
-    []
+    [],
   );
   const [aiTrends, setAiTrends] = useState<(Trend | string)[]>([]);
   const [hoveredSegment, setHoveredSegment] = useState<string | null>(null);
@@ -99,7 +103,7 @@ export default function AnalyticsPage() {
         // Calculate metrics
         const totalTasks = tasks.length;
         const completedTasks = tasks.filter(
-          (t: any) => t.status === "completed" || t.status === "done"
+          (t: any) => t.status === "completed" || t.status === "done",
         ).length;
         const completionRate =
           totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
@@ -107,7 +111,7 @@ export default function AnalyticsPage() {
           (t: any) =>
             t.status !== "completed" &&
             t.dueDate &&
-            new Date(t.dueDate) < new Date()
+            new Date(t.dueDate) < new Date(),
         ).length;
         const onTrackTasks = totalTasks - overdueTasks - completedTasks;
         const avgTasksPerMember =
@@ -115,13 +119,13 @@ export default function AnalyticsPage() {
 
         // Calculate task status distribution
         const inProgressCount = tasks.filter(
-          (t: any) => t.status === "in-progress" || t.status === "inprogress"
+          (t: any) => t.status === "in-progress" || t.status === "inprogress",
         ).length;
         const stuckCount = tasks.filter(
-          (t: any) => t.status === "stuck"
+          (t: any) => t.status === "stuck",
         ).length;
         const doneCount = tasks.filter(
-          (t: any) => t.status === "completed" || t.status === "done"
+          (t: any) => t.status === "completed" || t.status === "done",
         ).length;
 
         setTaskStatusCounts({
@@ -164,7 +168,7 @@ export default function AnalyticsPage() {
             overdueTasks,
             totalTasks,
             completedTasks,
-            members.length
+            members.length,
           );
           localAiTrends = generateTrends(completionRate, overdueTasks, tasks);
           performanceSummary = generatePerformanceSummary(
@@ -173,7 +177,7 @@ export default function AnalyticsPage() {
             totalTasks,
             completedTasks,
             members.length,
-            avgTasksPerMember
+            avgTasksPerMember,
           );
         }
 
@@ -185,13 +189,13 @@ export default function AnalyticsPage() {
                 overdueTasks,
                 totalTasks,
                 completedTasks,
-                members.length
-              )
+                members.length,
+              ),
         );
         setAiTrends(
           localAiTrends.length > 0
             ? localAiTrends
-            : generateTrends(completionRate, overdueTasks, tasks)
+            : generateTrends(completionRate, overdueTasks, tasks),
         );
 
         setAnalytics({
@@ -209,7 +213,7 @@ export default function AnalyticsPage() {
                   overdueTasks,
                   totalTasks,
                   completedTasks,
-                  members.length
+                  members.length,
                 ),
           trends:
             localAiTrends.length > 0
@@ -223,7 +227,7 @@ export default function AnalyticsPage() {
               totalTasks,
               completedTasks,
               members.length,
-              avgTasksPerMember
+              avgTasksPerMember,
             ),
         });
       } catch (error) {
@@ -241,7 +245,7 @@ export default function AnalyticsPage() {
     overdueTasks: number,
     totalTasks: number,
     completedTasks: number,
-    memberCount: number
+    memberCount: number,
   ): Recommendation[] => {
     const recommendations: Recommendation[] = [];
 
@@ -300,7 +304,7 @@ export default function AnalyticsPage() {
   const generateTrends = (
     completionRate: number,
     overdueTasks: number,
-    tasks: any[]
+    tasks: any[],
   ): (Trend | string)[] => {
     const trends: (Trend | string)[] = [];
 
@@ -344,7 +348,7 @@ export default function AnalyticsPage() {
     }
 
     const inProgressCount = tasks.filter(
-      (t: any) => t.status === "in-progress" || t.status === "inprogress"
+      (t: any) => t.status === "in-progress" || t.status === "inprogress",
     ).length;
     if (inProgressCount > tasks.length * 0.3) {
       trends.push({
@@ -362,7 +366,7 @@ export default function AnalyticsPage() {
     totalTasks: number,
     completedTasks: number,
     memberCount: number,
-    avgTasksPerMember: number
+    avgTasksPerMember: number,
   ): string => {
     let summary = `Your team is currently tracking at ${completionRate}% completion rate with ${totalTasks} total tasks. `;
 
@@ -500,404 +504,347 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: COLORS.bg,
-        color: COLORS.text,
-        fontFamily: "system-ui, -apple-system, sans-serif",
-        padding: "20px",
-      }}
-    >
-      <div style={{ maxWidth: "1600px", margin: "0 auto" }}>
-        {/* Header */}
-        <div
+    <PageContainer title="ANALYTICS">
+      {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          marginBottom: 24,
+        }}
+      >
+        <button
+          onClick={() => router.back()}
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            marginBottom: 24,
+            background: "none",
+            border: "none",
+            fontSize: 24,
+            cursor: "pointer",
+            color: COLORS.text,
+            padding: 0,
           }}
         >
-          <button
-            onClick={() => router.back()}
-            style={{
-              background: "none",
-              border: "none",
-              fontSize: 24,
-              cursor: "pointer",
-              color: COLORS.text,
-              padding: 0,
-            }}
-          >
-            ←
-          </button>
-          <h1
-            style={{
-              fontSize: 24,
-              fontWeight: 600,
-              margin: 0,
-              color: COLORS.text,
-            }}
-          >
-            Analytics Overview
-          </h1>
-        </div>
+          ←
+        </button>
+        <h1
+          style={{
+            fontSize: 24,
+            fontWeight: 600,
+            margin: 0,
+            color: COLORS.text,
+          }}
+        >
+          Analytics Overview
+        </h1>
+      </div>
 
-        {/* Key Metrics Grid */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 16,
-            marginBottom: 24,
-          }}
-        >
-          {[
-            {
-              label: "Campaign Tasks",
-              value: analytics.totalTasks,
-              color: COLORS.info,
-            },
-            {
-              label: "Delivered",
-              value: analytics.completedTasks,
-              color: COLORS.success,
-            },
-            {
-              label: "Success Rate",
-              value: `${analytics.completionRate}%`,
-              color: COLORS.warning,
-            },
-            {
-              label: "Timeline Risks",
-              value: analytics.overdueTasks,
-              color: COLORS.error,
-            },
-          ].map((metric, i) => (
-            <div
-              key={i}
-              style={{
-                background: COLORS.cardBg,
-                border: "1px solid rgba(0,0,0,0.1)",
-                filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
-                padding: 20,
-                borderRadius: 8,
-                display: "flex",
-                gap: 16,
-                alignItems: "flex-start",
-              }}
-            >
-              <div>
-                <p style={{ fontSize: 12, color: COLORS.muted, margin: 0 }}>
-                  {metric.label}
-                </p>
-                <div
-                  style={{
-                    fontSize: 28,
-                    fontWeight: 700,
-                    color: metric.color,
-                    marginTop: 4,
-                  }}
-                >
-                  {metric.value}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Two Column Layout */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 20,
-            marginBottom: 24,
-          }}
-        >
-          {/* Recommendations */}
+      {/* Key Metrics Grid */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, 1fr)",
+          gap: 16,
+          marginBottom: 24,
+        }}
+      >
+        {[
+          {
+            label: "Campaign Tasks",
+            value: analytics.totalTasks,
+            color: COLORS.info,
+          },
+          {
+            label: "Delivered",
+            value: analytics.completedTasks,
+            color: COLORS.success,
+          },
+          {
+            label: "Success Rate",
+            value: `${analytics.completionRate}%`,
+            color: COLORS.warning,
+          },
+          {
+            label: "Timeline Risks",
+            value: analytics.overdueTasks,
+            color: COLORS.error,
+          },
+        ].map((metric, i) => (
           <div
+            key={i}
             style={{
               background: COLORS.cardBg,
               border: "1px solid rgba(0,0,0,0.1)",
               filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
               padding: 20,
               borderRadius: 8,
+              display: "flex",
+              gap: 16,
+              alignItems: "flex-start",
             }}
           >
-            <h2
-              style={{
-                fontSize: 16,
-                fontWeight: 600,
-                marginBottom: 16,
-                margin: 0,
-                color: "#333",
-              }}
-            >
-              Smart Recommendations
-            </h2>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 12,
-                marginTop: 16,
-              }}
-            >
-              {(analytics?.recommendations || []).length > 0 ? (
-                analytics.recommendations.map((rec, i) => (
+            <div>
+              <p style={{ fontSize: 12, color: COLORS.muted, margin: 0 }}>
+                {metric.label}
+              </p>
+              <div
+                style={{
+                  fontSize: 28,
+                  fontWeight: 700,
+                  color: metric.color,
+                  marginTop: 4,
+                }}
+              >
+                {metric.value}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Two Column Layout */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 20,
+          marginBottom: 24,
+        }}
+      >
+        {/* Recommendations */}
+        <div
+          style={{
+            background: COLORS.cardBg,
+            border: "1px solid rgba(0,0,0,0.1)",
+            filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
+            padding: 20,
+            borderRadius: 8,
+          }}
+        >
+          <h2
+            style={{
+              fontSize: 16,
+              fontWeight: 600,
+              marginBottom: 16,
+              margin: 0,
+              color: "#333",
+            }}
+          >
+            Smart Recommendations
+          </h2>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              marginTop: 16,
+            }}
+          >
+            {(analytics?.recommendations || []).length > 0 ? (
+              analytics.recommendations.map((rec, i) => (
+                <div
+                  key={i}
+                  style={{
+                    background: "rgba(0, 0, 0, 0.02)",
+                    border: "1px solid rgba(0, 0, 0, 0.1)",
+                    padding: 12,
+                    borderRadius: 6,
+                  }}
+                >
+                  <h3
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      margin: "0 0 4px",
+                      color: COLORS.text,
+                    }}
+                  >
+                    {rec.title}
+                  </h3>
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: COLORS.muted,
+                      margin: 0,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {rec.description}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <p style={{ fontSize: 12, color: COLORS.muted }}>
+                No recommendations available yet
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Trends */}
+        <div
+          style={{
+            background: COLORS.cardBg,
+            border: "1px solid rgba(0,0,0,0.1)",
+            filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
+            padding: 20,
+            borderRadius: 8,
+          }}
+        >
+          <h2
+            style={{
+              fontSize: 16,
+              fontWeight: 600,
+              marginBottom: 16,
+              margin: 0,
+              color: "#333",
+            }}
+          >
+            Campaign Performance Trends
+          </h2>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              marginTop: 16,
+            }}
+          >
+            {(analytics?.trends || []).length > 0 ? (
+              analytics.trends.map((trend, i) => {
+                const trendData =
+                  typeof trend === "string" ? { text: trend } : trend;
+                return (
                   <div
                     key={i}
                     style={{
-                      background: "rgba(0, 0, 0, 0.02)",
-                      border: "1px solid rgba(0, 0, 0, 0.1)",
                       padding: 12,
+                      background: "rgba(0, 0, 0, 0.02)",
                       borderRadius: 6,
+                      border: "1px solid rgba(0, 0, 0, 0.1)",
                     }}
                   >
-                    <h3
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 600,
-                        margin: "0 0 4px",
-                        color: COLORS.text,
-                      }}
-                    >
-                      {rec.title}
-                    </h3>
-                    <p
-                      style={{
-                        fontSize: 12,
-                        color: COLORS.muted,
-                        margin: 0,
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      {rec.description}
-                    </p>
+                    <span style={{ fontSize: 13, color: COLORS.text }}>
+                      {trendData.text}
+                    </span>
                   </div>
-                ))
-              ) : (
-                <p style={{ fontSize: 12, color: COLORS.muted }}>
-                  No recommendations available yet
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Trends */}
-          <div
-            style={{
-              background: COLORS.cardBg,
-              border: "1px solid rgba(0,0,0,0.1)",
-              filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
-              padding: 20,
-              borderRadius: 8,
-            }}
-          >
-            <h2
-              style={{
-                fontSize: 16,
-                fontWeight: 600,
-                marginBottom: 16,
-                margin: 0,
-                color: "#333",
-              }}
-            >
-              Campaign Performance Trends
-            </h2>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 12,
-                marginTop: 16,
-              }}
-            >
-              {(analytics?.trends || []).length > 0 ? (
-                analytics.trends.map((trend, i) => {
-                  const trendData =
-                    typeof trend === "string" ? { text: trend } : trend;
-                  return (
-                    <div
-                      key={i}
-                      style={{
-                        padding: 12,
-                        background: "rgba(0, 0, 0, 0.02)",
-                        borderRadius: 6,
-                        border: "1px solid rgba(0, 0, 0, 0.1)",
-                      }}
-                    >
-                      <span style={{ fontSize: 13, color: COLORS.text }}>
-                        {trendData.text}
-                      </span>
-                    </div>
-                  );
-                })
-              ) : (
-                <p style={{ fontSize: 12, color: COLORS.muted }}>
-                  No trends available yet
-                </p>
-              )}
-            </div>
+                );
+              })
+            ) : (
+              <p style={{ fontSize: 12, color: COLORS.muted }}>
+                No trends available yet
+              </p>
+            )}
           </div>
         </div>
+      </div>
 
-        {/* Charts Grid - Overall Task Overview and Team Progress */}
+      {/* Charts Grid - Overall Task Overview and Team Progress */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(500px, 1fr))",
+          gap: 20,
+          marginBottom: 24,
+        }}
+      >
+        {/* Overall Task Overview - Detailed Pie Chart with AI Insights */}
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(500px, 1fr))",
-            gap: 20,
-            marginBottom: 24,
+            background: "#F9FAFD",
+            border: "1px solid rgba(0,0,0,0.1)",
+            filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
+            padding: 20,
+            borderRadius: 8,
           }}
         >
-          {/* Overall Task Overview - Detailed Pie Chart with AI Insights */}
-          <div
+          <h3
             style={{
-              background: "#F9FAFD",
-              border: "1px solid rgba(0,0,0,0.1)",
-              filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
-              padding: 20,
-              borderRadius: 8,
+              fontSize: 15,
+              fontWeight: 600,
+              margin: "0 0 16px 0",
+              color: "#333",
             }}
           >
-            <h3
-              style={{
-                fontSize: 15,
-                fontWeight: 600,
-                margin: "0 0 16px 0",
-                color: "#333",
-              }}
-            >
-              Overall task overview
-            </h3>
+            Overall task overview
+          </h3>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+            }}
+          >
             <div
               style={{
                 display: "flex",
-                flexDirection: "column",
-                gap: 16,
+                alignItems: "center",
+                gap: 48,
+                justifyContent: "center",
               }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 48,
-                  justifyContent: "center",
-                }}
-              >
-                {/* Pie Chart SVG */}
-                {analytics.totalTasks > 0 ? (
-                  <div style={{ position: "relative", flexShrink: 0 }}>
-                    <svg
-                      width="280"
-                      height="280"
-                      viewBox="0 0 200 200"
-                      style={{ flexShrink: 0 }}
-                    >
-                      <g transform="translate(100,100)">
-                        {(() => {
-                          const radius = 90;
-                          const gap = 0.04;
-                          let cumulative = -Math.PI / 2;
+              {/* Pie Chart SVG */}
+              {analytics.totalTasks > 0 ? (
+                <div style={{ position: "relative", flexShrink: 0 }}>
+                  <svg
+                    width="280"
+                    height="280"
+                    viewBox="0 0 200 200"
+                    style={{ flexShrink: 0 }}
+                  >
+                    <g transform="translate(100,100)">
+                      {(() => {
+                        const radius = 90;
+                        const gap = 0.04;
+                        let cumulative = -Math.PI / 2;
 
-                          const segments = [
-                            {
-                              value: taskStatusCounts.inProgress,
-                              color: COLORS.inProgress,
-                              label: "Working on it",
-                            },
-                            {
-                              value: taskStatusCounts.done,
-                              color: COLORS.done,
-                              label: "Done",
-                            },
-                            {
-                              value: taskStatusCounts.stuck,
-                              color: COLORS.stuck,
-                              label: "Stuck",
-                            },
-                          ].filter((s) => s.value > 0);
+                        const segments = [
+                          {
+                            value: taskStatusCounts.inProgress,
+                            color: COLORS.inProgress,
+                            label: "Working on it",
+                          },
+                          {
+                            value: taskStatusCounts.done,
+                            color: COLORS.done,
+                            label: "Done",
+                          },
+                          {
+                            value: taskStatusCounts.stuck,
+                            color: COLORS.stuck,
+                            label: "Stuck",
+                          },
+                        ].filter((s) => s.value > 0);
 
-                          return segments.map((segment, i) => {
-                            const portion =
-                              segment.value / analytics.totalTasks;
-                            const angle = portion * Math.PI * 2;
-                            const startAngle = cumulative + gap / 2;
-                            const endAngle = cumulative + angle - gap / 2;
+                        return segments.map((segment, i) => {
+                          const portion = segment.value / analytics.totalTasks;
+                          const angle = portion * Math.PI * 2;
+                          const startAngle = cumulative + gap / 2;
+                          const endAngle = cumulative + angle - gap / 2;
 
-                            const x1 = radius * Math.cos(startAngle);
-                            const y1 = radius * Math.sin(startAngle);
-                            const x2 = radius * Math.cos(endAngle);
-                            const y2 = radius * Math.sin(endAngle);
+                          const x1 = radius * Math.cos(startAngle);
+                          const y1 = radius * Math.sin(startAngle);
+                          const x2 = radius * Math.cos(endAngle);
+                          const y2 = radius * Math.sin(endAngle);
 
-                            const largeArc = angle > Math.PI ? 1 : 0;
+                          const largeArc = angle > Math.PI ? 1 : 0;
 
-                            // Calculate text position in the middle of the segment
-                            const textAngle = cumulative + angle / 2;
-                            const textRadius = radius * 0.65;
-                            const textX = textRadius * Math.cos(textAngle);
-                            const textY = textRadius * Math.sin(textAngle);
+                          // Calculate text position in the middle of the segment
+                          const textAngle = cumulative + angle / 2;
+                          const textRadius = radius * 0.65;
+                          const textX = textRadius * Math.cos(textAngle);
+                          const textY = textRadius * Math.sin(textAngle);
 
-                            if (
-                              segments.length === 1 &&
-                              angle > 2 * Math.PI - 0.1
-                            ) {
-                              return (
-                                <g key={i}>
-                                  <circle
-                                    cx="0"
-                                    cy="0"
-                                    r={radius}
-                                    fill={segment.color}
-                                    stroke="#ffffff"
-                                    strokeWidth="1.5"
-                                    style={{
-                                      cursor: "pointer",
-                                      transition: "opacity 0.2s",
-                                      opacity:
-                                        hoveredSegment === null ||
-                                        hoveredSegment === segment.label
-                                          ? 1
-                                          : 0.6,
-                                    }}
-                                    onMouseEnter={() =>
-                                      setHoveredSegment(segment.label)
-                                    }
-                                    onMouseLeave={() => setHoveredSegment(null)}
-                                  />
-                                  {hoveredSegment === segment.label && (
-                                    <text
-                                      x={textX}
-                                      y={textY}
-                                      textAnchor="middle"
-                                      dominantBaseline="middle"
-                                      fill="white"
-                                      fontSize="16"
-                                      fontWeight="bold"
-                                      pointerEvents="none"
-                                    >
-                                      {segment.value}
-                                    </text>
-                                  )}
-                                </g>
-                              );
-                            }
-
-                            const path = [
-                              `M ${x1} ${y1}`,
-                              `A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`,
-                              `L 0 0 Z`,
-                            ].join(" ");
-
-                            cumulative += angle;
-
+                          if (
+                            segments.length === 1 &&
+                            angle > 2 * Math.PI - 0.1
+                          ) {
                             return (
                               <g key={i}>
-                                <path
-                                  d={path}
+                                <circle
+                                  cx="0"
+                                  cy="0"
+                                  r={radius}
                                   fill={segment.color}
                                   stroke="#ffffff"
                                   strokeWidth="1.5"
@@ -931,290 +878,336 @@ export default function AnalyticsPage() {
                                 )}
                               </g>
                             );
-                          });
-                        })()}
-                      </g>
-                    </svg>
-                  </div>
-                ) : (
+                          }
+
+                          const path = [
+                            `M ${x1} ${y1}`,
+                            `A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`,
+                            `L 0 0 Z`,
+                          ].join(" ");
+
+                          cumulative += angle;
+
+                          return (
+                            <g key={i}>
+                              <path
+                                d={path}
+                                fill={segment.color}
+                                stroke="#ffffff"
+                                strokeWidth="1.5"
+                                style={{
+                                  cursor: "pointer",
+                                  transition: "opacity 0.2s",
+                                  opacity:
+                                    hoveredSegment === null ||
+                                    hoveredSegment === segment.label
+                                      ? 1
+                                      : 0.6,
+                                }}
+                                onMouseEnter={() =>
+                                  setHoveredSegment(segment.label)
+                                }
+                                onMouseLeave={() => setHoveredSegment(null)}
+                              />
+                              {hoveredSegment === segment.label && (
+                                <text
+                                  x={textX}
+                                  y={textY}
+                                  textAnchor="middle"
+                                  dominantBaseline="middle"
+                                  fill="white"
+                                  fontSize="16"
+                                  fontWeight="bold"
+                                  pointerEvents="none"
+                                >
+                                  {segment.value}
+                                </text>
+                              )}
+                            </g>
+                          );
+                        });
+                      })()}
+                    </g>
+                  </svg>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    width: 280,
+                    height: 280,
+                    borderRadius: "50%",
+                    background: "rgba(0,0,0,0.04)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: COLORS.muted,
+                    fontSize: 14,
+                    fontWeight: 500,
+                  }}
+                >
+                  No tasks yet
+                </div>
+              )}
+
+              {/* Legend */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                  minWidth: 180,
+                }}
+              >
+                {[
+                  {
+                    label: "Working on it",
+                    value: taskStatusCounts.inProgress,
+                    color: COLORS.inProgress,
+                  },
+                  {
+                    label: "Done",
+                    value: taskStatusCounts.done,
+                    color: COLORS.done,
+                  },
+                  {
+                    label: "Stuck",
+                    value: taskStatusCounts.stuck,
+                    color: COLORS.stuck,
+                  },
+                ].map((item, i) => (
                   <div
+                    key={i}
                     style={{
-                      width: 280,
-                      height: 280,
-                      borderRadius: "50%",
-                      background: "rgba(0,0,0,0.04)",
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "center",
-                      color: COLORS.muted,
-                      fontSize: 14,
+                      gap: 10,
+                      fontSize: 13.5,
                       fontWeight: 500,
+                      color: "#333",
                     }}
                   >
-                    No tasks yet
-                  </div>
-                )}
-
-                {/* Legend */}
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 12,
-                    minWidth: 180,
-                  }}
-                >
-                  {[
-                    {
-                      label: "Working on it",
-                      value: taskStatusCounts.inProgress,
-                      color: COLORS.inProgress,
-                    },
-                    {
-                      label: "Done",
-                      value: taskStatusCounts.done,
-                      color: COLORS.done,
-                    },
-                    {
-                      label: "Stuck",
-                      value: taskStatusCounts.stuck,
-                      color: COLORS.stuck,
-                    },
-                  ].map((item, i) => (
                     <div
-                      key={i}
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                        fontSize: 13.5,
-                        fontWeight: 500,
-                        color: "#333",
+                        width: 14,
+                        height: 14,
+                        borderRadius: 3,
+                        background: item.color,
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.12)",
                       }}
-                    >
-                      <div
-                        style={{
-                          width: 14,
-                          height: 14,
-                          borderRadius: 3,
-                          background: item.color,
-                          boxShadow: "0 1px 3px rgba(0,0,0,0.12)",
-                        }}
-                      />
-                      <span>
-                        {item.label}{" "}
-                        <strong>
-                          {analytics.totalTasks > 0
-                            ? Math.round(
-                                (item.value / analytics.totalTasks) * 100
-                              )
-                            : 0}
-                          %
-                        </strong>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* AI Insights */}
-              <div
-                style={{
-                  background: "rgba(93, 139, 177, 0.05)",
-                  border: "1px solid rgba(93, 139, 177, 0.2)",
-                  padding: 12,
-                  borderRadius: 6,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: COLORS.primary,
-                    marginBottom: 8,
-                  }}
-                >
-                  AI Insight
-                </div>
-                <div
-                  style={{ fontSize: 12, color: COLORS.text, lineHeight: 1.6 }}
-                >
-                  {taskStatusCounts.done > taskStatusCounts.inProgress
-                    ? "Strong completion rate! Your team is shipping tasks at a healthy pace. Keep maintaining this momentum."
-                    : taskStatusCounts.inProgress > taskStatusCounts.stuck
-                    ? "Good progress on active work. Focus on reducing bottlenecks to improve completion rate."
-                    : "Many tasks are stuck. Prioritize unblocking these to accelerate delivery."}
-                </div>
+                    />
+                    <span>
+                      {item.label}{" "}
+                      <strong>
+                        {analytics.totalTasks > 0
+                          ? Math.round(
+                              (item.value / analytics.totalTasks) * 100,
+                            )
+                          : 0}
+                        %
+                      </strong>
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
 
-          {/* Overall Task Status Bar Chart - AI Enhanced */}
-          <div
-            style={{
-              background: "#F9FAFD",
-              border: "1px solid rgba(0,0,0,0.1)",
-              filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
-              padding: 20,
-              borderRadius: 8,
-            }}
-          >
-            <TaskStatusChart
-              title="Overall task status"
-              data={[
-                {
-                  status: "Working on it",
-                  count: taskStatusCounts.inProgress,
-                  color: COLORS.inProgress,
-                },
-                {
-                  status: "Stuck",
-                  count: taskStatusCounts.stuck,
-                  color: COLORS.stuck,
-                },
-                {
-                  status: "Done",
-                  count: taskStatusCounts.done,
-                  color: COLORS.done,
-                },
-              ]}
-            />
-
-            {/* AI Recommendations for Task Status */}
-            {aiRecommendations.length > 0 && (
-              <div
-                style={{
-                  marginTop: 16,
-                  paddingTop: 16,
-                  borderTop: "1px solid rgba(0,0,0,0.1)",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: COLORS.primary,
-                    marginBottom: 12,
-                  }}
-                >
-                  Recommended Actions
-                </div>
-                <div
-                  style={{ display: "flex", flexDirection: "column", gap: 10 }}
-                >
-                  {aiRecommendations
-                    .slice(0, 3)
-                    .map((rec: Recommendation, i: number) => (
-                      <div
-                        key={i}
-                        style={{
-                          display: "flex",
-                          gap: 10,
-                          padding: 10,
-                          background: "rgba(0, 0, 0, 0.02)",
-                          borderLeft: "3px solid #000",
-                          borderRadius: 4,
-                        }}
-                      >
-                        <div
-                          style={{ fontSize: 12, minWidth: 16, color: "#000" }}
-                        >
-                          •
-                        </div>
-                        <div>
-                          <div
-                            style={{
-                              fontSize: 12,
-                              fontWeight: 600,
-                              color: "#333",
-                            }}
-                          >
-                            {rec.title}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: 11,
-                              color: COLORS.text,
-                              marginTop: 2,
-                            }}
-                          >
-                            {rec.description}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Performance Summary with AI Insights */}
-        <div
-          style={{
-            marginTop: 24,
-            background: "rgba(16, 185, 129, 0.1)",
-            border: "1px solid rgba(16, 185, 129, 0.2)",
-            padding: 20,
-            borderRadius: 8,
-          }}
-        >
-          <h3 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 12px" }}>
-            Campaign Performance Summary
-          </h3>
-          <div style={{ fontSize: 13, color: COLORS.text, lineHeight: 1.8 }}>
-            <p>
-              {analytics.performanceSummary ||
-                `Your team is currently tracking at ${analytics.completionRate}% completion rate with ${analytics.totalTasks} total tasks. With ${analytics.completedTasks} completed and ${analytics.overdueTasks} overdue, the recommended focus is on maintaining momentum while addressing any blockers. Average task distribution per team member is ${analytics.avgTasksPerMember} tasks.`}
-            </p>
-          </div>
-
-          {/* AI Trends */}
-          {aiTrends.length > 0 && (
+            {/* AI Insights */}
             <div
               style={{
-                marginTop: 16,
-                paddingTop: 16,
-                borderTop: "1px solid rgba(16, 185, 129, 0.2)",
+                background: "rgba(93, 139, 177, 0.05)",
+                border: "1px solid rgba(93, 139, 177, 0.2)",
+                padding: 12,
+                borderRadius: 6,
               }}
             >
               <div
                 style={{
                   fontSize: 12,
                   fontWeight: 600,
-                  color: "#059669",
-                  marginBottom: 10,
+                  color: COLORS.primary,
+                  marginBottom: 8,
                 }}
               >
-                Current Trends
+                AI Insight
               </div>
               <div
+                style={{ fontSize: 12, color: COLORS.text, lineHeight: 1.6 }}
+              >
+                {taskStatusCounts.done > taskStatusCounts.inProgress
+                  ? "Strong completion rate! Your team is shipping tasks at a healthy pace. Keep maintaining this momentum."
+                  : taskStatusCounts.inProgress > taskStatusCounts.stuck
+                    ? "Good progress on active work. Focus on reducing bottlenecks to improve completion rate."
+                    : "Many tasks are stuck. Prioritize unblocking these to accelerate delivery."}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Overall Task Status Bar Chart - AI Enhanced */}
+        <div
+          style={{
+            background: "#F9FAFD",
+            border: "1px solid rgba(0,0,0,0.1)",
+            filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
+            padding: 20,
+            borderRadius: 8,
+          }}
+        >
+          <TaskStatusChart
+            title="Overall task status"
+            data={[
+              {
+                status: "Working on it",
+                count: taskStatusCounts.inProgress,
+                color: COLORS.inProgress,
+              },
+              {
+                status: "Stuck",
+                count: taskStatusCounts.stuck,
+                color: COLORS.stuck,
+              },
+              {
+                status: "Done",
+                count: taskStatusCounts.done,
+                color: COLORS.done,
+              },
+            ]}
+          />
+
+          {/* AI Recommendations for Task Status */}
+          {aiRecommendations.length > 0 && (
+            <div
+              style={{
+                marginTop: 16,
+                paddingTop: 16,
+                borderTop: "1px solid rgba(0,0,0,0.1)",
+              }}
+            >
+              <div
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                  gap: 10,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: COLORS.primary,
+                  marginBottom: 12,
                 }}
               >
-                {aiTrends.map((trend: any, i: number) => (
-                  <div
-                    key={i}
-                    style={{
-                      padding: 10,
-                      background: "rgba(0, 0, 0, 0.02)",
-                      borderRadius: 4,
-                      border: "1px solid rgba(0, 0, 0, 0.1)",
-                      fontSize: 12,
-                      color: COLORS.text,
-                    }}
-                  >
-                    {typeof trend === "object" ? trend.text : trend}
-                  </div>
-                ))}
+                Recommended Actions
+              </div>
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 10 }}
+              >
+                {aiRecommendations
+                  .slice(0, 3)
+                  .map((rec: Recommendation, i: number) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: "flex",
+                        gap: 10,
+                        padding: 10,
+                        background: "rgba(0, 0, 0, 0.02)",
+                        borderLeft: "3px solid #000",
+                        borderRadius: 4,
+                      }}
+                    >
+                      <div
+                        style={{ fontSize: 12, minWidth: 16, color: "#000" }}
+                      >
+                        •
+                      </div>
+                      <div>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: "#333",
+                          }}
+                        >
+                          {rec.title}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: COLORS.text,
+                            marginTop: 2,
+                          }}
+                        >
+                          {rec.description}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
               </div>
             </div>
           )}
         </div>
       </div>
-    </div>
+
+      {/* Performance Summary with AI Insights */}
+      <div
+        style={{
+          marginTop: 24,
+          background: "rgba(16, 185, 129, 0.1)",
+          border: "1px solid rgba(16, 185, 129, 0.2)",
+          padding: 20,
+          borderRadius: 8,
+        }}
+      >
+        <h3 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 12px" }}>
+          Campaign Performance Summary
+        </h3>
+        <div style={{ fontSize: 13, color: COLORS.text, lineHeight: 1.8 }}>
+          <p>
+            {analytics.performanceSummary ||
+              `Your team is currently tracking at ${analytics.completionRate}% completion rate with ${analytics.totalTasks} total tasks. With ${analytics.completedTasks} completed and ${analytics.overdueTasks} overdue, the recommended focus is on maintaining momentum while addressing any blockers. Average task distribution per team member is ${analytics.avgTasksPerMember} tasks.`}
+          </p>
+        </div>
+
+        {/* AI Trends */}
+        {aiTrends.length > 0 && (
+          <div
+            style={{
+              marginTop: 16,
+              paddingTop: 16,
+              borderTop: "1px solid rgba(16, 185, 129, 0.2)",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#059669",
+                marginBottom: 10,
+              }}
+            >
+              Current Trends
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: 10,
+              }}
+            >
+              {aiTrends.map((trend: any, i: number) => (
+                <div
+                  key={i}
+                  style={{
+                    padding: 10,
+                    background: "rgba(0, 0, 0, 0.02)",
+                    borderRadius: 4,
+                    border: "1px solid rgba(0, 0, 0, 0.1)",
+                    fontSize: 12,
+                    color: COLORS.text,
+                  }}
+                >
+                  {typeof trend === "object" ? trend.text : trend}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </PageContainer>
   );
 }

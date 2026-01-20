@@ -3,6 +3,9 @@
 import React, { useState, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { getCurrentUser } from "@/utils/sessionManager";
+import { useAuthProtection } from "@/app/hooks/useAuthProtection";
+import { PageContainer } from "@/app/components/PageContainer";
+import { PageContentCon } from "@/app/components/PageContentCon";
 import { AlertCircle } from "lucide-react";
 
 interface Log {
@@ -21,6 +24,7 @@ interface Log {
 }
 
 export default function LogsPage() {
+  useAuthProtection(); // Protect this route
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -90,14 +94,7 @@ export default function LogsPage() {
   }
 
   return (
-    <div className="p-8 bg-white min-h-screen">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Activity Logs</h1>
-        <p className="text-gray-600">
-          {logs.length} log{logs.length !== 1 ? "s" : ""} recorded
-        </p>
-      </div>
-
+    <PageContainer title="ACTIVITY LOGS">
       {logs.length === 0 ? (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
           <AlertCircle size={40} className="mx-auto text-gray-400 mb-3" />
@@ -145,6 +142,6 @@ export default function LogsPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

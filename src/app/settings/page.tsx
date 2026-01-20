@@ -18,6 +18,9 @@ import {
   clearUserSession,
   saveUserSession,
 } from "@/utils/sessionManager";
+import { useAuthProtection } from "@/app/hooks/useAuthProtection";
+import { PageContainer } from "@/app/components/PageContainer";
+import { PageContentCon } from "@/app/components/PageContentCon";
 import { useRouter } from "next/navigation";
 
 interface User {
@@ -46,6 +49,7 @@ const ROLES = ["EMPLOYEE", "TEAM_LEAD", "MANAGER", "CO_OWNER"];
 
 export default function SettingsPage() {
   const router = useRouter();
+  useAuthProtection(); // Protect this route
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("profile");
   const [loading, setLoading] = useState(true);
@@ -73,6 +77,7 @@ export default function SettingsPage() {
   const [showRoleDropdown, setShowRoleDropdown] = useState<number | null>(null);
   const [approvingUserId, setApprovingUserId] = useState<number | null>(null);
   const [rejectingUserId, setRejectingUserId] = useState<number | null>(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     loadCurrentUser();
@@ -104,7 +109,7 @@ export default function SettingsPage() {
   };
 
   const handleProfilePictureChange = async (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -278,7 +283,7 @@ export default function SettingsPage() {
   const rejectUser = async (userId: number) => {
     if (
       !confirm(
-        "Are you sure you want to reject this user? Their account will be deleted."
+        "Are you sure you want to reject this user? Their account will be deleted.",
       )
     )
       return;
@@ -308,8 +313,29 @@ export default function SettingsPage() {
   };
 
   const handleLogout = async () => {
-    clearUserSession();
-    router.push("/auth/login");
+    try {
+      // Clear session data FIRST (before API call)
+      // This ensures getCurrentUser() won't have user data to send
+      clearUserSession();
+      if (typeof window !== "undefined") {
+        sessionStorage.clear();
+      }
+
+      // Call logout API to clear server-side cookies
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (err) {
+      console.error("Logout API error:", err);
+    } finally {
+      // Hard refresh to clear any cached app state and socket connections
+      if (typeof window !== "undefined") {
+        window.location.href = "/auth/login";
+      }
+    }
+  };
+
+  const confirmLogout = () => {
+    setShowLogoutConfirm(false);
+    handleLogout();
   };
 
   if (loading) {
@@ -321,23 +347,19 @@ export default function SettingsPage() {
   }
 
   const canManageUsers = ["OWNER", "CO_OWNER", "MANAGER"].includes(
-    currentUser?.role || ""
+    currentUser?.role || "",
   );
 
   return (
-    <div className="p-8 bg-white min-h-screen">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+    <PageContainer title="SETTINGS">
         <button
-          onClick={handleLogout}
+          onClick={() => setShowLogoutConfirm(true)}
           className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
         >
           <LogOut size={18} />
           Logout
         </button>
-      </div>
-
+      
       {/* Tabs */}
       <div className="flex gap-2 mb-8 border-b border-gray-200">
         <button
@@ -643,7 +665,7 @@ export default function SettingsPage() {
                                     setShowRoleDropdown(
                                       showRoleDropdown === user.id
                                         ? null
-                                        : user.id
+                                        : user.id,
                                     )
                                   }
                                   className="text-sm px-3 py-1 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition-colors whitespace-nowrap"
@@ -686,6 +708,40 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
-    </div>
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                <AlertCircle size={24} className="text-red-600" />
+              </div>
+              <h2 className="text-xl font-bold text-gray-900">
+                Confirm Logout
+              </h2>
+            </div>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to logout? You'll need to sign in again to
+              access your account.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 px-4 py-2 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmLogout}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </PageContainer>
   );
 }
