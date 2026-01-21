@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/utils/sessionManager";
 import { useAuthProtection } from "@/app/hooks/useAuthProtection";
 import { PageContainer } from "@/app/components/PageContainer";
 import { PageContentCon } from "@/app/components/PageContentCon";
+import { DatePickerInput } from "@/app/components/DatePickerInput";
 
 type User = {
   id: number;
@@ -46,15 +47,15 @@ type Task = {
 };
 
 const COLORS = {
-  bg: "#ffffff",
-  cardBg: "#F9FAFD",
-  text: "#1f2937",
-  muted: "#6b7280",
+  bg: "#transparent",
+  cardBg: "#transparent",
+  text: "#ffffff",
+  muted: "#ffffff",
   todo: "#8b5cf6",
   inProgress: "#f59e0b",
   stuck: "#ef4444",
   done: "#10b981",
-  shadow: "#E1F1FD",
+  shadow: "#000000",
 };
 
 const statusColors: { [key: string]: string } = {
@@ -94,6 +95,7 @@ export default function TasksPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("task");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   // Load current user from session manager
   useEffect(() => {
@@ -412,7 +414,6 @@ export default function TasksPage() {
 
   return (
     <PageContainer title="TASKS">
-      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -421,22 +422,6 @@ export default function TasksPage() {
           marginBottom: 24,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <h1 style={{ margin: 0, color: COLORS.text, fontSize: 24 }}>tasks</h1>
-          <button
-            style={{
-              background: "none",
-              border: "none",
-              color: COLORS.muted,
-              cursor: "pointer",
-              fontSize: 14,
-              padding: "0px 0px 0px 0px",
-            }}
-          >
-            ▼
-          </button>
-        </div>
-
         <button
           onClick={() => setShowCreateModal(true)}
           style={{
@@ -467,11 +452,11 @@ export default function TasksPage() {
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 8,
-            padding: "8px 14px 8px 14px",
-            borderRadius: 6,
-            background: "rgba(0,0,0,0.03)",
-            border: "1px solid rgba(0,0,0,0.1)",
+            gap: 60,
+            padding: "8px 18px 8px 18px",
+            borderRadius: 32,
+            background: "rgba(59, 130, 246, 0.15)",
+            boxShadow: "1px 1px 12px rgba(0, 0, 0, 0.20)",
           }}
         >
           <span style={{ fontSize: 16 }}>🔍</span>
@@ -482,8 +467,9 @@ export default function TasksPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               background: "none",
+              marginLeft: -50,
               border: "none",
-              color: COLORS.text,
+              color: "#ffffff",
               fontSize: 13,
               outline: "none",
               width: 200,
@@ -497,57 +483,69 @@ export default function TasksPage() {
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
             style={{
-              padding: "8px 12px 8px 12px",
+              padding: "4px 10px 4px 10px",
               borderRadius: 6,
-              background: "rgba(0,0,0,0.03)",
-              color: COLORS.text,
-              border: "1px solid rgba(0,0,0,0.1)",
+              background: "rgba(59, 130, 246, 0.25)",
+              color: "#ffffff",
+              boxShadow: "1px 1px 2px rgba(0, 0, 0, 0.20)",
               fontSize: 13,
               cursor: "pointer",
             }}
           >
-            <option value="task">Sort by Task</option>
-            <option value="assignee">Sort by Assignee</option>
-            <option value="status">Sort by Status</option>
-            <option value="priority">Sort by Priority</option>
-            <option value="duedate">Sort by Due Date</option>
+            <option value="task">Task</option>
+            <option value="assignee">Assignee</option>
+            <option value="status">Status</option>
+            <option value="priority">Priority</option>
+            <option value="duedate">Due Date</option>
           </select>
 
           <button
             onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
             style={{
-              padding: "8px 12px 8px 12px",
+              padding: "8px",
               borderRadius: 6,
-              background: "rgba(0,0,0,0.03)",
-              color: COLORS.text,
-              border: "1px solid rgba(0,0,0,0.1)",
+              background: "transparent",
+              color: "#ffffff",
+              boxShadow: "1px 1px 12px rgba(0, 0, 0, 0.20)",
               cursor: "pointer",
-              fontSize: 13,
-              fontWeight: 600,
+              fontSize: 10,
+              fontWeight: 400,
             }}
           >
             {sortOrder === "asc" ? "↑ ASC" : "↓ DESC"}
           </button>
+
+          {/* View Mode Toggle */}
+          <button
+            onClick={() => setViewMode(viewMode === "list" ? "grid" : "list")}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 6,
+              background:
+                viewMode === "grid" ? "#3b82f6" : "rgba(59, 130, 246, 0.3)",
+              color: "#ffffff",
+              border: "1px solid rgba(59, 130, 246, 0.5)",
+              cursor: "pointer",
+              fontSize: 11,
+              fontWeight: 600,
+              transition: "all 0.3s ease",
+            }}
+          >
+            {viewMode === "grid" ? "📊 Grid" : "📋 List"}
+          </button>
         </div>
       </div>
 
-      {/* Tasks Table */}
-      <div
+      {/* Tasks View - List or Grid */}
+      <PageContentCon
         style={{
-          background: "#F9FAFD",
-          border: "1px solid rgba(0,0,0,0.1)",
-          filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
-          borderRadius: 8,
-          overflow: "hidden",
+          overflowX: viewMode === "grid" ? "auto" : "auto",
+          maxHeight: "calc(100vh - 200px)",
+          overflowY: "auto",
         }}
       >
-        <div
-          style={{
-            overflowX: "auto",
-            maxHeight: "calc(100vh - 200px)",
-            overflowY: "auto",
-          }}
-        >
+        {viewMode === "list" ? (
+          /* LIST VIEW */
           <table
             style={{
               width: "100%",
@@ -571,8 +569,8 @@ export default function TasksPage() {
                   style={{
                     padding: "12px 16px 12px 16px",
                     textAlign: "left",
-                    fontWeight: 600,
-                    color: COLORS.muted,
+                    fontWeight: 300,
+                    color: COLORS.text,
                   }}
                 >
                   Task
@@ -581,8 +579,8 @@ export default function TasksPage() {
                   style={{
                     padding: "12px 16px 12px 16px",
                     textAlign: "left",
-                    fontWeight: 600,
-                    color: COLORS.muted,
+                    fontWeight: 300,
+                    color: COLORS.text,
                     minWidth: 150,
                   }}
                 >
@@ -592,8 +590,8 @@ export default function TasksPage() {
                   style={{
                     padding: "12px 16px 12px 16px",
                     textAlign: "center",
-                    fontWeight: 600,
-                    color: COLORS.muted,
+                    fontWeight: 300,
+                    color: COLORS.text,
                     minWidth: 80,
                   }}
                 >
@@ -603,8 +601,8 @@ export default function TasksPage() {
                   style={{
                     padding: "12px 16px 12px 16px",
                     textAlign: "center",
-                    fontWeight: 600,
-                    color: COLORS.muted,
+                    fontWeight: 300,
+                    color: COLORS.text,
                     minWidth: 100,
                   }}
                 >
@@ -614,8 +612,8 @@ export default function TasksPage() {
                   style={{
                     padding: "12px 16px 12px 16px",
                     textAlign: "center",
-                    fontWeight: 600,
-                    color: COLORS.muted,
+                    fontWeight: 300,
+                    color: COLORS.text,
                     minWidth: 100,
                   }}
                 >
@@ -625,8 +623,8 @@ export default function TasksPage() {
                   style={{
                     padding: "12px 16px 12px 16px",
                     textAlign: "center",
-                    fontWeight: 600,
-                    color: COLORS.muted,
+                    fontWeight: 300,
+                    color: COLORS.text,
                     minWidth: 80,
                   }}
                 >
@@ -636,8 +634,8 @@ export default function TasksPage() {
                   style={{
                     padding: "12px 16px 12px 16px",
                     textAlign: "center",
-                    fontWeight: 600,
-                    color: COLORS.muted,
+                    fontWeight: 300,
+                    color: COLORS.text,
                     minWidth: 120,
                   }}
                 >
@@ -647,8 +645,8 @@ export default function TasksPage() {
                   style={{
                     padding: "12px 16px 12px 16px",
                     textAlign: "center",
-                    fontWeight: 600,
-                    color: COLORS.muted,
+                    fontWeight: 300,
+                    color: COLORS.text,
                     minWidth: 80,
                   }}
                 >
@@ -664,7 +662,7 @@ export default function TasksPage() {
                     style={{
                       padding: "40px 16px 40px 16px",
                       textAlign: "center",
-                      color: COLORS.muted,
+                      color: "#ffffff",
                     }}
                   >
                     {tasks.length === 0 ? "No tasks yet" : "No matching tasks"}
@@ -685,7 +683,7 @@ export default function TasksPage() {
                           colSpan={8}
                           style={{
                             padding: "12px 16px 12px 16px",
-                            fontWeight: 600,
+                            fontWeight: 300,
                             color: COLORS.text,
                             fontSize: 12,
                           }}
@@ -1601,8 +1599,196 @@ export default function TasksPage() {
               )}
             </tbody>
           </table>
-        </div>
-      </div>
+        ) : (
+          /* GRID VIEW */
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+              gap: 16,
+              padding: "16px 0",
+            }}
+          >
+            {getFilteredAndSortedTasks().length === 0 ? (
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  textAlign: "center",
+                  padding: "60px 20px",
+                  color: "#ffffff",
+                }}
+              >
+                {tasks.length === 0 ? "No tasks yet" : "No matching tasks"}
+              </div>
+            ) : (
+              getFilteredAndSortedTasks().map((task) => (
+                <div
+                  key={task.id}
+                  onClick={() => {
+                    setSelectedTaskId(task.id);
+                    loadTaskDetails(task.id);
+                  }}
+                  style={{
+                    background: "rgba(0,0,0,0.1)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 8,
+                    padding: "16px 16px 16px 16px",
+                    cursor: "pointer",
+                    transition: "all 0.3s ease",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.background =
+                      "rgba(59, 130, 246, 0.15)";
+                    (e.currentTarget as HTMLElement).style.borderColor =
+                      "rgba(59, 130, 246, 0.5)";
+                    (e.currentTarget as HTMLElement).style.transform =
+                      "translateY(-2px)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background =
+                      "rgba(0,0,0,0.1)";
+                    (e.currentTarget as HTMLElement).style.borderColor =
+                      "rgba(255,255,255,0.1)";
+                    (e.currentTarget as HTMLElement).style.transform =
+                      "translateY(0)";
+                  }}
+                >
+                  {/* Card Header - Title */}
+                  <div>
+                    <h3
+                      style={{
+                        margin: "0 0 4px 0",
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: "#ffffff",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {task.title}
+                    </h3>
+                    {task.description && (
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 12,
+                          color: "rgba(255,255,255,0.7)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {task.description}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Status Badge */}
+                  <div
+                    style={{
+                      display: "inline-block",
+                      padding: "4px 10px 4px 10px",
+                      borderRadius: 4,
+                      background: statusColors[task.status || "todo"],
+                      color: "#fff",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      width: "fit-content",
+                    }}
+                  >
+                    {statusLabels[task.status || "todo"]}
+                  </div>
+
+                  {/* Priority & Due Date */}
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      paddingTop: 8,
+                      borderTop: "1px solid rgba(255,255,255,0.1)",
+                    }}
+                  >
+                    {task.priority && (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          padding: "2px 6px 2px 6px",
+                          borderRadius: 3,
+                          background:
+                            task.priority === "high"
+                              ? "rgba(239, 68, 68, 0.2)"
+                              : task.priority === "medium"
+                                ? "rgba(245, 158, 11, 0.2)"
+                                : "rgba(34, 197, 94, 0.2)",
+                          color:
+                            task.priority === "high"
+                              ? "#ef4444"
+                              : task.priority === "medium"
+                                ? "#f59e0b"
+                                : "#22c55e",
+                          fontWeight: 600,
+                          textTransform: "capitalize",
+                        }}
+                      >
+                        {task.priority}
+                      </span>
+                    )}
+                    {task.dueDate && (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: "rgba(255,255,255,0.7)",
+                          marginLeft: "auto",
+                        }}
+                      >
+                        📅{" "}
+                        {new Date(task.dueDate).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "2-digit",
+                        })}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Assignee */}
+                  {task.assignee && (
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: "rgba(255,255,255,0.7)",
+                        paddingTop: 4,
+                      }}
+                    >
+                      👤 {task.assignee.name || task.assignee.email}
+                    </div>
+                  )}
+
+                  {/* Stats Footer */}
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 12,
+                      paddingTop: 8,
+                      borderTop: "1px solid rgba(255,255,255,0.1)",
+                      fontSize: 11,
+                      color: "rgba(255,255,255,0.6)",
+                    }}
+                  >
+                    <span>💬 {task.comments?.length || 0}</span>
+                    <span>📎 {task.attachments?.length || 0}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </PageContentCon>
 
       {/* Task Details Panel */}
       {selectedTaskId && taskDetails && (
@@ -1612,18 +1798,23 @@ export default function TasksPage() {
             inset: 0,
             background: "rgba(0,0,0,0.5)",
             display: "flex",
-            justifyContent: "flex-end",
+            justifyContent: "center",
+            alignItems: "center",
             zIndex: 1000,
+            padding: "20px",
           }}
           onClick={() => setSelectedTaskId(null)}
         >
           <div
             style={{
-              width: "400px",
-              height: "100%",
+              width: "100%",
+              maxWidth: 600,
+              maxHeight: "90vh",
               background: COLORS.cardBg,
-              borderLeft: "1px solid rgba(0,0,0,0.1)",
+              borderRadius: 12,
+              border: "1px solid rgba(0,0,0,0.1)",
               overflow: "auto",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1668,11 +1859,59 @@ export default function TasksPage() {
                 >
                   Title
                 </div>
-                <div
-                  style={{ color: COLORS.text, fontSize: 14, fontWeight: 500 }}
-                >
-                  {taskDetails.title}
-                </div>
+                {taskDetails.createdById === currentUser?.id ? (
+                  <input
+                    type="text"
+                    value={
+                      editingCell?.field === "title"
+                        ? editValue
+                        : taskDetails.title
+                    }
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onBlur={() => {
+                      if (editingCell?.field === "title" && editValue.trim()) {
+                        handleSaveField(taskDetails.id, "title", editValue);
+                      }
+                      setEditingCell(null);
+                    }}
+                    onFocus={() => {
+                      setEditingCell({
+                        taskId: taskDetails.id,
+                        field: "title",
+                      });
+                      setEditValue(taskDetails.title);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && editValue.trim()) {
+                        handleSaveField(taskDetails.id, "title", editValue);
+                        setEditingCell(null);
+                      } else if (e.key === "Escape") {
+                        setEditingCell(null);
+                      }
+                    }}
+                    style={{
+                      width: "100%",
+                      color: COLORS.text,
+                      fontSize: 14,
+                      fontWeight: 500,
+                      padding: "8px 8px 8px 8px",
+                      borderRadius: 4,
+                      border: "1px solid rgba(59, 130, 246, 0.3)",
+                      background: "rgba(0,0,0,0.1)",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      color: COLORS.text,
+                      fontSize: 14,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {taskDetails.title}
+                  </div>
+                )}
               </div>
 
               {taskDetails.description && (
@@ -1688,9 +1927,57 @@ export default function TasksPage() {
                   >
                     Description
                   </div>
-                  <div style={{ color: COLORS.text, fontSize: 13 }}>
-                    {taskDetails.description}
-                  </div>
+                  {taskDetails.createdById === currentUser?.id ? (
+                    <textarea
+                      value={
+                        editingCell?.field === "description"
+                          ? editValue
+                          : taskDetails.description
+                      }
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={() => {
+                        if (
+                          editingCell?.field === "description" &&
+                          editValue.trim()
+                        ) {
+                          handleSaveField(
+                            taskDetails.id,
+                            "description",
+                            editValue,
+                          );
+                        }
+                        setEditingCell(null);
+                      }}
+                      onFocus={() => {
+                        setEditingCell({
+                          taskId: taskDetails.id,
+                          field: "description",
+                        });
+                        setEditValue(taskDetails.description || "");
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                          setEditingCell(null);
+                        }
+                      }}
+                      style={{
+                        width: "100%",
+                        minHeight: 80,
+                        color: COLORS.text,
+                        fontSize: 13,
+                        padding: "8px 8px 8px 8px",
+                        borderRadius: 4,
+                        border: "1px solid rgba(59, 130, 246, 0.3)",
+                        background: "rgba(0,0,0,0.1)",
+                        boxSizing: "border-box",
+                        fontFamily: "inherit",
+                      }}
+                    />
+                  ) : (
+                    <div style={{ color: COLORS.text, fontSize: 13 }}>
+                      {taskDetails.description}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1706,19 +1993,47 @@ export default function TasksPage() {
                 >
                   Status
                 </div>
-                <div
-                  style={{
-                    display: "inline-block",
-                    padding: "4px 10px 4px 10px",
-                    borderRadius: 4,
-                    background: statusColors[taskDetails.status || "todo"],
-                    color: "#fff",
-                    fontSize: 12,
-                    fontWeight: 600,
-                  }}
-                >
-                  {statusLabels[taskDetails.status || "todo"]}
-                </div>
+                {taskDetails.createdById === currentUser?.id ? (
+                  <select
+                    value={
+                      editingCell?.field === "status"
+                        ? editValue
+                        : taskDetails.status || "todo"
+                    }
+                    onChange={(e) => {
+                      setEditValue(e.target.value);
+                      handleSaveField(taskDetails.id, "status", e.target.value);
+                    }}
+                    style={{
+                      padding: "8px 8px 8px 8px",
+                      borderRadius: 4,
+                      border: "1px solid rgba(59, 130, 246, 0.3)",
+                      background: "rgba(0,0,0,0.1)",
+                      color: COLORS.text,
+                      fontSize: 13,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <option value="todo">To do</option>
+                    <option value="inprogress">In Progress</option>
+                    <option value="stuck">Overdue</option>
+                    <option value="completed">Done</option>
+                  </select>
+                ) : (
+                  <div
+                    style={{
+                      display: "inline-block",
+                      padding: "4px 10px 4px 10px",
+                      borderRadius: 4,
+                      background: statusColors[taskDetails.status || "todo"],
+                      color: "#fff",
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {statusLabels[taskDetails.status || "todo"]}
+                  </div>
+                )}
               </div>
 
               {taskDetails.priority && (
@@ -1734,15 +2049,46 @@ export default function TasksPage() {
                   >
                     Priority
                   </div>
-                  <div
-                    style={{
-                      color: COLORS.text,
-                      fontSize: 13,
-                      textTransform: "capitalize",
-                    }}
-                  >
-                    {taskDetails.priority}
-                  </div>
+                  {taskDetails.createdById === currentUser?.id ? (
+                    <select
+                      value={
+                        editingCell?.field === "priority"
+                          ? editValue
+                          : taskDetails.priority || "medium"
+                      }
+                      onChange={(e) => {
+                        setEditValue(e.target.value);
+                        handleSaveField(
+                          taskDetails.id,
+                          "priority",
+                          e.target.value,
+                        );
+                      }}
+                      style={{
+                        padding: "8px 8px 8px 8px",
+                        borderRadius: 4,
+                        border: "1px solid rgba(59, 130, 246, 0.3)",
+                        background: "rgba(0,0,0,0.1)",
+                        color: COLORS.text,
+                        fontSize: 13,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                  ) : (
+                    <div
+                      style={{
+                        color: COLORS.text,
+                        fontSize: 13,
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {taskDetails.priority}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1759,14 +2105,35 @@ export default function TasksPage() {
                   >
                     Due Date
                   </div>
-                  <div style={{ color: COLORS.text, fontSize: 13 }}>
-                    {new Date(taskDetails.dueDate).toLocaleDateString("en-US", {
-                      weekday: "short",
-                      month: "short",
-                      day: "2-digit",
-                      year: "numeric",
-                    })}
-                  </div>
+                  {taskDetails.createdById === currentUser?.id ? (
+                    <DatePickerInput
+                      value={
+                        editingCell?.field === "dueDate"
+                          ? editValue
+                          : taskDetails.dueDate || ""
+                      }
+                      onChange={(value) => {
+                        setEditValue(value);
+                        handleSaveField(
+                          taskDetails.id,
+                          "dueDate",
+                          value || null,
+                        );
+                      }}
+                    />
+                  ) : (
+                    <div style={{ color: COLORS.text, fontSize: 13 }}>
+                      {new Date(taskDetails.dueDate).toLocaleDateString(
+                        "en-US",
+                        {
+                          weekday: "short",
+                          month: "short",
+                          day: "2-digit",
+                          year: "numeric",
+                        },
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1783,9 +2150,44 @@ export default function TasksPage() {
                   >
                     Assignee
                   </div>
-                  <div style={{ color: COLORS.text, fontSize: 13 }}>
-                    {taskDetails.assignee.name || taskDetails.assignee.email}
-                  </div>
+                  {taskDetails.createdById === currentUser?.id ? (
+                    <select
+                      value={
+                        editingCell?.field === "assigneeId"
+                          ? editValue
+                          : taskDetails.assignee?.id || ""
+                      }
+                      onChange={(e) => {
+                        setEditValue(e.target.value);
+                        handleSaveField(
+                          taskDetails.id,
+                          "assigneeId",
+                          e.target.value ? Number(e.target.value) : null,
+                        );
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: "8px 8px 8px 8px",
+                        borderRadius: 4,
+                        border: "1px solid rgba(59, 130, 246, 0.3)",
+                        background: "rgba(0,0,0,0.1)",
+                        color: COLORS.text,
+                        fontSize: 13,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <option value="">Unassigned</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name || u.email}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div style={{ color: COLORS.text, fontSize: 13 }}>
+                      {taskDetails.assignee.name || taskDetails.assignee.email}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2174,7 +2576,7 @@ function CreateTaskModal({
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [assigneeId, setAssigneeId] = useState<number | "">("");
+  const [assigneeId, setAssigneeId] = useState<number | null>(null);
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState("medium");
   const [loading, setLoading] = useState(false);
@@ -2187,8 +2589,24 @@ function CreateTaskModal({
     e.preventDefault();
     setError("");
 
+    // Validation - all required except description
     if (!title.trim()) {
       setError("Title is required");
+      return;
+    }
+
+    if (!priority) {
+      setError("Priority is required");
+      return;
+    }
+
+    if (!assigneeId) {
+      setError("Assignee is required");
+      return;
+    }
+
+    if (!dueDate) {
+      setError("Due date is required");
       return;
     }
 
@@ -2203,8 +2621,8 @@ function CreateTaskModal({
         title,
         description: description || null,
         priority,
-        dueDate: dueDate || null,
-        assigneeId: assigneeId || null,
+        dueDate,
+        assigneeId,
         status: "todo",
       };
 
@@ -2403,12 +2821,13 @@ function CreateTaskModal({
                   fontWeight: 500,
                 }}
               >
-                Assignee
+                Assignee *
               </label>
               <select
-                value={assigneeId}
+                required
+                value={assigneeId || ""}
                 onChange={(e) =>
-                  setAssigneeId(e.target.value ? Number(e.target.value) : "")
+                  setAssigneeId(e.target.value ? Number(e.target.value) : null)
                 }
                 style={{
                   width: "100%",
@@ -2421,7 +2840,7 @@ function CreateTaskModal({
                   boxSizing: "border-box",
                 }}
               >
-                <option value="">Unassigned</option>
+                <option value="">Select an assignee...</option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.name || u.email}{" "}
@@ -2441,9 +2860,10 @@ function CreateTaskModal({
                   fontWeight: 500,
                 }}
               >
-                Priority
+                Priority *
               </label>
               <select
+                required
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
                 style={{
@@ -2474,22 +2894,13 @@ function CreateTaskModal({
                 fontWeight: 500,
               }}
             >
-              Due Date
+              Due Date *
             </label>
-            <input
-              type="datetime-local"
+            <DatePickerInput
               value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "10px 10px 10px 10px",
-                borderRadius: 6,
-                border: "1px solid rgba(0,0,0,0.1)",
-                background: "rgba(0,0,0,0.03)",
-                color: COLORS.text,
-                fontSize: 13,
-                boxSizing: "border-box",
-              }}
+              onChange={setDueDate}
+              required
+              placeholder="Select date and time..."
             />
           </div>
 

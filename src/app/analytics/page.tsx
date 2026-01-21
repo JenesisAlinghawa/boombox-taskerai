@@ -2,12 +2,19 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Lock } from "lucide-react";
+import { AlertCircle, Lock, Network } from "lucide-react";
 import TaskStatusChart from "@/app/components/TaskStatusChart";
 import { getCurrentUser } from "@/utils/sessionManager";
 import { useAuthProtection } from "@/app/hooks/useAuthProtection";
 import { PageContainer } from "@/app/components/PageContainer";
 import { PageContentCon } from "@/app/components/PageContentCon";
+import {
+  buildTaskGraph,
+  findCriticalPath,
+  formatPath,
+  hasCircularDependencies,
+  type TaskNode as DijkstraTaskNode,
+} from "@/utils/dijkstra";
 
 const COLORS = {
   bg: "#ffffff",
@@ -65,6 +72,8 @@ export default function AnalyticsPage() {
   );
   const [aiTrends, setAiTrends] = useState<(Trend | string)[]>([]);
   const [hoveredSegment, setHoveredSegment] = useState<string | null>(null);
+  const [criticalPath, setCriticalPath] = useState<string | null>(null);
+  const [dijkstraError, setDijkstraError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -133,6 +142,49 @@ export default function AnalyticsPage() {
           stuck: stuckCount,
           done: doneCount,
         });
+
+        // Calculate optimal task path using Dijkstra's algorithm
+        try {
+          // Only process tasks that have a duration and potential dependencies
+          const validTasks = tasks.map((task: any) => ({
+            id: task.id,
+            title: task.title,
+            duration: task.dueDate
+              ? Math.max(
+                  1,
+                  Math.ceil(
+                    (new Date(task.dueDate).getTime() - new Date().getTime()) /
+                      (1000 * 60 * 60 * 24),
+                  ),
+                )
+              : 1, // Default 1 day if no due date
+            priority: task.priority || "medium",
+            dependencies: [], // Placeholder for future dependency support
+          }));
+
+          if (validTasks.length > 0) {
+            const graph = buildTaskGraph(validTasks as DijkstraTaskNode[]);
+
+            // Check for circular dependencies
+            if (hasCircularDependencies(graph)) {
+              setDijkstraError("Circular dependency detected in task graph");
+              setCriticalPath(null);
+            } else {
+              // Calculate critical path
+              const criticalResult = findCriticalPath(graph);
+              const pathString = formatPath(criticalResult);
+              setCriticalPath(pathString);
+              setDijkstraError(null);
+            }
+          }
+        } catch (dijkstraErr: any) {
+          console.warn(
+            "Failed to calculate optimal path:",
+            dijkstraErr.message,
+          );
+          setDijkstraError(dijkstraErr.message || "Failed to calculate path");
+          setCriticalPath(null);
+        }
 
         // Fetch AI-driven recommendations from Gemini
         let localAiRecommendations: Recommendation[] = [];
@@ -600,6 +652,87 @@ export default function AnalyticsPage() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Critical Path - Task Optimization using Dijkstra */}
+      <div
+        style={{
+          background: COLORS.cardBg,
+          border: "1px solid rgba(0,0,0,0.1)",
+          filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
+          padding: 20,
+          borderRadius: 8,
+          marginBottom: 24,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 16,
+          }}
+        >
+          <Network size={24} color={COLORS.info} />
+          <h2
+            style={{
+              fontSize: 16,
+              fontWeight: 600,
+              margin: 0,
+              color: COLORS.text,
+            }}
+          >
+            Optimal Task Sequence (Dijkstra's Algorithm)
+          </h2>
+        </div>
+
+        {dijkstraError ? (
+          <div
+            style={{
+              padding: 12,
+              background: "rgba(239, 68, 68, 0.1)",
+              border: "1px solid rgba(239, 68, 68, 0.3)",
+              borderRadius: 6,
+              color: COLORS.error,
+              fontSize: 13,
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+            }}
+          >
+            <AlertCircle size={18} />
+            <span>{dijkstraError}</span>
+          </div>
+        ) : criticalPath ? (
+          <div
+            style={{
+              padding: 12,
+              background: "rgba(16, 185, 129, 0.1)",
+              border: "1px solid rgba(16, 185, 129, 0.3)",
+              borderRadius: 6,
+              fontSize: 13,
+            }}
+          >
+            <p style={{ margin: 0, color: COLORS.text, fontWeight: 500 }}>
+              🎯 <strong>Optimal Path:</strong> {criticalPath}
+            </p>
+            <p
+              style={{
+                margin: "8px 0 0",
+                fontSize: 12,
+                color: COLORS.muted,
+              }}
+            >
+              This represents the critical path - the longest sequence of
+              dependent tasks that determines the minimum project completion
+              time.
+            </p>
+          </div>
+        ) : (
+          <p style={{ fontSize: 13, color: COLORS.muted, margin: 0 }}>
+            Loading optimal task sequence...
+          </p>
+        )}
       </div>
 
       {/* Two Column Layout */}

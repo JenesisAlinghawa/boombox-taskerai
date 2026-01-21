@@ -15,12 +15,12 @@ export const PageContentCon = ({
     <div
       className={className}
       style={{
-        background: "rgba(0, 0, 0, 0.40)",
-        backdropFilter: "blur(5px)",
+        background: "rgba(255, 255, 255, 0.22)",
+        backdropFilter: "blur(2px)",
         WebkitBackdropFilter: "blur(5px)",
         border: "1px solid rgba(255, 255, 255, 0.10)",
-        borderRadius: 12,
-        boxShadow: "1px 1px 2px rgba(255, 255, 255, 0.10)",
+        borderRadius: 6,
+        boxShadow: "1px 1px 12px rgba(0, 0, 0, 0.20)",
         padding: "20px",
         fontFamily: "var(--font-inria-sans)",
         fontWeight: "400",

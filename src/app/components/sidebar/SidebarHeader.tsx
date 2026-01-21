@@ -18,7 +18,7 @@ export const SidebarHeader = React.memo(function SidebarHeaderComponent({
         flexDirection: "column",
         alignItems: "center",
         gap: 8,
-        borderBottom: "1px solid rgba(255,255,255,0.1)",
+        borderBottom: "1px solid rgba(255,255,255,0.25)",
         transition: "all 0.3s ease",
       }}
     >

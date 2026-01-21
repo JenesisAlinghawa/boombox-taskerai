@@ -25,7 +25,7 @@ export function SidePanel() {
     <aside
       style={{
         width,
-        background: "rgba(0, 68, 255, 0.23)",
+        background: "rgba(0, 68, 220, 0.40)",
         color: "#ffffff",
         height: `calc(100vh - ${verticalGap * 2}px)`,
         position: "fixed",
@@ -34,11 +34,9 @@ export function SidePanel() {
         zIndex: 50,
         display: "flex",
         flexDirection: "column",
-        border: "1px solid rgba(255, 255, 255, 0.10)",
         borderRadius: 12,
-        boxShadow: "1px 1px 2px rgba(255, 255, 255, 0.10)",
         backdropFilter: "blur(2px)",
-        WebkitBackdropFilter: "blur(2px)",
+        WebkitBackdropFilter: "blur(5px)",
         transition: "width 0.3s ease",
         overflow: "hidden",
       }}

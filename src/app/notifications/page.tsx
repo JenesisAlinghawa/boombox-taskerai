@@ -164,15 +164,15 @@ export default function NotificationsPage() {
             <div
               key={notification.id}
               style={{
-                background: "#F9FAFD",
-                border: `1px solid ${
-                  notification.isRead
-                    ? "rgba(0,0,0,0.1)"
-                    : "rgba(239, 68, 68, 0.3)"
+                 background: "rgba(255, 255, 255, 0.12)",
+                 backdropFilter: "blur(2px)",
+                 WebkitBackdropFilter: "blur(5px)",
+                 border: `1px solid ${
+                 notification.isRead ? "rgba(0,0,0,0.12)" : "rgba(239, 68, 68, 0.23)"
                 }`,
                 filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
                 borderRadius: "12px",
-                padding: "16px",
+                padding: "6px 18px 6px 18px",
                 display: "flex",
                 alignItems: "center",
                 gap: "16px",
@@ -182,29 +182,29 @@ export default function NotificationsPage() {
               }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLElement).style.background =
-                  "rgba(249, 250, 253, 0.8)";
+                  "rgba(249, 250, 253, 0.1)";
                 (e.currentTarget as HTMLElement).style.borderColor =
-                  "rgba(0,0,0,0.15)";
+                  "rgba(255, 255, 255, 0.22)";
               }}
               onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.background = "#F9FAFD";
+                (e.currentTarget as HTMLElement).style.background = "rgba(255, 255, 255, 0.22)";
                 (e.currentTarget as HTMLElement).style.borderColor =
                   notification.isRead
-                    ? "rgba(0,0,0,0.1)"
-                    : "rgba(239, 68, 68, 0.3)";
+                    ? "rgba(255, 255, 255, 0.1)"
+                    : "rgba(255, 255, 255, 0.22)";
               }}
             >
               {/* Icon */}
               <div
                 style={{
-                  width: "48px",
-                  height: "48px",
-                  borderRadius: "8px",
+                  width: "38px",
+                  height: "38px",
+                  borderRadius: "42px",
                   background: getNotificationColor(notification.type),
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "24px",
+                  fontSize: "18px",
                   flexShrink: 0,
                 }}
               >
@@ -222,9 +222,9 @@ export default function NotificationsPage() {
               >
                 <h3
                   style={{
-                    color: "#333",
-                    fontSize: "14px",
-                    fontWeight: 600,
+                    color: "#ffffff",
+                    fontSize: "12px",
+                    fontWeight: 320,
                     margin: "0 0 4px 0",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
@@ -235,9 +235,9 @@ export default function NotificationsPage() {
                 </h3>
                 <p
                   style={{
-                    color: "#666",
-                    fontSize: "13px",
-                    margin: "0 0 4px 0",
+                    color: "#ffffff",
+                    fontSize: "10px",
+                    margin: "0",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -247,8 +247,8 @@ export default function NotificationsPage() {
                 </p>
                 <p
                   style={{
-                    color: "#a0aec0",
-                    fontSize: "12px",
+                    color: "#ffffff9f",
+                    fontSize: "10px",
                     margin: 0,
                   }}
                 >
@@ -290,12 +290,11 @@ export default function NotificationsPage() {
                   }}
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLElement).style.background =
-                      "rgba(100, 116, 139, 0.3)";
+                      "rgba(255, 255, 255, 0.1)";
                   }}
                   onMouseLeave={(e) => {
                     (e.currentTarget as HTMLElement).style.background =
-                      "rgba(100, 116, 139, 0.2)";
-                  }}
+                      "rgba(255, 255, 255, 0.22)";                  }}
                 >
                   Dismiss
                 </button>
@@ -307,12 +306,12 @@ export default function NotificationsPage() {
                   }}
                   style={{
                     background: "rgba(239, 68, 68, 0.2)",
-                    color: "#ef4444",
+                    color: "#ffffff",
                     border: "1px solid rgba(239, 68, 68, 0.3)",
                     borderRadius: "6px",
                     padding: "6px 12px",
                     fontSize: "12px",
-                    fontWeight: 500,
+                    fontWeight: 200,
                     cursor: "pointer",
                     transition: "all 0.2s",
                     flexShrink: 0,

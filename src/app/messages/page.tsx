@@ -28,6 +28,14 @@ import { MessageBubble } from "@/app/components/MessageBubble";
 import { PageContainer } from "@/app/components/PageContainer";
 import { PageContentCon } from "@/app/components/PageContentCon";
 import { io, Socket } from "socket.io-client";
+import {
+  buildTaskGraph,
+  findCriticalPath,
+  findOptimalPath,
+  formatPath,
+  hasCircularDependencies,
+  type TaskNode as DijkstraTaskNode,
+} from "@/utils/dijkstra";
 
 interface User {
   id: number;
@@ -93,8 +101,8 @@ const ChannelListItem = React.memo(
       >
         <div
           style={{
-            width: "40px",
-            height: "40px",
+            width: "32px",
+            height: "32px",
             borderRadius: "50%",
             background: "#fff",
             display: "flex",
@@ -194,15 +202,15 @@ const UserListItem = React.memo(
         <div
           style={{
             position: "relative",
-            width: "40px",
-            height: "40px",
+            width: "32px",
+            height: "32px",
             flexShrink: 0,
           }}
         >
           <div
             style={{
-              width: "40px",
-              height: "40px",
+              width: "32px",
+              height: "32px",
               borderRadius: "50%",
               background: "#fff",
               display: "flex",
@@ -234,12 +242,12 @@ const UserListItem = React.memo(
               position: "absolute",
               bottom: "-2px",
               right: "-2px",
-              width: "14px",
-              height: "14px",
+              width: "12px",
+              height: "12px",
               borderRadius: "50%",
               background: isOnline ? "#10b981" : "#6b7280",
               border: "2px solid rgba(13, 27, 42, 1)",
-              boxShadow: "0 0 0 2px rgba(30, 41, 59, 0.8)",
+              boxShadow: "0 0 0 1px rgba(30, 41, 59, 0.8)",
             }}
           />
         </div>
@@ -644,11 +652,104 @@ export default function MessagesPage() {
     }
   };
 
+  const handleOptimizationQuery = async (
+    query: string,
+  ): Promise<string | null> => {
+    const lowerQuery = query.toLowerCase();
+    const optimizationKeywords = [
+      "optimize",
+      "shortest path",
+      "critical path",
+      "fastest way",
+      "best sequence",
+      "task sequence",
+    ];
+
+    // Check if this is an optimization query
+    const isOptimizationQuery = optimizationKeywords.some((keyword) =>
+      lowerQuery.includes(keyword),
+    );
+
+    if (!isOptimizationQuery || !currentUser) {
+      return null;
+    }
+
+    try {
+      // Fetch current user's tasks
+      const tasksRes = await fetch("/api/tasks", {
+        headers: {
+          "x-user-id": String(currentUser.id),
+        },
+      });
+
+      if (!tasksRes.ok) {
+        return null;
+      }
+
+      const tasksData = await tasksRes.json();
+      const tasks = Array.isArray(tasksData?.tasks) ? tasksData.tasks : [];
+
+      if (tasks.length === 0) {
+        return "📋 No tasks found to optimize.";
+      }
+
+      // Build Dijkstra graph from tasks
+      const dijkstraTasks = tasks.map((task: any) => ({
+        id: task.id,
+        title: task.title,
+        duration: task.dueDate
+          ? Math.max(
+              1,
+              Math.ceil(
+                (new Date(task.dueDate).getTime() - new Date().getTime()) /
+                  (1000 * 60 * 60 * 24),
+              ),
+            )
+          : 1,
+        priority: task.priority || "medium",
+        dependencies: [], // Placeholder for future dependency support
+      }));
+
+      const graph = buildTaskGraph(dijkstraTasks as DijkstraTaskNode[]);
+
+      // Check for circular dependencies
+      if (hasCircularDependencies(graph)) {
+        return "⚠️ Circular dependency detected in your task graph. Please review task dependencies.";
+      }
+
+      // Calculate critical path
+      const criticalResult = findCriticalPath(graph);
+      const pathString = formatPath(criticalResult);
+
+      // Generate natural language response
+      const taskCount = criticalResult.path.length;
+      const totalDays = criticalResult.totalDuration.toFixed(1);
+
+      let response = `🚀 **Task Optimization Results**\n\n`;
+      response += `The fastest way to complete your tasks is:\n`;
+      response += `**${pathString}**\n\n`;
+      response += `This critical path contains ${taskCount} task${taskCount !== 1 ? "s" : ""} and will take approximately **${totalDays} days** to complete.\n\n`;
+      response += `**Detailed Sequence:**\n`;
+
+      criticalResult.steps.forEach((step, index) => {
+        response += `${index + 1}. **${step.taskName}** (${step.duration.toFixed(1)}d) - Cumulative: ${step.cumulativeDuration.toFixed(1)}d\n`;
+      });
+
+      return response;
+    } catch (error) {
+      console.error("Error processing optimization query:", error);
+      return "❌ Failed to analyze task optimization. Please try again.";
+    }
+  };
+
   const sendMessage = async () => {
     if (!messageInput.trim()) return;
 
     setSendingMessage(true);
     try {
+      // Check if this is an optimization query and get AI response
+      const optimizationResponse = await handleOptimizationQuery(messageInput);
+
       if (selectedChannel && currentUser) {
         const res = await fetch(
           `/api/channels/${selectedChannel.id}/messages`,
@@ -677,6 +778,27 @@ export default function MessagesPage() {
         const data = await res.json();
         const newMessage = data.message;
         setMessages([...messages, newMessage]);
+
+        // If this was an optimization query, add bot response
+        if (optimizationResponse) {
+          setTimeout(() => {
+            const botMessage = {
+              id: Math.random(),
+              content: optimizationResponse,
+              sender: {
+                id: 0,
+                email: "TaskBot",
+                firstName: "Task",
+                lastName: "Bot",
+                role: "bot",
+                active: true,
+              },
+              createdAt: new Date().toISOString(),
+              isEdited: false,
+            };
+            setMessages((prev) => [...prev, botMessage]);
+          }, 500);
+        }
 
         if (socketRef.current) {
           socketRef.current.emit("message:send", {
@@ -716,6 +838,27 @@ export default function MessagesPage() {
         const data = await res.json();
         const newMessage = data.message;
         setMessages([...messages, newMessage]);
+
+        // If this was an optimization query, add bot response
+        if (optimizationResponse) {
+          setTimeout(() => {
+            const botMessage = {
+              id: Math.random(),
+              content: optimizationResponse,
+              sender: {
+                id: 0,
+                email: "TaskBot",
+                firstName: "Task",
+                lastName: "Bot",
+                role: "bot",
+                active: true,
+              },
+              createdAt: new Date().toISOString(),
+              isEdited: false,
+            };
+            setMessages((prev) => [...prev, botMessage]);
+          }, 500);
+        }
 
         if (socketRef.current) {
           socketRef.current.emit("message:send", {
@@ -991,12 +1134,17 @@ export default function MessagesPage() {
         ::-webkit-scrollbar-thumb:hover {
           background: rgba(255, 255, 255, 0.3);
         }
+        @media (max-width: 1200px) {
+          #right-sidebar {
+            display: none;
+          }
+        }
       `}</style>
       <div style={{ display: "flex", height: "100%", gap: "12px" }}>
         {/* Left Sidebar */}
         <div
           style={{
-            width: "80px",
+            width: "56px",
             flexShrink: 0,
             display: "flex",
             flexDirection: "column",
@@ -1006,15 +1154,15 @@ export default function MessagesPage() {
           {/* Channels Container */}
           <PageContentCon
             style={{
-              height: "auto",
+              height: "40%",
               minHeight: "200px",
               maxHeight: "320px",
               overflow: "visible",
               display: "flex",
               flexDirection: "column",
               paddingTop: "16px",
-              paddingLeft: "16px",
-              paddingRight: "16px",
+              paddingLeft: "8px",
+              paddingRight: "8px",
               paddingBottom: "16px",
               background: "rgba(255,255,255,0.06)",
               border: "1px solid rgba(255,255,255,0.12)",
@@ -1073,7 +1221,7 @@ export default function MessagesPage() {
                   flexDirection: "column",
                   gap: "12px",
                   overflowY: "auto",
-                  overflowX: "visible",
+                  overflowX: "hidden",
                   flex: 1,
                 }}
               >
@@ -1101,8 +1249,8 @@ export default function MessagesPage() {
               display: "flex",
               flexDirection: "column",
               paddingTop: "16px",
-              paddingLeft: "16px",
-              paddingRight: "16px",
+              paddingLeft: "8px",
+              paddingRight: "8px",
               paddingBottom: "16px",
               background: "rgba(255,255,255,0.06)",
               border: "1px solid rgba(255,255,255,0.12)",
@@ -1140,20 +1288,6 @@ export default function MessagesPage() {
                 >
                   TEAM
                 </h2>
-                <button
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "transparent",
-                    padding: "0px 0px 0px 0px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <MoreVertical size={20} />
-                </button>
               </div>
               <div
                 style={{
@@ -1161,7 +1295,7 @@ export default function MessagesPage() {
                   flexDirection: "column",
                   gap: "12px",
                   overflowY: "auto",
-                  overflowX: "visible",
+                  overflowX: "hidden",
                   flex: 1,
                 }}
               >
@@ -1445,247 +1579,261 @@ export default function MessagesPage() {
         </PageContentCon>
 
         {/* Right Sidebar */}
-        <PageContentCon
-          style={{ width: "240px", flexShrink: 0, overflow: "auto" }}
-        >
-          {selectedChannel || selectedDMUser ? (
-            <div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  marginBottom: 20,
-                  padding: "16px 16px 16px 16px",
-                  borderRadius: "12px",
-                  background: "rgba(255,255,255,0.05)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                }}
-              >
+        <div id="right-sidebar">
+          <PageContentCon
+            style={{
+              width: "240px",
+              flexShrink: 0,
+              overflow: "auto",
+              height: "100%",
+            }}
+          >
+            {selectedChannel || selectedDMUser ? (
+              <div>
                 <div
                   style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: "50%",
-                    background: "#798CC3",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 18,
-                    color: "#fff",
-                    fontWeight: "600",
+                    gap: 12,
+                    marginBottom: 20,
+                    padding: "16px 16px 16px 16px",
+                    borderRadius: "12px",
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.1)",
                   }}
                 >
-                  {selectedDMUser
-                    ? `${selectedDMUser.firstName[0]}${selectedDMUser.lastName[0]}`
-                    : selectedChannel
-                      ? selectedChannel.name[0].toUpperCase()
-                      : ""}
-                </div>
-                <div>
                   <div
                     style={{
-                      fontSize: "16px",
+                      width: 56,
+                      height: 56,
+                      borderRadius: "50%",
+                      background: "#798CC3",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 18,
+                      color: "#fff",
+                      fontWeight: "600",
+                    }}
+                  >
+                    {selectedDMUser
+                      ? `${selectedDMUser.firstName[0]}${selectedDMUser.lastName[0]}`
+                      : selectedChannel
+                        ? selectedChannel.name[0].toUpperCase()
+                        : ""}
+                  </div>
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "16px",
+                        fontWeight: "400",
+                        color: "#fff",
+                        fontFamily: "var(--font-inria-sans)",
+                      }}
+                    >
+                      {selectedDMUser
+                        ? `${selectedDMUser.firstName} ${selectedDMUser.lastName}`
+                        : selectedChannel
+                          ? selectedChannel.name
+                          : ""}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "rgba(255,255,255,0.6)",
+                        fontFamily: "var(--font-inria-sans)",
+                      }}
+                    >
+                      {selectedDMUser
+                        ? getStatusDisplay(selectedDMUser)
+                        : selectedChannel
+                          ? selectedChannel.description || "No description"
+                          : ""}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <input
+                    type="text"
+                    placeholder="Search in chat"
+                    value={messageSearch}
+                    onChange={(e) => setMessageSearch(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px 8px 12px",
+                      borderRadius: 8,
+                      background: "rgba(255,255,255,0.05)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      color: "#fff",
+                      fontSize: "var(--font-size-subdescription)",
+                      outline: "none",
+                      fontFamily: "var(--font-inria-sans)",
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <h4
+                    style={{
+                      fontSize: "var(--font-size-description)",
                       fontWeight: "400",
+                      margin: "0 0 16px 0",
                       color: "#fff",
                       fontFamily: "var(--font-inria-sans)",
                     }}
                   >
-                    {selectedDMUser
-                      ? `${selectedDMUser.firstName} ${selectedDMUser.lastName}`
-                      : selectedChannel
-                        ? selectedChannel.name
-                        : ""}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      color: "rgba(255,255,255,0.6)",
-                      fontFamily: "var(--font-inria-sans)",
-                    }}
-                  >
-                    {selectedDMUser
-                      ? getStatusDisplay(selectedDMUser)
-                      : selectedChannel
-                        ? selectedChannel.description || "No description"
-                        : ""}
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ marginBottom: 16 }}>
-                <input
-                  type="text"
-                  placeholder="Search in chat"
-                  value={messageSearch}
-                  onChange={(e) => setMessageSearch(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px 8px 12px",
-                    borderRadius: 8,
-                    background: "rgba(255,255,255,0.05)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    color: "#fff",
-                    fontSize: "var(--font-size-subdescription)",
-                    outline: "none",
-                    fontFamily: "var(--font-inria-sans)",
-                  }}
-                />
-              </div>
-
-              <div>
-                <h4
-                  style={{
-                    fontSize: "var(--font-size-description)",
-                    fontWeight: "400",
-                    margin: "0 0 16px 0",
-                    color: "#fff",
-                    fontFamily: "var(--font-inria-sans)",
-                  }}
-                >
-                  {selectedDMUser ? "Task Progress" : "Members"}
-                </h4>
-                {selectedDMUser ? (
-                  loadingUserTasks ? (
-                    <div
-                      style={{
-                        textAlign: "center",
-                        color: "rgba(255,255,255,0.5)",
-                        fontSize: "var(--font-size-subdescription)",
-                        fontFamily: "var(--font-inria-sans)",
-                      }}
-                    >
-                      Loading...
-                    </div>
-                  ) : (
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "repeat(2, 1fr)",
-                        gap: 12,
-                      }}
-                    >
-                      {[
-                        {
-                          label: "To do",
-                          value: selectedUserTaskStats.todo,
-                          color: "#FF6B6B",
-                        },
-                        {
-                          label: "In Progress",
-                          value: selectedUserTaskStats.inProgress,
-                          color: "#4ECDC4",
-                        },
-                        {
-                          label: "Stuck",
-                          value: selectedUserTaskStats.stuck,
-                          color: "#FFE66D",
-                        },
-                        {
-                          label: "Done",
-                          value: selectedUserTaskStats.done,
-                          color: "#95E1D3",
-                        },
-                      ].map((stat, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            textAlign: "center",
-                            padding: "12px 12px 12px 12px",
-                            borderRadius: "8px",
-                            background: "rgba(255,255,255,0.05)",
-                            border: "1px solid rgba(255,255,255,0.1)",
-                          }}
-                        >
+                    {selectedDMUser ? "Task Progress" : "Members"}
+                  </h4>
+                  {selectedDMUser ? (
+                    loadingUserTasks ? (
+                      <div
+                        style={{
+                          textAlign: "center",
+                          color: "rgba(255,255,255,0.5)",
+                          fontSize: "var(--font-size-subdescription)",
+                          fontFamily: "var(--font-inria-sans)",
+                        }}
+                      >
+                        Loading...
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(2, 1fr)",
+                          gap: 12,
+                        }}
+                      >
+                        {[
+                          {
+                            label: "To do",
+                            value: selectedUserTaskStats.todo,
+                            color: "#FF6B6B",
+                          },
+                          {
+                            label: "In Progress",
+                            value: selectedUserTaskStats.inProgress,
+                            color: "#4ECDC4",
+                          },
+                          {
+                            label: "Stuck",
+                            value: selectedUserTaskStats.stuck,
+                            color: "#FFE66D",
+                          },
+                          {
+                            label: "Done",
+                            value: selectedUserTaskStats.done,
+                            color: "#95E1D3",
+                          },
+                        ].map((stat, i) => (
                           <div
+                            key={i}
                             style={{
-                              fontSize: "24px",
-                              fontWeight: "600",
-                              color: stat.color,
-                              fontFamily: "var(--font-inria-sans)",
-                            }}
-                          >
-                            {stat.value}
-                          </div>
-                          <p
-                            style={{
-                              fontSize: "12px",
-                              color: "rgba(255,255,255,0.7)",
-                              margin: "8px 0 0 0",
-                              fontFamily: "var(--font-inria-sans)",
-                            }}
-                          >
-                            {stat.label}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )
-                ) : (
-                  <div
-                    style={{ display: "flex", flexDirection: "column", gap: 8 }}
-                  >
-                    {selectedChannel &&
-                      selectedChannel.members
-                        ?.filter(
-                          (m) =>
-                            m && m.user && m.user.firstName && m.user.lastName,
-                        )
-                        .map((m) => (
-                          <div
-                            key={m.user.id}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 8,
+                              textAlign: "center",
+                              padding: "12px 12px 12px 12px",
+                              borderRadius: "8px",
+                              background: "rgba(255,255,255,0.05)",
+                              border: "1px solid rgba(255,255,255,0.1)",
                             }}
                           >
                             <div
                               style={{
-                                width: 28,
-                                height: 28,
-                                borderRadius: "50%",
-                                background: "#798CC3",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: 11,
-                                color: "#fff",
-                                fontWeight: "500",
-                              }}
-                            >
-                              {m.user.firstName[0]}
-                              {m.user.lastName[0]}
-                            </div>
-                            <span
-                              style={{
-                                fontSize: "var(--font-size-subdescription)",
-                                color: "#fff",
+                                fontSize: "24px",
+                                fontWeight: "600",
+                                color: stat.color,
                                 fontFamily: "var(--font-inria-sans)",
                               }}
                             >
-                              {m.user.firstName} {m.user.lastName}
-                            </span>
+                              {stat.value}
+                            </div>
+                            <p
+                              style={{
+                                fontSize: "12px",
+                                color: "rgba(255,255,255,0.7)",
+                                margin: "8px 0 0 0",
+                                fontFamily: "var(--font-inria-sans)",
+                              }}
+                            >
+                              {stat.label}
+                            </p>
                           </div>
                         ))}
-                  </div>
-                )}
+                      </div>
+                    )
+                  ) : (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                      }}
+                    >
+                      {selectedChannel &&
+                        selectedChannel.members
+                          ?.filter(
+                            (m) =>
+                              m &&
+                              m.user &&
+                              m.user.firstName &&
+                              m.user.lastName,
+                          )
+                          .map((m) => (
+                            <div
+                              key={m.user.id}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: "50%",
+                                  background: "#798CC3",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: 11,
+                                  color: "#fff",
+                                  fontWeight: "500",
+                                }}
+                              >
+                                {m.user.firstName[0]}
+                                {m.user.lastName[0]}
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: "var(--font-size-subdescription)",
+                                  color: "#fff",
+                                  fontFamily: "var(--font-inria-sans)",
+                                }}
+                              >
+                                {m.user.firstName} {m.user.lastName}
+                              </span>
+                            </div>
+                          ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ) : (
-            <div
-              style={{
-                height: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "rgba(255,255,255,0.5)",
-              }}
-            >
-              Select a channel or conversation
-            </div>
-          )}
-        </PageContentCon>
+            ) : (
+              <div
+                style={{
+                  height: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "rgba(255,255,255,0.5)",
+                }}
+              >
+                Select a channel or conversation
+              </div>
+            )}
+          </PageContentCon>
+        </div>
       </div>
 
       <CreateChannelModal

@@ -56,14 +56,12 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
         const user = await getCurrentUser();
         if (!user?.id) return;
 
-        const res = await fetch(
-          `/api/direct-messages/users?userId=${user.id}`
-        );
+        const res = await fetch(`/api/direct-messages/users?userId=${user.id}`);
         const data = await res.json();
         const users = Array.isArray(data?.users) ? data.users : [];
         const totalUnread = users.reduce(
           (sum: number, u: any) => sum + (u.unreadCount || 0),
-          0
+          0,
         );
         setUnreadMessages(totalUnread);
       } catch {}
@@ -98,18 +96,16 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
 
   const buttonStyle = (active: boolean): React.CSSProperties => ({
     width: "100%",
-    padding: "10px 16px 10px 16px", // Reduced left padding (12px instead of 16px + extra from nav)
-    background: active
-      ? "linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.25) 100%)"
-      : "transparent",
-    color: active ? "#a0d8ef" : "#ffffff",
-    border: "none",
-    borderRadius: 8,
+    padding: "10px 16px 10px 16px",
+    borderColor: active ? "rgba(225,225,225,0.65)" : "transparent",
+    color: "#ffffff",
+    borderWidth: 1,
+    borderRadius: 32,
     display: "flex",
     alignItems: "center",
     gap: 12,
     fontSize: 12,
-    fontWeight: active ? 600 : 500,
+    fontWeight: 200,
     cursor: "pointer",
     transition: "all 0.2s",
     position: "relative",
@@ -127,7 +123,7 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
     >
       <nav
         style={{
-          padding: "12px 0", // Removed horizontal padding to eliminate double indentation
+          padding: "12px 0",
           display: "flex",
           flexDirection: "column",
           gap: 8,
@@ -143,7 +139,7 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
               href={item.href}
               style={{
                 textDecoration: "none",
-                width:"85%",
+                width: "85%",
                 margin: "0 auto",
                 display: "block",
               }}
@@ -163,7 +159,13 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
                     }}
                   />
                 )}
-                <div style={{ width: 20, display: "flex", justifyContent: "flex-start" }}>
+                <div
+                  style={{
+                    width: 20,
+                    display: "flex",
+                    justifyContent: "flex-start",
+                  }}
+                >
                   <Icon size={20} strokeWidth={1.5} />
                 </div>
                 {!collapsed && <span>{item.label}</span>}
@@ -198,13 +200,13 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
       <div
         style={{
           margin: "0 16px",
-          borderTop: "1px solid rgba(255,255,255,0.1)",
+          borderTop: "1px solid rgba(255,255,255,0.25)",
         }}
       />
 
       <nav
         style={{
-          padding: "12px 0", // Removed horizontal padding to eliminate double indentation
+          padding: "12px 0",
           display: "flex",
           flexDirection: "column",
           gap: 8,
@@ -220,9 +222,10 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
               href={item.href}
               style={{
                 textDecoration: "none",
-                width:"80%",
+                width: "80%",
                 margin: "0 auto",
-                display: "block",}}
+                display: "block",
+              }}
             >
               <button
                 style={buttonStyle(active)}
@@ -239,7 +242,13 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
                     }}
                   />
                 )}
-                <div style={{ width: 20, display: "flex", justifyContent: "flex-start" }}>
+                <div
+                  style={{
+                    width: 20,
+                    display: "flex",
+                    justifyContent: "flex-start",
+                  }}
+                >
                   <Icon size={20} strokeWidth={1.5} />
                 </div>
                 {!collapsed && <span>{item.label}</span>}

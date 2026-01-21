@@ -15,7 +15,7 @@ const COLORS = {
   inProgress: "#3b82f6",
   stuck: "#ef4444",
   done: "#10b981",
-  muted: "rgba(255, 255, 255, 0.6)",
+  muted: "#000000",
 };
 
 interface TeamMemberProgress {
@@ -142,7 +142,7 @@ export default function DashboardPage() {
               key={i}
               className="flex flex-col justify-center min-h-[120px]"
             >
-              <p className="text-[13px] text-white/50 mb-2 uppercase tracking-tight">
+              <p className="text-[13px] text-black/50 mb-2 uppercase tracking-tight">
                 {stat.label}
               </p>
               <div className="text-3xl font-bold">{stat.value}</div>
@@ -151,10 +151,10 @@ export default function DashboardPage() {
         </div>
 
         {/* Charts Grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
           {/* Pie Chart Card */}
           <PageContentCon className="cursor-pointer hover:bg-black/50 transition-colors">
-            <h3 className="text-sm font-semibold mb-6 uppercase tracking-widest text-white/80">
+            <h3 className="text-sm font-semibold mb-6 uppercase tracking-widest text-black/80">
               Overall task overview
             </h3>
             <div className="flex flex-col md:flex-row items-center justify-around gap-8">
@@ -204,19 +204,19 @@ export default function DashboardPage() {
                   </svg>
                 </div>
               ) : (
-                <div className="w-[180px] h-[180px] rounded-full border border-dashed border-white/20 flex items-center justify-center text-white/40">
+                <div className="w-[180px] h-[180px] rounded-full border border-dashed border-white/20 flex items-center justify-center text-black/40">
                   No tasks
                 </div>
               )}
 
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-4">
                 {statusData.map((item, i) => (
-                  <div key={i} className="flex items-center gap-3 text-sm">
+                  <div key={i} className="flex items-center gap-5 text-sm">
                     <div
                       className="w-3 h-3 rounded-[2px]"
                       style={{ background: item.color }}
                     />
-                    <span className="text-white/60">{item.label}</span>
+                    <span className="text-black/60">{item.label}</span>
                     <span className="font-bold ml-auto">{item.percent}%</span>
                   </div>
                 ))}
@@ -226,12 +226,12 @@ export default function DashboardPage() {
 
           {/* Team Progress Card */}
           <PageContentCon>
-            <h3 className="text-sm font-semibold mb-6 uppercase tracking-widest text-white/80">
+            <h3 className="text-sm font-semibold mb-6 uppercase tracking-widest text-black/80">
               Overall team progress overview
             </h3>
             <div className="flex flex-col gap-5 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
               {teamProgress.length === 0 ? (
-                <div className="text-center py-10 text-white/30 italic">
+                <div className="text-center py-10 text-black/30 italic">
                   No team members yet
                 </div>
               ) : (
@@ -250,7 +250,7 @@ export default function DashboardPage() {
                         <span className="text-xs font-medium">
                           {member.name}
                         </span>
-                        <span className="text-[10px] text-white/40">
+                        <span className="text-[10px] text-black/40">
                           {member.done}/{member.total} Tasks
                         </span>
                       </div>

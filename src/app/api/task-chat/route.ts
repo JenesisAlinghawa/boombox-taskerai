@@ -1,5 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { buildTaskGraph, findCriticalPath, formatPath, hasCircularDependencies } from "@/utils/dijkstra";
+import type { TaskNode } from "@/utils/dijkstra";
 
 interface TeamMember {
   id: number;
@@ -10,16 +13,18 @@ interface TeamMember {
 interface TaskerBotRequest {
   message: string;
   teamMembers: TeamMember[];
+  userId?: string;
 }
 
 interface TaskerBotResponse {
-  action: "create" | "assign" | "update" | "delete" | "query" | null;
+  action: "create" | "assign" | "update" | "delete" | "query" | "optimize" | null;
   title: string | null;
   description: string | null;
   assigneeEmail: string | null;
   dueDate: string | null;
   priority: "low" | "medium" | "high" | null;
   message: string;
+  optimizationPath?: string; // Optional field for optimization results
 }
 
 const SYSTEM_PROMPT = `You are TaskerBot, a helpful and conversational AI task assistant made in the style of Grok.
@@ -30,18 +35,20 @@ YOUR JOB:
 1. Respond naturally to ANYTHING the user says - chat, questions, vague requests, bad grammar - treat it all as valid input
 2. ALWAYS acknowledge what the user is asking or saying in a friendly way
 3. AFTER responding, ALWAYS propose creating a task based on what they mentioned IF it sounds like something actionable
-4. Be conversational first, task-creation second
+4. Recognize optimization queries about task sequences and critical paths
+5. Be conversational first, task-creation second
 
 IMPORTANT RULES:
 - Even if the prompt is vague, bad grammar, or unclear - respond naturally and ask clarifying questions if needed
 - If they mention anything that could become a task, propose it: "Want me to create a task for this?"
 - Don't refuse to engage with casual chat or vague requests
 - Always extract task details if they're interested (title, assignee, due date, priority)
+- When user asks about "optimizing tasks", "shortest path", "critical path", "fastest way", "best sequence", or "task sequence" - respond with "optimize" action
 - Return ONLY valid JSON (no markdown, no extra text)
 
 JSON OUTPUT FORMAT (REQUIRED - ALWAYS RETURN THIS):
 {
-  "action": "create" | "chat" | null,
+  "action": "create" | "optimize" | "chat" | null,
   "title": "task title or null",
   "description": "task description or null", 
   "assigneeEmail": "user@email.com or null",
@@ -57,6 +64,9 @@ Output: {"action":"chat","title":null,"description":null,"assigneeEmail":null,"d
 
 Input: "can you make or create a task about cars and assign to jinshi and it should be done until next month"
 Output: {"action":"create","title":"Cars","description":null,"assigneeEmail":"jinshi@company.com","dueDate":"2026-02-16","priority":null,"message":"Got it! Creating 'Cars' for Jinshi with a due date next month. 🚀"}
+
+Input: "optimize my tasks" or "what's the critical path?"
+Output: {"action":"optimize","title":null,"description":null,"assigneeEmail":null,"dueDate":null,"priority":null,"message":"Let me analyze your task dependencies and find the optimal sequence!"}
 
 Input: "what time is it"
 Output: {"action":"chat","title":null,"description":null,"assigneeEmail":null,"dueDate":null,"priority":null,"message":"It's currently January 16, 2026. By the way, got anything on your plate that needs tracking? I can help turn anything into a task!"}
@@ -302,6 +312,52 @@ function calculateDueDate(dateString: string): string | null {
   return null;
 }
 
+async function handleOptimizationQuery(userId: string): Promise<string> {
+  try {
+    // Fetch all user's tasks
+    const tasks = await prisma.task.findMany({
+      where: { createdById: parseInt(userId) }
+    });
+
+    if (tasks.length === 0) {
+      return "You don't have any tasks yet. Create some tasks with dependencies, and I can help you find the optimal sequence!";
+    }
+
+    // Convert tasks to Dijkstra format
+    const dijkstraTasks: TaskNode[] = tasks.map(task => ({
+      id: task.id,
+      title: task.title,
+      duration: Math.ceil((new Date(task.dueDate || new Date()).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) || 1,
+      priority: (task.priority || "medium") as "low" | "medium" | "high",
+      dependencies: [] // No dependencies in current schema, will be added in future updates
+    }));
+
+    // Build graph
+    const graph = buildTaskGraph(dijkstraTasks);
+
+    // Check for circular dependencies
+    if (hasCircularDependencies(graph)) {
+      return "⚠️ I found circular dependencies in your tasks! This means Task A depends on B, and B (directly or indirectly) depends on A. Please fix these and try again.";
+    }
+
+    // Find critical path
+    const criticalResult = findCriticalPath(graph);
+
+    if (!criticalResult.path || criticalResult.path.length === 0) {
+      return "Your tasks don't have dependencies yet. Add dependencies between tasks to see the optimal sequence!";
+    }
+
+    const pathTitles = criticalResult.path
+      .map(nodeId => tasks.find(t => t.id === nodeId)?.title || nodeId)
+      .join(" → ");
+
+    return `🎯 **Critical Path Analysis**\n\nOptimal task sequence: ${pathTitles}\n\nTotal duration: **${criticalResult.totalDuration?.toFixed(1) || 0} days**\n\nThis is the longest chain of dependent tasks. Completing this path determines your minimum project completion time. Tasks not on this path can run in parallel!`;
+  } catch (error) {
+    console.error("[TaskerBot] Optimization error:", error);
+    return "I couldn't analyze your tasks right now. Make sure you have tasks set up!";
+  }
+}
+
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
 
@@ -321,7 +377,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const { message, teamMembers = [] } = body;
+  const { message, teamMembers = [], userId } = body;
 
   try {
     console.log("[TaskerBot]", "Received:", message);
@@ -338,82 +394,113 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Try Gemini first if API key is available
-    if (process.env.GEMINI_API_KEY) {
-      try {
-        console.log("[TaskerBot] Initializing Gemini...");
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({ 
-          model: "gemini-1.5-pro"
-        });
+    // Check for optimization queries
+    const optimizationKeywords = ["optimize", "shortest path", "critical path", "fastest way", "best sequence", "task sequence", "what's the optimal"];
+    const lowerMessage = message.toLowerCase();
+    const isOptimizationQuery = optimizationKeywords.some(keyword => lowerMessage.includes(keyword));
 
-        const teamContext =
-          teamMembers.length > 0 ? `\n\nTeam Members:\n${formatTeamMembers(teamMembers)}` : "";
-
-        console.log("[TaskerBot] Calling Gemini API...");
-
-        const response = await model.generateContent({
-          contents: [{ role: "user", parts: [{ text: message + teamContext }] }],
-          systemInstruction: SYSTEM_PROMPT,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 500,
-          },
-        });
-
-        console.log("[TaskerBot] Got Gemini response");
-
-        const responseText = response.response.text();
-        console.log("[TaskerBot] Response text:", responseText.substring(0, 150));
-
-        let parsed: TaskerBotResponse;
-        try {
-          parsed = parseGeminiResponse(responseText);
-          console.log("[TaskerBot] Parsed action:", parsed.action);
-        } catch (parseError) {
-          console.error("[TaskerBot] Parse error:", parseError);
-          // Fall through to fallback
-          throw parseError;
-        }
-
-        // Post-process due date
-        if (parsed.dueDate && !parsed.dueDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
-          const calculated = calculateDueDate(parsed.dueDate);
-          if (calculated) parsed.dueDate = calculated;
-        }
-
-        // Smart team member matching
-        if (!parsed.assigneeEmail && teamMembers.length > 0) {
-          const combined = (message + " " + (parsed.title || "")).toLowerCase();
-          for (const member of teamMembers) {
-            if (
-              combined.includes(member.name.toLowerCase()) ||
-              combined.includes(member.email.split("@")[0].toLowerCase())
-            ) {
-              parsed.assigneeEmail = member.email;
-              break;
-            }
-          }
-        }
-
-        const duration = Date.now() - startTime;
-        console.log("[TaskerBot] Success in", `${duration}ms`);
-
-        return NextResponse.json(parsed);
-      } catch (geminiError) {
-        console.error("[TaskerBot] Gemini error:", geminiError);
-        console.log("[TaskerBot] Falling back to rule-based parser");
-      }
-    } else {
-      console.log("[TaskerBot] GEMINI_API_KEY not configured, using fallback");
+    if (isOptimizationQuery && userId) {
+      console.log("[TaskerBot] Detected optimization query");
+      const optimizationResult = await handleOptimizationQuery(userId);
+      return NextResponse.json({
+        action: "optimize",
+        title: null,
+        description: null,
+        assigneeEmail: null,
+        dueDate: null,
+        priority: null,
+        message: optimizationResult,
+      });
     }
 
-    // Fallback to rule-based parser
-    console.log("[TaskerBot] Using rule-based parser");
-    const fallbackResponse = parseTaskFromMessage(message, teamMembers);
-    const duration = Date.now() - startTime;
-    console.log("[TaskerBot] Fallback success in", `${duration}ms`);
-    return NextResponse.json(fallbackResponse);
+    // Always try Gemini first
+    if (!process.env.GEMINI_API_KEY) {
+      console.error("[TaskerBot] ❌ GEMINI_API_KEY not configured!");
+      return NextResponse.json({
+        action: null,
+        title: null,
+        description: null,
+        assigneeEmail: null,
+        dueDate: null,
+        priority: null,
+        message: "❌ Gemini API key not configured. Please set GEMINI_API_KEY environment variable.",
+      });
+    }
+
+    try {
+      console.log("[TaskerBot] Initializing Gemini...");
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-pro"
+      });
+
+      const teamContext =
+        teamMembers.length > 0 ? `\n\nTeam Members:\n${formatTeamMembers(teamMembers)}` : "";
+
+      console.log("[TaskerBot] Calling Gemini API...");
+      console.log("[TaskerBot] User message:", message);
+
+      const response = await model.generateContent({
+        contents: [{ role: "user", parts: [{ text: message + teamContext }] }],
+        systemInstruction: SYSTEM_PROMPT,
+        generationConfig: {
+          temperature: 0.8, // Slightly higher for more natural responses
+          maxOutputTokens: 500,
+        },
+      });
+
+      console.log("[TaskerBot] Got Gemini response");
+
+      const responseText = response.response.text();
+      console.log("[TaskerBot] Raw response text:", responseText);
+
+      let parsed: TaskerBotResponse;
+      try {
+        parsed = parseGeminiResponse(responseText);
+        console.log("[TaskerBot] Parsed successfully - Action:", parsed.action);
+      } catch (parseError) {
+        console.error("[TaskerBot] Parse error:", parseError);
+        console.error("[TaskerBot] Response text that failed to parse:", responseText);
+        throw parseError;
+      }
+
+      // Post-process due date
+      if (parsed.dueDate && !parsed.dueDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        const calculated = calculateDueDate(parsed.dueDate);
+        if (calculated) parsed.dueDate = calculated;
+      }
+
+      // Smart team member matching
+      if (!parsed.assigneeEmail && teamMembers.length > 0) {
+        const combined = (message + " " + (parsed.title || "")).toLowerCase();
+        for (const member of teamMembers) {
+          if (
+            combined.includes(member.name.toLowerCase()) ||
+            combined.includes(member.email.split("@")[0].toLowerCase())
+          ) {
+            parsed.assigneeEmail = member.email;
+            break;
+          }
+        }
+      }
+
+      const duration = Date.now() - startTime;
+      console.log("[TaskerBot] ✅ Success in", `${duration}ms`);
+
+      return NextResponse.json(parsed);
+    } catch (geminiError) {
+      console.error("[TaskerBot] ❌ Gemini error:", geminiError);
+      const duration = Date.now() - startTime;
+      return NextResponse.json({
+        action: null,
+        title: null,
+        description: null,
+        assigneeEmail: null,
+        dueDate: null,
+        priority: null,
+        message: `Error connecting to AI: ${geminiError instanceof Error ? geminiError.message : "Unknown error"}`,
+      });
+    }
   } catch (error) {
     const duration = Date.now() - startTime;
     console.error("[TaskerBot] Unexpected error:", error, `(${duration}ms)`);

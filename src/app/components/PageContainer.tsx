@@ -15,22 +15,20 @@ export const PageContainer = ({ children, title }: PageContainerProps) => {
         width: "100%",
         display: "flex",
         flexDirection: "column",
-        background: "rgba(0, 68, 255, 0.20)",
-        backdropFilter: "blur(50px)",
-        WebkitBackdropFilter: "blur(50px)",
-        border: "1px solid rgba(255, 255, 255, 0.10)",
+        background: "rgba(0, 68, 220, 0.2)",
+        backdropFilter: "blur(1px)",
+        WebkitBackdropFilter: "blur(2px)",
         borderRadius: 12,
-        boxShadow: "1px 1px 2px rgba(255, 255, 255, 0.10)",
-        padding: "24px",
+        padding: "10px 20px",
         overflow: "hidden",
       }}
     >
       {title && (
-        <div className="mb-6">
+        <div className="mb-2">
           <h1
             style={{
               color: "#ffffff",
-              fontSize: "var(--font-size-title)",
+              fontSize: "var(--font-size-description-small)",
               fontWeight: "400",
               textTransform: "uppercase",
               letterSpacing: "0.2em",
