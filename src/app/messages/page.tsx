@@ -72,31 +72,136 @@ interface Message {
 type ViewType = "channels" | "dms";
 
 // Channel List Item Component
-const ChannelListItem = React.memo(
-  ({
-    channel,
-    onSelect,
-  }: {
-    channel: Channel;
-    onSelect: (channel: Channel) => void;
-  }) => {
-    const [showTooltip, setShowTooltip] = React.useState(false);
+const ChannelListItem = React.memo(function ChannelListItem({
+  channel,
+  onSelect,
+}: {
+  channel: Channel;
+  onSelect: (channel: Channel) => void;
+}) {
+  const [showTooltip, setShowTooltip] = React.useState(false);
 
-    return (
+  return (
+    <div
+      onClick={() => onSelect(channel)}
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "4px 4px 4px 4px",
+        cursor: "pointer",
+        borderRadius: "8px",
+        background: "transparent",
+        position: "relative",
+        width: "fit-content",
+      }}
+    >
       <div
-        onClick={() => onSelect(channel)}
-        onMouseEnter={() => setShowTooltip(true)}
-        onMouseLeave={() => setShowTooltip(false)}
         style={{
+          width: "32px",
+          height: "32px",
+          borderRadius: "50%",
+          background: "#fff",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          padding: "4px 4px 4px 4px",
-          cursor: "pointer",
-          borderRadius: "8px",
-          background: "transparent",
+          fontSize: "16px",
+          color: "#798CC3",
+          fontWeight: "600",
+          flexShrink: 0,
           position: "relative",
-          width: "fit-content",
+        }}
+      >
+        {channel.profilePicture ? (
+          <img
+            src={channel.profilePicture}
+            alt={channel.name}
+            style={{
+              width: "100%",
+              height: "100%",
+              borderRadius: "50%",
+              objectFit: "cover",
+            }}
+          />
+        ) : (
+          channel.name[0].toUpperCase()
+        )}
+      </div>
+      {showTooltip && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: "100%",
+            left: "50%",
+            transform: "translateX(-50%)",
+            marginBottom: "8px",
+            background: "rgba(0, 0, 0, 0.9)",
+            color: "#fff",
+            padding: "6px 10px 6px 10px",
+            borderRadius: "6px",
+            fontSize: "13px",
+            fontFamily: "var(--font-inria-sans)",
+            whiteSpace: "nowrap",
+            zIndex: 1000,
+            pointerEvents: "none",
+            animation: "fadeIn 0.2s",
+          }}
+        >
+          {channel.name}
+          <div
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: "50%",
+              transform: "translateX(-50%)",
+              borderLeft: "4px solid transparent",
+              borderRight: "4px solid transparent",
+              borderTop: "4px solid rgba(0, 0, 0, 0.9)",
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+});
+
+// User List Item Component
+const UserListItem = React.memo(function UserListItem({
+  user,
+  isOnline,
+  onSelect,
+}: {
+  user: User;
+  isOnline: boolean;
+  onSelect: (user: User) => void;
+}) {
+  const [showTooltip, setShowTooltip] = React.useState(false);
+
+  return (
+    <div
+      onClick={() => onSelect(user)}
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "4px 4px 4px 4px",
+        cursor: "pointer",
+        borderRadius: "8px",
+        background: "transparent",
+        position: "relative",
+        width: "fit-content",
+      }}
+    >
+      <div
+        style={{
+          position: "relative",
+          width: "32px",
+          height: "32px",
+          flexShrink: 0,
         }}
       >
         <div
@@ -111,14 +216,13 @@ const ChannelListItem = React.memo(
             fontSize: "16px",
             color: "#798CC3",
             fontWeight: "600",
-            flexShrink: 0,
             position: "relative",
           }}
         >
-          {channel.profilePicture ? (
+          {user.profilePicture ? (
             <img
-              src={channel.profilePicture}
-              alt={channel.name}
+              src={user.profilePicture}
+              alt={user.firstName}
               style={{
                 width: "100%",
                 height: "100%",
@@ -127,168 +231,60 @@ const ChannelListItem = React.memo(
               }}
             />
           ) : (
-            channel.name[0].toUpperCase()
+            `${user.firstName[0]}${user.lastName[0]}`
           )}
         </div>
-        {showTooltip && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: "100%",
-              left: "50%",
-              transform: "translateX(-50%)",
-              marginBottom: "8px",
-              background: "rgba(0, 0, 0, 0.9)",
-              color: "#fff",
-              padding: "6px 10px 6px 10px",
-              borderRadius: "6px",
-              fontSize: "13px",
-              fontFamily: "var(--font-inria-sans)",
-              whiteSpace: "nowrap",
-              zIndex: 1000,
-              pointerEvents: "none",
-              animation: "fadeIn 0.2s",
-            }}
-          >
-            {channel.name}
-            <div
-              style={{
-                position: "absolute",
-                top: "100%",
-                left: "50%",
-                transform: "translateX(-50%)",
-                borderLeft: "4px solid transparent",
-                borderRight: "4px solid transparent",
-                borderTop: "4px solid rgba(0, 0, 0, 0.9)",
-              }}
-            />
-          </div>
-        )}
-      </div>
-    );
-  },
-);
-
-// User List Item Component
-const UserListItem = React.memo(
-  ({
-    user,
-    isOnline,
-    onSelect,
-  }: {
-    user: User;
-    isOnline: boolean;
-    onSelect: (user: User) => void;
-  }) => {
-    const [showTooltip, setShowTooltip] = React.useState(false);
-
-    return (
-      <div
-        onClick={() => onSelect(user)}
-        onMouseEnter={() => setShowTooltip(true)}
-        onMouseLeave={() => setShowTooltip(false)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "4px 4px 4px 4px",
-          cursor: "pointer",
-          borderRadius: "8px",
-          background: "transparent",
-          position: "relative",
-          width: "fit-content",
-        }}
-      >
         <div
           style={{
-            position: "relative",
-            width: "32px",
-            height: "32px",
-            flexShrink: 0,
+            position: "absolute",
+            bottom: "-2px",
+            right: "-2px",
+            width: "12px",
+            height: "12px",
+            borderRadius: "50%",
+            background: isOnline ? "#10b981" : "#6b7280",
+            border: "2px solid rgba(13, 27, 42, 1)",
+            boxShadow: "0 0 0 1px rgba(30, 41, 59, 0.8)",
+          }}
+        />
+      </div>
+      {showTooltip && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: "100%",
+            left: "50%",
+            transform: "translateX(-50%)",
+            marginBottom: "8px",
+            background: "rgba(0, 0, 0, 0.9)",
+            color: "#fff",
+            padding: "6px 10px 6px 10px",
+            borderRadius: "6px",
+            fontSize: "13px",
+            fontFamily: "var(--font-inria-sans)",
+            whiteSpace: "nowrap",
+            zIndex: 1000,
+            pointerEvents: "none",
+            animation: "fadeIn 0.2s",
           }}
         >
-          <div
-            style={{
-              width: "32px",
-              height: "32px",
-              borderRadius: "50%",
-              background: "#fff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "16px",
-              color: "#798CC3",
-              fontWeight: "600",
-              position: "relative",
-            }}
-          >
-            {user.profilePicture ? (
-              <img
-                src={user.profilePicture}
-                alt={user.firstName}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  borderRadius: "50%",
-                  objectFit: "cover",
-                }}
-              />
-            ) : (
-              `${user.firstName[0]}${user.lastName[0]}`
-            )}
-          </div>
+          {user.firstName} {user.lastName}
           <div
             style={{
               position: "absolute",
-              bottom: "-2px",
-              right: "-2px",
-              width: "12px",
-              height: "12px",
-              borderRadius: "50%",
-              background: isOnline ? "#10b981" : "#6b7280",
-              border: "2px solid rgba(13, 27, 42, 1)",
-              boxShadow: "0 0 0 1px rgba(30, 41, 59, 0.8)",
+              top: "100%",
+              left: "50%",
+              transform: "translateX(-50%)",
+              borderLeft: "4px solid transparent",
+              borderRight: "4px solid transparent",
+              borderTop: "4px solid rgba(0, 0, 0, 0.9)",
             }}
           />
         </div>
-        {showTooltip && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: "100%",
-              left: "50%",
-              transform: "translateX(-50%)",
-              marginBottom: "8px",
-              background: "rgba(0, 0, 0, 0.9)",
-              color: "#fff",
-              padding: "6px 10px 6px 10px",
-              borderRadius: "6px",
-              fontSize: "13px",
-              fontFamily: "var(--font-inria-sans)",
-              whiteSpace: "nowrap",
-              zIndex: 1000,
-              pointerEvents: "none",
-              animation: "fadeIn 0.2s",
-            }}
-          >
-            {user.firstName} {user.lastName}
-            <div
-              style={{
-                position: "absolute",
-                top: "100%",
-                left: "50%",
-                transform: "translateX(-50%)",
-                borderLeft: "4px solid transparent",
-                borderRight: "4px solid transparent",
-                borderTop: "4px solid rgba(0, 0, 0, 0.9)",
-              }}
-            />
-          </div>
-        )}
-      </div>
-    );
-  },
-);
+      )}
+    </div>
+  );
+});
 
 export default function MessagesPage() {
   useAuthProtection(); // Protect this route

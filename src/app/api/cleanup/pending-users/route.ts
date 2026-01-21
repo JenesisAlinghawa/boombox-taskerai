@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const prisma = require("@/lib/prisma").default;
+    const prisma = (await import("@/lib/prisma")).default;
 
     const pendingUsers = await prisma.user.findMany({
       where: { active: false },

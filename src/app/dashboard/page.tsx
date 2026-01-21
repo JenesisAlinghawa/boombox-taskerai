@@ -2,286 +2,248 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import TaskStatusChart from "@/app/components/TaskStatusChart";
+import { format } from "date-fns";
 import { getCurrentUser } from "@/utils/sessionManager";
 import { useAuthProtection } from "@/app/hooks/useAuthProtection";
 import { PageContainer } from "@/app/components/PageContainer";
 import { PageContentCon } from "@/app/components/PageContentCon";
+import { TaskCounter } from "@/app/components/dashboard/TaskCounter";
+import { WeeklyLineChart } from "@/app/components/dashboard/WeeklyLineChart";
+import { PieChartSummary } from "@/app/components/dashboard/PieChartSummary";
+import { CalendarTimeline } from "@/app/components/dashboard/CalendarTimeline";
+import { DijkstraPlaceholder } from "@/app/components/dashboard/DijkstraPlaceholder";
+import { Clock } from "lucide-react";
 
-// Theme properties aligned with your spec
-const COLORS = {
-  primary: "#5d8bb1",
-  todo: "#8b5cf6",
-  inProgress: "#3b82f6",
-  stuck: "#ef4444",
-  done: "#10b981",
-  muted: "#000000",
-};
-
-interface TeamMemberProgress {
-  id: number;
-  name: string;
-  done: number;
-  total: number;
-  progress: number;
+interface DashboardData {
+  pending: number;
+  inProgress: number;
+  completed: number;
+  overdue: number;
+  weeklyData: {
+    labels: string[];
+    inProgress: number[];
+    completed: number[];
+    overdue: number[];
+  };
+  calendarTasks: Array<{
+    date: number;
+    taskCount: number;
+  }>;
+  aiInsight: string;
 }
 
 export default function DashboardPage() {
   const router = useRouter();
-  useAuthProtection(); // Protect this route
-  const [stats, setStats] = useState({
-    todo: 0,
-    inProgress: 0,
-    stuck: 0,
-    done: 0,
-  });
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [teamProgress, setTeamProgress] = useState<TeamMemberProgress[]>([]);
+  useAuthProtection();
 
-  // Load User Session
+  const [data, setData] = useState<DashboardData>({
+    pending: 0,
+    inProgress: 0,
+    completed: 0,
+    overdue: 0,
+    weeklyData: {
+      labels: [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+      ],
+      inProgress: [0, 0, 0, 0, 0, 0, 0],
+      completed: [0, 0, 0, 0, 0, 0, 0],
+      overdue: [0, 0, 0, 0, 0, 0, 0],
+    },
+    calendarTasks: [],
+    aiInsight: "",
+  });
+
+  const [currentTime, setCurrentTime] = useState<string>("");
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+
+  // Load current time
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const user = await getCurrentUser();
-        if (user) setCurrentUser(user);
-      } catch (error) {
-        console.error("Failed to load user session:", error);
-      }
+    const updateTime = () => {
+      const now = new Date();
+      setCurrentTime(format(now, "h:mm a"));
     };
-    loadUser();
+    updateTime();
+    const interval = setInterval(updateTime, 60000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Fetch Tasks for current user
+  // Load user and fetch dashboard data
   useEffect(() => {
-    if (!currentUser) return;
-    fetch("/api/tasks", { headers: { "x-user-id": String(currentUser.id) } })
-      .then((r) => r.json())
-      .then((data) => {
-        const taskList = Array.isArray(data?.tasks) ? data.tasks : [];
-        setStats({
-          todo: taskList.filter((t: any) => t.status === "todo").length,
-          inProgress: taskList.filter((t: any) => t.status === "inprogress")
-            .length,
-          stuck: taskList.filter((t: any) => t.status === "stuck").length,
-          done: taskList.filter((t: any) => t.status === "completed").length,
+    const loadDashboard = async () => {
+      try {
+        const user = await getCurrentUser();
+        if (!user) {
+          router.push("/auth/login");
+          return;
+        }
+
+        const response = await fetch("/api/dashboard", {
+          headers: { "x-user-id": String(user.id) },
         });
-      })
-      .catch(() => {});
-  }, [currentUser]);
 
-  // Fetch Team Progress
-  useEffect(() => {
-    if (!currentUser) return;
-    fetch("/api/teams", { headers: { "x-user-id": String(currentUser.id) } })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data?.team?.members) return;
-        const members = data.team.members;
-        Promise.all(
-          members.map((member: any) =>
-            fetch("/api/tasks", {
-              headers: { "x-user-id": String(member.userId) },
-            })
-              .then((r) => r.json())
-              .then((taskData) => {
-                const tasks = Array.isArray(taskData?.tasks)
-                  ? taskData.tasks
-                  : [];
-                const done = tasks.filter(
-                  (t: any) => t.status === "completed" || t.status === "done",
-                ).length;
-                const total = tasks.length;
-                return {
-                  id: member.userId,
-                  name: member.user?.name || "Unknown",
-                  done,
-                  total,
-                  progress: total > 0 ? Math.round((done / total) * 100) : 0,
-                };
-              })
-              .catch(() => ({
-                id: member.userId,
-                name: member.user?.name || "Unknown",
-                done: 0,
-                total: 0,
-                progress: 0,
-              })),
-          ),
-        ).then(setTeamProgress);
-      });
-  }, [currentUser]);
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error("Dashboard API error:", {
+            status: response.status,
+            statusText: response.statusText,
+            data: errorData,
+          });
+          throw new Error(
+            `Failed to fetch dashboard data: ${response.status} ${response.statusText}`,
+          );
+        }
 
-  const total = stats.todo + stats.inProgress + stats.stuck + stats.done;
+        const dashboardData = await response.json();
+        setData(dashboardData);
+      } catch (error) {
+        console.error("Failed to load dashboard:", error);
+      }
+    };
 
-  const statusData = [
-    { label: "To do", value: stats.todo, color: COLORS.todo },
-    {
-      label: "Working on it",
-      value: stats.inProgress,
-      color: COLORS.inProgress,
-    },
-    { label: "Done", value: stats.done, color: COLORS.done },
-    { label: "Stuck", value: stats.stuck, color: COLORS.stuck },
-  ].map((item) => ({
-    ...item,
-    percent: total > 0 ? ((item.value / total) * 100).toFixed(1) : "0",
-  }));
+    loadDashboard();
+  }, [router]);
+
+  const today = new Date();
+  const formattedDate = format(today, "MMMM d, yyyy");
+  const dayName = format(today, "EEEE");
+  const total = data.pending + data.inProgress + data.completed + data.overdue;
 
   return (
     <PageContainer title="DASHBOARD">
-      <div className="max-w-[1600px] mx-auto space-y-8">
-        {/* Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { label: "To do tasks", value: stats.todo },
-            { label: "In progress tasks", value: stats.inProgress },
-            { label: "Completed tasks", value: stats.done },
-            { label: "Overdue tasks", value: stats.stuck },
-          ].map((stat, i) => (
-            <PageContentCon
-              key={i}
-              className="flex flex-col justify-center min-h-[120px]"
-            >
-              <p className="text-[13px] text-black/50 mb-2 uppercase tracking-tight">
-                {stat.label}
+      <div className="max-w-7xl mx-auto space-y-6 pb-8">
+        {/* Top section: Date and Time */}
+        <div className="bg-gradient-to-r from-blue-900/40 to-blue-800/40 backdrop-blur-md rounded-lg p-6 border border-blue-500/20">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <p className="text-2xl sm:text-3xl font-bold text-white">
+                {formattedDate}
               </p>
-              <div className="text-3xl font-bold">{stat.value}</div>
+              <p className="text-gray-300 text-sm sm:text-base mt-1">
+                {dayName}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-gray-300">
+              <Clock size={18} />
+              <span className="text-sm sm:text-base">{currentTime}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Main grid layout */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Left column (2/3 width) */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Top row: Dijkstra + Pending tasks */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {/* Dijkstra card */}
+              <PageContentCon className="space-y-4">
+                <h2 className="text-lg font-semibold text-white">
+                  Dijkstra Task Optimization
+                </h2>
+                <DijkstraPlaceholder />
+              </PageContentCon>
+
+              {/* Pending tasks card */}
+              <PageContentCon className="space-y-4">
+                <h2 className="text-lg font-semibold text-white">
+                  Pending tasks
+                </h2>
+                <div className="bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg flex items-center justify-center min-h-96 border-2 border-dashed border-gray-300">
+                  <div className="text-center">
+                    <p className="text-gray-400 font-semibold text-lg">
+                      TO DO TASKS APPEARS HERE (COMPACT)
+                    </p>
+                    <p className="text-gray-300 text-sm mt-2">
+                      {data.pending} pending task{data.pending !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </div>
+              </PageContentCon>
+            </div>
+
+            {/* Weekly Task Progress Chart */}
+            <PageContentCon className="space-y-4">
+              <h2 className="text-lg font-semibold text-white">
+                Weekly Task Progress
+              </h2>
+              <WeeklyLineChart data={data.weeklyData} />
             </PageContentCon>
-          ))}
+          </div>
+
+          {/* Right column (1/3 width) */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Tasks Timeline Calendar */}
+            <PageContentCon className="space-y-4">
+              <h2 className="text-lg font-semibold text-white">
+                Tasks Timeline
+              </h2>
+              <CalendarTimeline
+                month={currentMonth}
+                year={currentYear}
+                tasks={data.calendarTasks}
+                currentDay={today.getDate()}
+                onPrevMonth={() => {
+                  if (currentMonth === 0) {
+                    setCurrentMonth(11);
+                    setCurrentYear(currentYear - 1);
+                  } else {
+                    setCurrentMonth(currentMonth - 1);
+                  }
+                }}
+                onNextMonth={() => {
+                  if (currentMonth === 11) {
+                    setCurrentMonth(0);
+                    setCurrentYear(currentYear + 1);
+                  } else {
+                    setCurrentMonth(currentMonth + 1);
+                  }
+                }}
+              />
+            </PageContentCon>
+
+            {/* Task counters */}
+            <div className="grid grid-cols-2 gap-3">
+              <TaskCounter
+                label="Pending"
+                count={data.pending}
+                color="purple"
+              />
+              <TaskCounter
+                label="Tasks in progress"
+                count={data.inProgress}
+                color="blue"
+              />
+              <TaskCounter
+                label="Completed Tasks"
+                count={data.completed}
+                color="green"
+              />
+              <TaskCounter
+                label="Overdue Tasks"
+                count={data.overdue}
+                color="red"
+              />
+            </div>
+          </div>
         </div>
 
-        {/* Charts Grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-          {/* Pie Chart Card */}
-          <PageContentCon className="cursor-pointer hover:bg-black/50 transition-colors">
-            <h3 className="text-sm font-semibold mb-6 uppercase tracking-widest text-black/80">
-              Overall task overview
-            </h3>
-            <div className="flex flex-col md:flex-row items-center justify-around gap-8">
-              {total > 0 ? (
-                <div className="relative w-[200px] h-[200px]">
-                  <svg
-                    width="200"
-                    height="200"
-                    viewBox="0 0 200 200"
-                    className="transform -rotate-90"
-                  >
-                    <g transform="translate(100,100)">
-                      {(() => {
-                        const radius = 90;
-                        const segments = statusData.filter((s) => s.value > 0);
-                        let cumulative = 0;
-
-                        return segments.map((segment, i) => {
-                          const portion = segment.value / total;
-                          const angle = portion * Math.PI * 2;
-
-                          if (portion >= 0.99) {
-                            return (
-                              <circle key={i} r={radius} fill={segment.color} />
-                            );
-                          }
-
-                          const x1 = radius * Math.cos(cumulative);
-                          const y1 = radius * Math.sin(cumulative);
-                          const x2 = radius * Math.cos(cumulative + angle);
-                          const y2 = radius * Math.sin(cumulative + angle);
-                          const path = `M ${x1} ${y1} A ${radius} ${radius} 0 ${angle > Math.PI ? 1 : 0} 1 ${x2} ${y2} L 0 0 Z`;
-
-                          cumulative += angle;
-                          return (
-                            <path
-                              key={i}
-                              d={path}
-                              fill={segment.color}
-                              className="stroke-black/20"
-                              strokeWidth="1"
-                            />
-                          );
-                        });
-                      })()}
-                    </g>
-                  </svg>
-                </div>
-              ) : (
-                <div className="w-[180px] h-[180px] rounded-full border border-dashed border-white/20 flex items-center justify-center text-black/40">
-                  No tasks
-                </div>
-              )}
-
-              <div className="flex flex-col gap-4">
-                {statusData.map((item, i) => (
-                  <div key={i} className="flex items-center gap-5 text-sm">
-                    <div
-                      className="w-3 h-3 rounded-[2px]"
-                      style={{ background: item.color }}
-                    />
-                    <span className="text-black/60">{item.label}</span>
-                    <span className="font-bold ml-auto">{item.percent}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </PageContentCon>
-
-          {/* Team Progress Card */}
-          <PageContentCon>
-            <h3 className="text-sm font-semibold mb-6 uppercase tracking-widest text-black/80">
-              Overall team progress overview
-            </h3>
-            <div className="flex flex-col gap-5 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
-              {teamProgress.length === 0 ? (
-                <div className="text-center py-10 text-black/30 italic">
-                  No team members yet
-                </div>
-              ) : (
-                teamProgress.map((member) => (
-                  <div key={member.id} className="flex items-center gap-4">
-                    <div className="w-9 h-9 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-xs font-bold shrink-0">
-                      {member.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .toUpperCase()
-                        .slice(0, 2)}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex justify-between mb-1">
-                        <span className="text-xs font-medium">
-                          {member.name}
-                        </span>
-                        <span className="text-[10px] text-black/40">
-                          {member.done}/{member.total} Tasks
-                        </span>
-                      </div>
-                      <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-green-500 transition-all duration-700"
-                          style={{ width: `${member.progress}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </PageContentCon>
-        </div>
-
-        {/* Bar Chart Full Width */}
-        <PageContentCon className="w-full">
-          <TaskStatusChart
-            title="Overall task status"
-            data={[
-              { status: "To do", count: stats.todo, color: COLORS.todo },
-              {
-                status: "Working on it",
-                count: stats.inProgress,
-                color: COLORS.inProgress,
-              },
-              { status: "Stuck", count: stats.stuck, color: COLORS.stuck },
-              { status: "Done", count: stats.done, color: COLORS.done },
-            ]}
+        {/* Bottom section: Task Summary */}
+        <PageContentCon className="space-y-6">
+          <h2 className="text-lg font-semibold text-white">Task Summary</h2>
+          <PieChartSummary
+            completed={data.completed}
+            total={total || 1}
+            inProgress={data.inProgress}
+            pending={data.pending}
+            overdue={data.overdue}
+            aiInsight={data.aiInsight}
           />
         </PageContentCon>
       </div>

@@ -1,7 +1,7 @@
+import { HfInference } from '@huggingface/inference';
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const inference = new HfInference(process.env.HUGGINGFACE_API_KEY);
 
 interface TaskData {
   tasks: any[];
@@ -219,9 +219,9 @@ export async function POST(request: NextRequest) {
   try {
     const data: TaskData = await request.json();
 
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.HUGGINGFACE_API_KEY) {
       return NextResponse.json(
-        { error: "Gemini API key not configured" },
+        { error: "Hugging Face API key not configured" },
         { status: 400 }
       );
     }
@@ -236,24 +236,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Grok-style system prompt for natural, friendly, witty AI responses
-    const systemPrompt = `You are Grok, a helpful and witty AI assistant for a marketing team using a task management platform. Your role is to analyze task performance data and provide natural, conversational insights that are:
-
-- NATURAL & FRIENDLY: Talk like a real person, not a robot. Use "you" and "we", be encouraging and warm.
-- WITTY & INSIGHTFUL: Add light humor when appropriate, but keep it professional. Make observations that are clever but actionable.
-- ENCOURAGING: Help the team see possibilities, not just problems. Frame challenges as opportunities.
-- VARIED IN PHRASING: Even when analyzing similar data, vary your language so responses feel fresh and thoughtful.
-- SPECIFIC & TACTICAL: Always tie insights back to concrete actions the team can take.
-
-AVOID:
-- Exaggeration or corporate jargon
-- Repetitive language or recycled phrases
-- Being overly cheerful when addressing real issues
-- Generic advice without context
-
-Your analysis should focus on social media campaign delivery and PR strategy execution. Consider task completion as campaign success, overdue tasks as timeline risks, and team capacity as resource allocation for marketing initiatives.`;
-
-    // Prepare data summary for Gemini with Grok-style guidance
+    // Prepare data summary for Llama with Grok-style guidance
     const taskSummary = `
 TASK PERFORMANCE DATA FOR ANALYSIS:
 
@@ -283,10 +266,10 @@ ${
 
 ANALYSIS NEEDED:
 1. Provide 2-3 specific recommendations based on task data (focus on what's actually happening, not generic advice)
-2. Identify current performance trends and what they mean for campaign execution
+2. Identify current performance trends and what they mean for execution
 3. Give a brief, natural summary of team performance and what's working or needs attention
 
-RESPONSE FORMAT (VALID JSON ONLY):
+RESPONSE FORMAT (VALID JSON ONLY - NO MARKDOWN):
 {
   "recommendations": [
     {
@@ -305,69 +288,64 @@ RESPONSE FORMAT (VALID JSON ONLY):
   "performanceSummary": "Brief, natural summary of team performance and next steps"
 }
 
-IMPORTANT: Return ONLY valid JSON. Be conversational, vary your phrasing, and tie insights to the actual data provided.
+IMPORTANT: Return ONLY valid JSON with no markdown or extra text. Be conversational, vary your phrasing, and tie insights to the actual data provided.
     `;
 
-    // Use Gemini with temperature 0.8-1.0 for natural variation
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-pro",
-      generationConfig: {
-        temperature: 0.85, // Natural variation range for conversational responses
-        maxOutputTokens: 1024,
-      }
-    });
+    const systemPrompt = `You are an insightful and witty AI assistant analyzing task management performance data. Your role is to provide natural, conversational insights that are:
 
-    let aiData: any = null;
+- NATURAL & FRIENDLY: Talk like a real person. Use "you" and "we", be encouraging and warm.
+- WITTY & INSIGHTFUL: Add light humor when appropriate. Make observations that are clever but actionable.
+- ENCOURAGING: Help teams see possibilities, not just problems. Frame challenges as opportunities.
+- VARIED & FRESH: Vary your language so responses never feel recycled or robotic.
+- SPECIFIC & TACTICAL: Always tie insights back to concrete actions the team can take.
+
+AVOID:
+- Corporate jargon or exaggeration
+- Recycled phrases or generic advice
+- Being overly cheerful about real issues
+- Repetitive patterns
+
+Respond ONLY with valid JSON output containing recommendations, trends, and a performance summary.`;
+
+    let responseText = "";
+
     try {
-      const result = await model.generateContent({
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: taskSummary }],
-          },
+      const response = await inference.chatCompletion({
+        model: "meta-llama/Llama-3.1-8B-Instruct",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: taskSummary },
         ],
-        systemInstruction: systemPrompt,
+        max_tokens: 1000,
+        temperature: 0.85,
       });
 
-      // Extract text from Gemini response
-      let text = "";
-      try {
-        const response = (result as any).response || (result as any).output?.[0] || result;
-        if (!response) {
-          text = JSON.stringify(result);
-        } else if (typeof response === "string") {
-          text = response;
-        } else if (typeof response.text === "function") {
-          text = await response.text();
-        } else if (typeof response.text === "string") {
-          text = response.text;
-        } else if ((result as any).output && (result as any).output[0]?.content) {
-          const content = (result as any).output[0].content.find((c: any) => c.type === "output_text") || (result as any).output[0].content[0];
-          text = content?.text || JSON.stringify(result);
-        } else {
-          text = JSON.stringify(result);
-        }
-      } catch (parseErr) {
-        console.warn("AI response parse attempt failed, will fallback", parseErr);
-        text = "";
+      responseText = response?.choices?.[0]?.message?.content?.trim() || "";
+
+      if (!responseText) {
+        throw new Error("Empty response from Hugging Face");
       }
 
-      if (text) {
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
+      console.log("HF analytics response:", responseText.slice(0, 250));
+    } catch (hfError) {
+      console.warn("Hugging Face API error, using fallback:", hfError);
+      responseText = "";
+    }
+
+    let aiData: any = null;
+
+    if (responseText) {
+      try {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           aiData = JSON.parse(jsonMatch[0]);
         } else {
-          // Try to parse as JSON directly
-          try {
-            aiData = JSON.parse(text);
-          } catch (e) {
-            aiData = null;
-          }
+          aiData = JSON.parse(responseText);
         }
+      } catch (parseErr) {
+        console.warn("Failed to parse AI response, using fallback", parseErr);
+        aiData = null;
       }
-    } catch (aiErr) {
-      console.warn("AI model call failed, will use enhanced fallback:", aiErr);
-      aiData = null;
     }
 
     // Map icons to icons8 URLs
@@ -385,21 +363,13 @@ IMPORTANT: Return ONLY valid JSON. Be conversational, vary your phrasing, and ti
       checkmark: "https://img.icons8.com/color/96/000000/checkmark.png",
       activity: "https://img.icons8.com/color/96/000000/activity.png",
       error: "https://img.icons8.com/color/96/000000/error.png",
-      // Social media & PR specific icons
-      socialmedia: "https://img.icons8.com/color/96/000000/facebook-new.png",
-      campaign: "https://img.icons8.com/color/96/000000/bullhorn.png",
-      engagement: "https://img.icons8.com/color/96/000000/hearts.png",
-      growth: "https://img.icons8.com/color/96/000000/growth.png",
-      analytics: "https://img.icons8.com/color/96/000000/combo-chart.png",
-      publicrelations: "https://img.icons8.com/color/96/000000/megaphone.png",
       strategy: "https://img.icons8.com/color/96/000000/strategy.png",
-      audience: "https://img.icons8.com/color/96/000000/contacts.png",
-      content: "https://img.icons8.com/color/96/000000/document.png",
+      analytics: "https://img.icons8.com/color/96/000000/combo-chart.png",
       default: "https://img.icons8.com/color/96/000000/info.png",
     };
 
     if (!aiData) {
-      // Enhanced fallback using multi-template rule-based logic when AI is unavailable
+      // Enhanced fallback using rule-based logic when AI is unavailable
       const fallbackRecs = generateRecommendations(
         data.completionRate,
         data.overdueTasks,
@@ -424,11 +394,11 @@ IMPORTANT: Return ONLY valid JSON. Be conversational, vary your phrasing, and ti
       return NextResponse.json({
         recommendations: enrichedRecs,
         trends: enrichedTrends,
-        performanceSummary: "Your team is working hard — keep up the great work and watch for ways to optimize!",
+        performanceSummary: "Your team is working hard — keep up the momentum and look for ways to optimize!",
       });
     }
 
-    // Enhance recommendations with icons8 URLs (aiData may already include icon keys)
+    // Enhance recommendations with icons8 URLs
     const recommendations: AIRecommendation[] = (aiData.recommendations || []).map((rec: any) => ({
       title: rec.title,
       description: rec.description,
@@ -448,10 +418,10 @@ IMPORTANT: Return ONLY valid JSON. Be conversational, vary your phrasing, and ti
       performanceSummary: aiData.performanceSummary || "",
     });
   } catch (error) {
-    console.error("AI Analytics Error:", error);
+    console.error("Analytics Error:", error);
     return NextResponse.json(
       {
-        error: "Failed to generate AI analytics",
+        error: "Failed to generate analytics",
         details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
