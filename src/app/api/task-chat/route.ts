@@ -1,7 +1,7 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { HfInference } from "@huggingface/inference";
 import { NextRequest, NextResponse } from "next/server";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const client = new HfInference(process.env.HUGGINGFACE_API_KEY || "");
 
 interface TeamMember {
   id: number;
@@ -111,6 +111,8 @@ function calculateDueDate(dueString: string | null): string | null {
 }
 
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
+  
   try {
     const body = (await req.json()) as TaskerBotRequest;
     const { message, teamMembers = [] } = body;
@@ -130,7 +132,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!process.env.GEMINI_API_KEY) {
+    // Check for Hugging Face API key
+    if (!process.env.HUGGINGFACE_API_KEY) {
+      console.error("[TaskerBot] ❌ HUGGINGFACE_API_KEY not configured!");
       return NextResponse.json(
         {
           action: null,
@@ -139,30 +143,59 @@ export async function POST(req: NextRequest) {
           assigneeEmail: null,
           dueDate: null,
           priority: null,
-          message: "❌ API key not configured. Please set GEMINI_API_KEY.",
+          message: "❌ Hugging Face API key not configured. Please set HUGGINGFACE_API_KEY.",
         },
         { status: 200 }
       );
     }
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash", // Current free-tier model (fast, high RPS)
-      generationConfig: {
-        temperature: 0.85,
-        maxOutputTokens: 500,
-        responseMimeType: "application/json", // Forces clean JSON output
-      },
-    });
+    console.log("[TaskerBot] Using HF API key:", process.env.HUGGINGFACE_API_KEY.slice(0, 10) + "...");
 
     const teamContext = `\n\nAvailable team members:\n${formatTeamMembers(teamMembers)}`;
+    
+    // Build the full prompt with system instructions
+    const fullPrompt = `${SYSTEM_PROMPT}\n\nUser message: ${message}${teamContext}`;
+    
+    console.log("[TaskerBot] 📤 Sending prompt to Hugging Face (Llama 3.1):");
+    console.log("[TaskerBot] Input (first 150 chars):", fullPrompt.slice(0, 150) + "...");
 
     let responseText = "";
 
     try {
-      const result = await model.generateContent(`${message}${teamContext}`);
-      responseText = result.response.text(); // With JSON mode, this is pure JSON
-    } catch (geminiError) {
-      console.error("Gemini API error:", geminiError);
+      // Call Hugging Face Inference API using Llama 3.1
+      const response = await client.textGeneration({
+        model: "meta-llama/Llama-2-7b-chat-hf", // Using Llama-2 for better free-tier availability
+        inputs: fullPrompt,
+        parameters: {
+          max_new_tokens: 500,
+          temperature: 0.85,
+          top_p: 0.95,
+          repetition_penalty: 1.2,
+          do_sample: true,
+        },
+      });
+
+      responseText = response.generated_text || "";
+      
+      // Remove the prompt from the response (HF includes the input in output)
+      if (responseText.includes(message)) {
+        responseText = responseText.substring(responseText.indexOf(message) + message.length).trim();
+      }
+
+      console.log("[TaskerBot] 📥 HF raw response (first 300 chars):", responseText.slice(0, 300) + "...");
+      
+      // Try to extract JSON from the response
+      // Llama might wrap it or add explanation, so we need to find the JSON object
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        responseText = jsonMatch[0];
+      }
+      
+    } catch (hfError) {
+      console.error("[TaskerBot] ❌ Hugging Face API Error:", hfError);
+      const errorMsg = hfError instanceof Error ? hfError.message : "Unknown HF error";
+      console.error("[TaskerBot] Error details:", errorMsg);
+      
       return NextResponse.json(
         {
           action: null,
@@ -171,18 +204,22 @@ export async function POST(req: NextRequest) {
           assigneeEmail: null,
           dueDate: null,
           priority: null,
-          message: "Oops, I'm having a quick moment. Try again in a sec? 😅",
+          message: "Oops, I'm having a quick moment. Try again? 😅",
         },
         { status: 200 }
       );
     }
 
+    // Parse the JSON response
     let parsed: TaskerBotResponse;
 
     try {
       parsed = JSON.parse(responseText);
+      console.log("[TaskerBot] ✅ Parsed JSON:", JSON.stringify(parsed).slice(0, 200) + "...");
     } catch (parseError) {
-      console.error("JSON parse error. Raw:", responseText);
+      console.error("[TaskerBot] ❌ JSON parse error. Raw response:", responseText);
+      console.error("[TaskerBot] Parse error:", parseError);
+      
       return NextResponse.json(
         {
           action: null,
@@ -203,7 +240,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Post-process due date if needed
-    if (parsed.dueDate && !parsed.dueDate.includes("-")) {
+    if (parsed.dueDate && !parsed.dueDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
       const calculated = calculateDueDate(parsed.dueDate);
       if (calculated) parsed.dueDate = calculated;
     }
@@ -222,9 +259,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const duration = Date.now() - startTime;
+    console.log(`[TaskerBot] ⏱️  Completed in ${duration}ms`);
+
     return NextResponse.json(parsed, { status: 200 });
+    
   } catch (error) {
-    console.error("TaskerBot API error:", error);
+    console.error("[TaskerBot] ❌ Overall error:", error);
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
+    
     return NextResponse.json(
       {
         action: null,
@@ -233,7 +276,7 @@ export async function POST(req: NextRequest) {
         assigneeEmail: null,
         dueDate: null,
         priority: null,
-        message: `I'm here to help! Try asking me to create, assign, or update a task. (Error: ${error instanceof Error ? error.message : "Unknown"})`,
+        message: `I'm here to help! Try asking me to create, assign, or update a task. (Error: ${errorMsg})`,
       },
       { status: 200 }
     );
