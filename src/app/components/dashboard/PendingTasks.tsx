@@ -11,17 +11,17 @@ const PendingTasks = ({ pending }: PendingTasksProps) => {
 
   return (
     <div className="bg-white/10 backdrop-blur rounded-xl p-4 h-full flex flex-col">
-      <h2 className="text-lg font-semibold text-white mb-4">Pending Tasks</h2>
+      <h2 className="text-lg font-normal text-black/62 mb-4">Pending Tasks</h2>
       <div className="flex-1 flex flex-col justify-center items-center">
         <div className="text-center">
           <CheckCircle2 size={32} className="text-yellow-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{pending}</p>
-          <p className="text-sm text-gray-300 mt-1">
+          <p className="text-2xl font-normal text-black/62">{pending}</p>
+          <p className="text-sm text-black/62 mt-1">
             pending task{pending !== 1 ? "s" : ""}
           </p>
         </div>
       </div>
-      <div className="text-xs text-gray-400 text-center mt-auto">
+      <div className="text-xs text-black/62 text-center mt-auto">
         View details in Tasks section
       </div>
     </div>

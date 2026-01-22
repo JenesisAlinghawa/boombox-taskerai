@@ -44,19 +44,20 @@ export default function LogsPage() {
       }
 
       setUserRole(user.role || "EMPLOYEE");
-      fetchLogs();
+      fetchLogs(user.id);
     } catch (err) {
       setError("Failed to authenticate");
       setLoading(false);
     }
   };
 
-  const fetchLogs = async () => {
+  const fetchLogs = async (userId: number) => {
     try {
       const response = await fetch("/api/logs", {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
+          "x-user-id": String(userId),
         },
       });
 
@@ -76,18 +77,18 @@ export default function LogsPage() {
 
   if (loading) {
     return (
-      <div className="p-8 text-center bg-white min-h-screen">
-        <p className="text-gray-600">Loading activity logs...</p>
+      <div className="p-8 text-center bg-white/10 min-h-screen">
+        <p className="text-black/62">Loading activity logs...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-8 bg-red-50 border border-red-200 rounded-lg">
-        <div className="flex items-center gap-3 text-red-800">
+      <div className="p-8 bg-red-500/10 border border-red-500/20 rounded-lg">
+        <div className="flex items-center gap-3 text-red-600">
           <AlertCircle size={24} />
-          <p className="text-lg font-semibold">{error}</p>
+          <p className="text-lg font-normal">{error}</p>
         </div>
       </div>
     );
@@ -96,26 +97,26 @@ export default function LogsPage() {
   return (
     <PageContainer title="ACTIVITY LOGS">
       {logs.length === 0 ? (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-          <AlertCircle size={40} className="mx-auto text-gray-400 mb-3" />
-          <p className="text-gray-600">No activity logs yet</p>
+        <div className="bg-white/10 border border-white/20 rounded-lg p-8 text-center">
+          <AlertCircle size={40} className="mx-auto text-black/62 mb-3" />
+          <p className="text-black/62">No activity logs yet</p>
         </div>
       ) : (
         <div className="space-y-3">
           {logs.map((log) => (
             <div
               key={log.id}
-              className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+              className="border border-white/10 rounded-lg p-4 hover:bg-white/5 transition-colors"
             >
               <div className="flex items-start justify-between mb-2">
                 <div>
-                  <h3 className="font-semibold text-gray-900">{log.action}</h3>
-                  <p className="text-sm text-gray-600">
+                  <h3 className="font-normal text-black/62">{log.action}</h3>
+                  <p className="text-sm text-black/62">
                     By {log.user.firstName} {log.user.lastName} (
                     {log.user.email})
                   </p>
                 </div>
-                <span className="text-xs text-gray-500 whitespace-nowrap">
+                <span className="text-xs text-black/62 whitespace-nowrap">
                   {formatDistanceToNow(new Date(log.createdAt), {
                     addSuffix: true,
                   })}
@@ -129,11 +130,11 @@ export default function LogsPage() {
               )}
 
               {log.data && (
-                <details className="text-xs text-gray-600 mt-2">
-                  <summary className="cursor-pointer hover:text-gray-900">
+                <details className="text-xs text-black/62 mt-2">
+                  <summary className="cursor-pointer hover:text-black/62">
                     View Details
                   </summary>
-                  <pre className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto">
+                  <pre className="mt-2 p-2 bg-white/10 rounded text-xs overflow-auto text-black/62">
                     {JSON.stringify(log.data, null, 2)}
                   </pre>
                 </details>

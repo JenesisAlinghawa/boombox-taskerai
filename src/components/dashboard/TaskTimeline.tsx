@@ -20,7 +20,7 @@ const TaskTimeline = () => {
 
   // Create task date map for quick lookup
   const taskDates = new Set(
-    data.calendarTasks.map((t: any) => t.date.toString())
+    data.calendarTasks.map((t: any) => t.date.toString()),
   );
 
   const handlePrevMonth = () => {
@@ -46,31 +46,31 @@ const TaskTimeline = () => {
   return (
     <div className="bg-white/10 backdrop-blur rounded-xl p-4 h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-white">Tasks Timeline</h2>
+        <h2 className="text-lg font-normal text-black/62">Tasks Timeline</h2>
         <div className="flex gap-1">
           <button
             onClick={handlePrevMonth}
             className="p-1 hover:bg-white/20 rounded"
           >
-            <ChevronLeft size={16} className="text-white" />
+            <ChevronLeft size={16} className="text-black/62" />
           </button>
           <button
             onClick={handleNextMonth}
             className="p-1 hover:bg-white/20 rounded"
           >
-            <ChevronRight size={16} className="text-white" />
+            <ChevronRight size={16} className="text-black/62" />
           </button>
         </div>
       </div>
 
-      <p className="text-xs text-gray-300 mb-3">
+      <p className="text-xs text-black/62 mb-3">
         {format(new Date(currentYear, currentMonth), "MMMM yyyy")}
       </p>
 
       {/* Weekday headers */}
       <div className="grid grid-cols-7 gap-1 mb-2">
         {weekDays.map((day) => (
-          <div key={day} className="text-xs text-gray-400 text-center">
+          <div key={day} className="text-xs text-black/62 text-center">
             {day}
           </div>
         ))}
@@ -92,10 +92,10 @@ const TaskTimeline = () => {
             <div
               key={day.toISOString()}
               className={`
-                aspect-square rounded flex items-center justify-center text-xs font-semibold
-                ${isToday ? "bg-blue-500 text-white" : ""}
-                ${hasTask && !isToday ? "bg-green-500/30 text-green-300" : ""}
-                ${!isToday && !hasTask ? "bg-white/5 text-gray-300" : ""}
+                aspect-square rounded flex items-center justify-center text-xs font-normal
+                ${isToday ? "bg-blue-500 text-black/62" : ""}
+                ${hasTask && !isToday ? "bg-green-500/30 text-black/62" : ""}
+                ${!isToday && !hasTask ? "bg-white/5 text-black/62" : ""}
               `}
             >
               {day.getDate()}

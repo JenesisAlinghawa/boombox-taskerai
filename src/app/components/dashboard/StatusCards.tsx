@@ -30,10 +30,10 @@ const StatusCards = ({ count, label, icon, color }: StatusCardsProps) => {
     <div
       className={`bg-gradient-to-br ${color} backdrop-blur rounded-xl p-4 border border-white/10 flex flex-col justify-between h-full`}
     >
-      <div className="flex items-start justify-between">
+      <div className="flex min-w-[134px] max-w-[220px] lg:w-[100%] items-start justify-between">
         <div>
-          <p className="text-sm text-gray-300">{label}</p>
-          <p className="text-3xl font-bold text-white mt-1">{count}</p>
+          <p className="text-sm text-black/62">{label}</p>
+          <p className="text-3xl font-normal text-black/62 mt-1">{count}</p>
         </div>
         <Icon size={24} className={iconColor} />
       </div>

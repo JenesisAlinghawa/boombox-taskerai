@@ -45,7 +45,7 @@ function InvitePageContent() {
       setLastName(data.lastName || "");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to verify invite link"
+        err instanceof Error ? err.message : "Failed to verify invite link",
       );
     } finally {
       setVerifyingToken(false);
@@ -98,7 +98,7 @@ function InvitePageContent() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center">
-          <p className="text-gray-600">Verifying invite link...</p>
+          <p className="text-black/62">Verifying invite link...</p>
         </div>
       </div>
     );
@@ -113,9 +113,9 @@ function InvitePageContent() {
               <Check size={32} className="text-green-600" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Success!</h1>
-          <p className="text-gray-600 mb-4">Your account has been created.</p>
-          <p className="text-sm text-gray-500">Redirecting to login...</p>
+          <h1 className="text-2xl font-normal text-black/62 mb-2">Success!</h1>
+          <p className="text-black/62 mb-4">Your account has been created.</p>
+          <p className="text-sm text-black/62">Redirecting to login...</p>
         </div>
       </div>
     );
@@ -125,8 +125,8 @@ function InvitePageContent() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Join TaskerAI</h1>
-          <p className="text-gray-600 mt-2">Complete your account setup</p>
+          <h1 className="text-3xl font-normal text-black/62">Join TaskerAI</h1>
+          <p className="text-black/62 mt-2">Complete your account setup</p>
         </div>
 
         {error && (
@@ -139,28 +139,32 @@ function InvitePageContent() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-normal text-black/62 mb-1">
               Email
             </label>
             <div className="relative">
-              <Mail size={18} className="absolute left-3 top-3 text-gray-400" />
+              <Mail size={18} className="absolute left-3 top-3 text-black/62" />
               <input
+                id="invite-email"
+                name="invite-email"
                 type="email"
                 value={email}
                 disabled
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-black/62"
               />
             </div>
           </div>
 
           {/* First Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-normal text-black/62 mb-1">
               First Name
             </label>
             <div className="relative">
-              <User size={18} className="absolute left-3 top-3 text-gray-400" />
+              <User size={18} className="absolute left-3 top-3 text-black/62" />
               <input
+                id="invite-first-name"
+                name="invite-first-name"
                 type="text"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
@@ -172,12 +176,14 @@ function InvitePageContent() {
 
           {/* Last Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-normal text-black/62 mb-1">
               Last Name
             </label>
             <div className="relative">
-              <User size={18} className="absolute left-3 top-3 text-gray-400" />
+              <User size={18} className="absolute left-3 top-3 text-black/62" />
               <input
+                id="invite-last-name"
+                name="invite-last-name"
                 type="text"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
@@ -189,11 +195,11 @@ function InvitePageContent() {
 
           {/* Password */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-normal text-black/62 mb-1">
               Password
             </label>
             <div className="relative">
-              <Lock size={18} className="absolute left-3 top-3 text-gray-400" />
+              <Lock size={18} className="absolute left-3 top-3 text-black/62" />
               <input
                 type="password"
                 value={password}
@@ -202,7 +208,7 @@ function InvitePageContent() {
                 placeholder="Minimum 8 characters"
               />
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-black/62 mt-1">
               Must be at least 8 characters
             </p>
           </div>
@@ -211,13 +217,13 @@ function InvitePageContent() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-normal disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Creating Account..." : "Create Account"}
           </button>
         </form>
 
-        <p className="text-xs text-gray-600 text-center mt-4">
+        <p className="text-xs text-black/62 text-center mt-4">
           Your account will be pending admin approval before you can log in.
         </p>
       </div>

@@ -56,40 +56,40 @@ const TaskTimeline = ({
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
-    <div className="bg-white/10 backdrop-blur rounded-xl p-4 h-full flex flex-col">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-white">Tasks Timeline</h2>
+    <div className="bg-white/10 backdrop-blur rounded-xl p-2 h-full flex flex-col">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-sm font-semibold text-black/62">Tasks Timeline</h2>
         <div className="flex gap-1">
           <button
             onClick={handlePrevMonth}
             className="p-1 hover:bg-white/20 rounded"
           >
-            <ChevronLeft size={16} className="text-white" />
+            <ChevronLeft size={14} className="text-black/62" />
           </button>
           <button
             onClick={handleNextMonth}
             className="p-1 hover:bg-white/20 rounded"
           >
-            <ChevronRight size={16} className="text-white" />
+            <ChevronRight size={14} className="text-black/62" />
           </button>
         </div>
       </div>
 
-      <p className="text-xs text-gray-300 mb-3">
+      <p className="text-xs text-black/62 mb-2">
         {format(new Date(currentYear, currentMonth), "MMMM yyyy")}
       </p>
 
       {/* Weekday headers */}
-      <div className="grid grid-cols-7 gap-1 mb-2">
+      <div className="grid grid-cols-7 gap-0.5 mb-1">
         {weekDays.map((day) => (
-          <div key={day} className="text-xs text-gray-400 text-center">
+          <div key={day} className="text-xs text-black/62 text-center">
             {day}
           </div>
         ))}
       </div>
 
       {/* Calendar grid */}
-      <div className="grid grid-cols-7 gap-1 flex-1">
+      <div className="grid grid-cols-7 gap-0.5 flex-1 auto-rows-fr">
         {/* Empty cells for days before month starts */}
         {Array.from({ length: firstDay.getDay() }).map((_, i) => (
           <div key={`empty-${i}`} className="bg-white/5 rounded" />
@@ -104,10 +104,10 @@ const TaskTimeline = ({
             <div
               key={day.toISOString()}
               className={`
-                aspect-square rounded flex items-center justify-center text-xs font-semibold
-                ${isToday ? "bg-blue-500 text-white" : ""}
-                ${hasTask && !isToday ? "bg-green-500/30 text-green-300" : ""}
-                ${!isToday && !hasTask ? "bg-white/5 text-gray-300" : ""}
+                rounded flex items-center justify-center text-xs font-semibold
+                ${isToday ? "bg-blue-500 text-black/62" : ""}
+                ${hasTask && !isToday ? "bg-green-500/30 text-black/62" : ""}
+                ${!isToday && !hasTask ? "bg-white/5 text-black/62" : ""}
               `}
             >
               {day.getDate()}

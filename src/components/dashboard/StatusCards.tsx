@@ -47,8 +47,8 @@ const StatusCards = () => {
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm text-gray-300">{card.label}</p>
-                <p className="text-3xl font-bold text-white mt-1">
+                <p className="text-sm text-black/62">{card.label}</p>
+                <p className="text-3xl font-normal text-black/62 mt-1">
                   {card.count}
                 </p>
               </div>

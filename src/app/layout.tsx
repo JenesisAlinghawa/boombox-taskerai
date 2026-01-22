@@ -20,6 +20,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inria+Sans:wght@400&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body
         className={`${inter.className} bg-[#01162B] text-white overflow-hidden`}
       >

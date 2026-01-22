@@ -26,7 +26,7 @@ const WeeklyProgressChart = () => {
 
   return (
     <div className="bg-white/10 backdrop-blur rounded-xl p-4 h-full flex flex-col">
-      <h2 className="text-lg font-semibold text-white mb-4">
+      <h2 className="text-lg font-normal text-black/62 mb-4">
         Weekly Task Progress
       </h2>
       <div className="flex-1 flex items-center justify-center">

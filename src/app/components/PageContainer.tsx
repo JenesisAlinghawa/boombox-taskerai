@@ -17,7 +17,7 @@ export const PageContainer = ({ children, title }: PageContainerProps) => {
         flexDirection: "column",
         background: "rgba(0, 68, 220, 0.2)",
         backdropFilter: "blur(1px)",
-        WebkitBackdropFilter: "blur(2px)",
+        WebkitBackdropFilter: "blur(92px)",
         borderRadius: 12,
         padding: "10px 20px",
         overflow: "hidden",

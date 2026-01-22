@@ -341,7 +341,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="p-8 bg-white min-h-screen">
-        <p className="text-gray-600">Loading settings...</p>
+        <p className="text-black/62">Loading settings...</p>
       </div>
     );
   }
@@ -352,14 +352,14 @@ export default function SettingsPage() {
 
   return (
     <PageContainer title="SETTINGS">
-        <button
-          onClick={() => setShowLogoutConfirm(true)}
-          className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-        >
-          <LogOut size={18} />
-          Logout
-        </button>
-      
+      <button
+        onClick={() => setShowLogoutConfirm(true)}
+        className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+      >
+        <LogOut size={18} />
+        Logout
+      </button>
+
       {/* Tabs */}
       <div className="flex gap-2 mb-8 border-b border-gray-200">
         <button
@@ -367,10 +367,10 @@ export default function SettingsPage() {
             setActiveTab("profile");
             setError(null);
           }}
-          className={`px-4 py-3 font-medium transition-colors ${
+          className={`px-4 py-3 font-normal transition-colors ${
             activeTab === "profile"
               ? "text-blue-600 border-b-2 border-blue-600"
-              : "text-gray-600 hover:text-gray-900"
+              : "text-black/62 hover:text-black/62"
           }`}
         >
           Profile
@@ -380,10 +380,10 @@ export default function SettingsPage() {
             setActiveTab("notifications");
             setError(null);
           }}
-          className={`px-4 py-3 font-medium transition-colors ${
+          className={`px-4 py-3 font-normal transition-colors ${
             activeTab === "notifications"
               ? "text-blue-600 border-b-2 border-blue-600"
-              : "text-gray-600 hover:text-gray-900"
+              : "text-black/62 hover:text-black/62"
           }`}
         >
           Notifications
@@ -395,10 +395,10 @@ export default function SettingsPage() {
               setError(null);
               fetchUsers();
             }}
-            className={`px-4 py-3 font-medium transition-colors ${
+            className={`px-4 py-3 font-normal transition-colors ${
               activeTab === "team"
                 ? "text-blue-600 border-b-2 border-blue-600"
-                : "text-gray-600 hover:text-gray-900"
+                : "text-black/62 hover:text-black/62"
             }`}
           >
             Team Management
@@ -417,14 +417,14 @@ export default function SettingsPage() {
       {activeTab === "profile" && currentUser && (
         <div className="max-w-2xl space-y-6">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            <h2 className="text-xl font-normal text-black/62 mb-4">
               Update Profile Details
             </h2>
 
             <div className="space-y-4">
               {/* Profile Picture */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-normal text-black/62 mb-2">
                   Profile Picture
                 </label>
                 <div className="flex items-center gap-4">
@@ -436,7 +436,7 @@ export default function SettingsPage() {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <Users size={32} className="text-gray-400" />
+                      <Users size={32} className="text-black/62" />
                     )}
                   </div>
                   <button
@@ -458,7 +458,7 @@ export default function SettingsPage() {
 
               {/* First Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-normal text-black/62 mb-2">
                   First Name
                 </label>
                 <input
@@ -472,7 +472,7 @@ export default function SettingsPage() {
 
               {/* Last Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-normal text-black/62 mb-1">
                   Last Name
                 </label>
                 <input
@@ -486,27 +486,27 @@ export default function SettingsPage() {
 
               {/* Email */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-normal text-black/62 mb-1">
                   Email (Read-only)
                 </label>
                 <input
                   type="email"
                   value={currentUser.email}
                   disabled
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-black/62"
                 />
               </div>
 
               {/* Role */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-normal text-black/62 mb-1">
                   Role (Read-only)
                 </label>
                 <input
                   type="text"
                   value={currentUser.role}
                   disabled
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-black/62"
                 />
               </div>
 
@@ -532,12 +532,12 @@ export default function SettingsPage() {
       {/* Notifications Tab */}
       {activeTab === "notifications" && (
         <div className="max-w-2xl space-y-6">
-          <h2 className="text-xl font-semibold text-gray-900">
+          <h2 className="text-xl font-normal text-black/62">
             Notification Preferences
           </h2>
           <div className="space-y-4">
             <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <label className="font-medium text-gray-900">
+              <label className="font-normal text-black/62">
                 Email Notifications
               </label>
               <button
@@ -560,13 +560,11 @@ export default function SettingsPage() {
       {/* Team Management Tab */}
       {activeTab === "team" && canManageUsers && (
         <div className="max-w-4xl space-y-6">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Team Management
-          </h2>
+          <h2 className="text-xl font-normal text-black/62">Team Management</h2>
 
           {/* Invite Section */}
           <div className="p-4 border border-gray-200 rounded-lg">
-            <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+            <h3 className="font-normal text-black/62 mb-3 flex items-center gap-2">
               <Plus size={18} />
               Add New Team Member
             </h3>
@@ -586,22 +584,22 @@ export default function SettingsPage() {
                 {inviting ? "Sending..." : "Send Invite"}
               </button>
             </div>
-            <p className="text-xs text-gray-500 mt-2">
+            <p className="text-xs text-black/62 mt-2">
               An invitation link will be sent to their email
             </p>
           </div>
 
           {/* Users List */}
           <div>
-            <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+            <h3 className="font-normal text-black/62 mb-3 flex items-center gap-2">
               <Users size={18} />
               Team Members ({users.length})
             </h3>
 
             {teamLoading ? (
-              <p className="text-gray-600">Loading team members...</p>
+              <p className="text-black/62">Loading team members...</p>
             ) : users.length === 0 ? (
-              <p className="text-gray-600">No team members yet</p>
+              <p className="text-black/62">No team members yet</p>
             ) : (
               <div className="space-y-2">
                 {users.map((user) => (
@@ -611,17 +609,17 @@ export default function SettingsPage() {
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <h4 className="font-medium text-gray-900">
+                        <h4 className="font-normal text-black/62">
                           {user.firstName} {user.lastName}
                         </h4>
-                        <span className="text-xs font-semibold px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                        <span className="text-xs font-normal px-2 py-1 bg-blue-100 text-blue-700 rounded">
                           {user.role}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-600 truncate">
+                      <p className="text-sm text-black/62 truncate">
                         {user.email}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-black/62 mt-1">
                         {!user.active && (
                           <span className="inline-block px-2 py-0.5 bg-amber-50 text-amber-700 rounded">
                             Pending Approval
@@ -668,7 +666,7 @@ export default function SettingsPage() {
                                         : user.id,
                                     )
                                   }
-                                  className="text-sm px-3 py-1 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition-colors whitespace-nowrap"
+                                  className="text-sm px-3 py-1 bg-gray-200 text-black/62 rounded hover:bg-gray-300 transition-colors whitespace-nowrap"
                                 >
                                   Change Role
                                 </button>
@@ -717,24 +715,24 @@ export default function SettingsPage() {
               <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
                 <AlertCircle size={24} className="text-red-600" />
               </div>
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className="text-xl font-normal text-black/62">
                 Confirm Logout
               </h2>
             </div>
-            <p className="text-gray-600 mb-6">
+            <p className="text-black/62 mb-6">
               Are you sure you want to logout? You'll need to sign in again to
               access your account.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 px-4 py-2 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                className="flex-1 px-4 py-2 bg-gray-200 text-black/62 rounded-lg hover:bg-gray-300 transition-colors font-normal"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmLogout}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-normal"
               >
                 Logout
               </button>

@@ -98,33 +98,33 @@ export default function AnalyticsPage() {
         {/* Key Metrics Section */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <PageContentCon className="space-y-2">
-            <p className="text-gray-400 text-sm">Completion Rate</p>
-            <p className="text-3xl font-bold text-green-400">
+            <p className="text-black/62 text-sm">Completion Rate</p>
+            <p className="text-3xl font-normal text-green-400">
               {data.taskCompletionRate.toFixed(1)}%
             </p>
-            <p className="text-xs text-gray-500">of all tasks completed</p>
+            <p className="text-xs text-black/62">of all tasks completed</p>
           </PageContentCon>
 
           <PageContentCon className="space-y-2">
-            <p className="text-gray-400 text-sm">Avg Task Duration</p>
-            <p className="text-3xl font-bold text-blue-400">
+            <p className="text-black/62 text-sm">Avg Task Duration</p>
+            <p className="text-3xl font-normal text-blue-400">
               {data.averageTaskDuration.toFixed(1)}
             </p>
-            <p className="text-xs text-gray-500">days per task</p>
+            <p className="text-xs text-black/62">days per task</p>
           </PageContentCon>
 
           <PageContentCon className="space-y-2">
-            <p className="text-gray-400 text-sm">Total Tasks</p>
-            <p className="text-3xl font-bold text-purple-400">{total}</p>
-            <p className="text-xs text-gray-500">all time</p>
+            <p className="text-black/62 text-sm">Total Tasks</p>
+            <p className="text-3xl font-normal text-purple-400">{total}</p>
+            <p className="text-xs text-black/62">all time</p>
           </PageContentCon>
 
           <PageContentCon className="space-y-2">
-            <p className="text-gray-400 text-sm">Overdue</p>
-            <p className="text-3xl font-bold text-red-400">
+            <p className="text-black/62 text-sm">Overdue</p>
+            <p className="text-3xl font-normal text-red-400">
               {data.stats.overdue}
             </p>
-            <p className="text-xs text-gray-500">tasks delayed</p>
+            <p className="text-xs text-black/62">tasks delayed</p>
           </PageContentCon>
         </div>
 
@@ -133,7 +133,7 @@ export default function AnalyticsPage() {
           {/* Left Column: Status Overview */}
           <div className="lg:col-span-1 space-y-6">
             <PageContentCon className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">Task Status</h3>
+              <h3 className="text-lg font-normal text-black/62">Task Status</h3>
               <div className="space-y-3">
                 <TaskCounter
                   label="Pending"
@@ -162,27 +162,27 @@ export default function AnalyticsPage() {
             <PageContentCon className="space-y-4">
               <div className="flex items-center gap-2">
                 <AlertCircle size={18} className="text-blue-400" />
-                <h3 className="text-lg font-semibold text-white">Insights</h3>
+                <h3 className="text-lg font-normal text-black/62">Insights</h3>
               </div>
 
-              <div className="space-y-4 text-sm text-gray-300">
+              <div className="space-y-4 text-sm text-black/62">
                 <div className="flex justify-between items-center p-3 bg-blue-500/10 rounded border border-blue-500/20">
                   <span>Active Tasks</span>
-                  <span className="font-bold text-blue-400">
+                  <span className="font-normal text-blue-400">
                     {data.stats.inProgress}
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center p-3 bg-green-500/10 rounded border border-green-500/20">
                   <span>Completion Rate</span>
-                  <span className="font-bold text-green-400">
+                  <span className="font-normal text-green-400">
                     {data.taskCompletionRate.toFixed(0)}%
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center p-3 bg-red-500/10 rounded border border-red-500/20">
                   <span>At Risk</span>
-                  <span className="font-bold text-red-400">
+                  <span className="font-normal text-red-400">
                     {data.stats.overdue}
                   </span>
                 </div>
@@ -194,7 +194,7 @@ export default function AnalyticsPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* Weekly Trend */}
             <PageContentCon className="space-y-4">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <h3 className="text-lg font-normal text-black/62 flex items-center gap-2">
                 <Calendar size={18} />
                 Weekly Trends
               </h3>
@@ -205,7 +205,7 @@ export default function AnalyticsPage() {
 
         {/* Full Width: Task Summary */}
         <PageContentCon className="space-y-6">
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+          <h2 className="text-lg font-normal text-black/62 flex items-center gap-2">
             <TrendingUp size={18} />
             Overall Summary
           </h2>

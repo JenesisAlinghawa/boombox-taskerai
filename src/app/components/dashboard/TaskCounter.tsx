@@ -18,8 +18,8 @@ export const TaskCounter = ({ label, count, color }: TaskCounterProps) => {
     <div
       className={`${colorMap[color]} rounded border p-3 flex justify-between items-center`}
     >
-      <span className="text-sm text-gray-300">{label}</span>
-      <span className={`font-bold text-lg ${colorMap[color].split(" ")[2]}`}>
+      <span className="text-sm text-black/62">{label}</span>
+      <span className={`font-normal text-lg ${colorMap[color].split(" ")[2]}`}>
         {count}
       </span>
     </div>

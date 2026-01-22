@@ -32,7 +32,7 @@ const TaskSummary = ({
 
   return (
     <div className="bg-white/10 backdrop-blur rounded-xl p-4 h-full flex flex-col">
-      <h2 className="text-lg font-semibold text-white mb-4">Task Summary</h2>
+      <h2 className="text-lg font-normal text-black/62 mb-4">Task Summary</h2>
 
       <div className="flex-1 flex flex-col items-center justify-center gap-4">
         <div className="w-full flex justify-center">
@@ -56,14 +56,16 @@ const TaskSummary = ({
         </div>
 
         <div className="text-center">
-          <p className="text-2xl font-bold text-white">{completionRate}%</p>
-          <p className="text-sm text-gray-300">
+          <p className="text-2xl font-normal text-black/62">
+            {completionRate}%
+          </p>
+          <p className="text-sm text-black/62">
             {completed} of {total} tasks completed
           </p>
         </div>
 
         <div className="w-full pt-3 border-t border-white/10">
-          <div className="flex items-start gap-2 text-xs text-gray-300">
+          <div className="flex items-start gap-2 text-xs text-black/62">
             <Zap size={14} className="text-yellow-400 flex-shrink-0 mt-0.5" />
             <p>
               {aiInsight ||

@@ -33,10 +33,10 @@ export function ChannelCreationModal({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedMembers, setSelectedMembers] = useState<Set<number>>(
-    new Set()
+    new Set(),
   );
   const [profilePictureFile, setProfilePictureFile] = useState<File | null>(
-    null
+    null,
   );
   const [profilePicturePreview, setProfilePicturePreview] = useState<
     string | null
@@ -65,8 +65,8 @@ export function ChannelCreationModal({
           (user) =>
             user.firstName.toLowerCase().includes(query) ||
             user.lastName.toLowerCase().includes(query) ||
-            user.email.toLowerCase().includes(query)
-        )
+            user.email.toLowerCase().includes(query),
+        ),
       );
     }
   }, [searchQuery, allUsers]);
@@ -86,7 +86,7 @@ export function ChannelCreationModal({
       const data = await response.json();
       // Filter out inactive users and current user
       const activeUsers = (data.users || []).filter(
-        (user: User) => user.active !== false && user.id !== currentUserId
+        (user: User) => user.active !== false && user.id !== currentUserId,
       );
       setAllUsers(activeUsers);
       setFilteredUsers(activeUsers);
@@ -109,7 +109,7 @@ export function ChannelCreationModal({
   };
 
   const handleProfilePictureChange = (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -161,7 +161,7 @@ export function ChannelCreationModal({
       <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">
+          <h2 className="text-xl font-normal text-black/62">
             Create New Channel
           </h2>
           <button
@@ -169,7 +169,7 @@ export function ChannelCreationModal({
             className="p-1 hover:bg-gray-100 rounded-lg transition"
             disabled={submitting}
           >
-            <X size={20} className="text-gray-600" />
+            <X size={20} className="text-black/62" />
           </button>
         </div>
 
@@ -183,7 +183,7 @@ export function ChannelCreationModal({
 
           {/* Channel Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-normal text-black/62 mb-2">
               Channel Name <span className="text-red-500">*</span>
             </label>
             <input
@@ -198,7 +198,7 @@ export function ChannelCreationModal({
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-normal text-black/62 mb-2">
               Description
             </label>
             <textarea
@@ -213,7 +213,7 @@ export function ChannelCreationModal({
 
           {/* Profile Picture */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-normal text-black/62 mb-2">
               Channel Picture
             </label>
             <div className="flex items-center gap-4">
@@ -230,8 +230,8 @@ export function ChannelCreationModal({
                   htmlFor="profile-picture-input"
                   className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg cursor-pointer transition"
                 >
-                  <Upload size={18} className="text-gray-600" />
-                  <span className="text-sm text-gray-700">Upload Image</span>
+                  <Upload size={18} className="text-black/62" />
+                  <span className="text-sm text-black/62">Upload Image</span>
                 </label>
               </div>
               {profilePicturePreview && (
@@ -259,10 +259,10 @@ export function ChannelCreationModal({
 
           {/* Members Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-normal text-black/62 mb-2">
               Add Members
             </label>
-            <p className="text-xs text-gray-500 mb-3">
+            <p className="text-xs text-black/62 mb-3">
               You will be added as a member automatically
             </p>
 
@@ -270,7 +270,7 @@ export function ChannelCreationModal({
             <div className="relative mb-4">
               <Search
                 size={18}
-                className="absolute left-3 top-2.5 text-gray-400"
+                className="absolute left-3 top-2.5 text-black/62"
               />
               <input
                 type="text"
@@ -285,11 +285,11 @@ export function ChannelCreationModal({
             {/* Members List */}
             <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
               {loading ? (
-                <div className="p-4 text-center text-gray-500 text-sm">
+                <div className="p-4 text-center text-black/62 text-sm">
                   Loading users...
                 </div>
               ) : filteredUsers.length === 0 ? (
-                <div className="p-4 text-center text-gray-500 text-sm">
+                <div className="p-4 text-center text-black/62 text-sm">
                   No users found
                 </div>
               ) : (
@@ -307,10 +307,10 @@ export function ChannelCreationModal({
                         className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-normal text-black/62">
                           {user.firstName} {user.lastName}
                         </p>
-                        <p className="text-xs text-gray-500 truncate">
+                        <p className="text-xs text-black/62 truncate">
                           {user.email}
                         </p>
                       </div>
@@ -321,7 +321,7 @@ export function ChannelCreationModal({
             </div>
 
             {selectedMembers.size > 0 && (
-              <div className="mt-3 text-sm text-gray-600">
+              <div className="mt-3 text-sm text-black/62">
                 {selectedMembers.size} member
                 {selectedMembers.size !== 1 ? "s" : ""} selected
               </div>
@@ -334,7 +334,7 @@ export function ChannelCreationModal({
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition disabled:opacity-50"
+              className="px-4 py-2 text-black/62 bg-gray-100 hover:bg-gray-200 rounded-lg transition disabled:opacity-50"
             >
               Cancel
             </button>

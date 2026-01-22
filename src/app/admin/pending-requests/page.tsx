@@ -65,7 +65,7 @@ export default function PendingRequestsPage() {
       setError(null);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to fetch pending users"
+        err instanceof Error ? err.message : "Failed to fetch pending users",
       );
     } finally {
       setLoading(false);
@@ -76,7 +76,7 @@ export default function PendingRequestsPage() {
     userId: number,
     email: string,
     firstName: string,
-    lastName: string
+    lastName: string,
   ) => {
     setApproving(userId);
     try {
@@ -106,7 +106,7 @@ export default function PendingRequestsPage() {
     userId: number,
     email: string,
     firstName: string,
-    lastName: string
+    lastName: string,
   ) => {
     setDenying(userId);
     try {
@@ -135,7 +135,7 @@ export default function PendingRequestsPage() {
   const sendWelcomeEmail = async (
     email: string,
     firstName: string,
-    lastName: string
+    lastName: string,
   ) => {
     try {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
@@ -161,7 +161,7 @@ export default function PendingRequestsPage() {
   const sendDenialEmail = async (
     email: string,
     firstName: string,
-    lastName: string
+    lastName: string,
   ) => {
     try {
       await fetch("/api/email/send", {
@@ -187,7 +187,7 @@ export default function PendingRequestsPage() {
       <div className="p-8 bg-red-50 border border-red-200 rounded-lg">
         <div className="flex items-center gap-3 text-red-800">
           <AlertCircle size={24} />
-          <p className="text-lg font-semibold">{error}</p>
+          <p className="text-lg font-normal">{error}</p>
         </div>
       </div>
     );
@@ -196,7 +196,7 @@ export default function PendingRequestsPage() {
   if (loading) {
     return (
       <div className="p-8 text-center">
-        <p className="text-gray-600">Loading pending requests...</p>
+        <p className="text-black/62">Loading pending requests...</p>
       </div>
     );
   }
@@ -212,10 +212,10 @@ export default function PendingRequestsPage() {
   return (
     <div className="p-8 bg-white min-h-screen">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+        <h1 className="text-3xl font-normal text-black/62 mb-2">
           Pending User Requests
         </h1>
-        <p className="text-gray-600">
+        <p className="text-black/62">
           {pendingUsers.length} user{pendingUsers.length !== 1 ? "s" : ""}{" "}
           awaiting approval
         </p>
@@ -223,8 +223,8 @@ export default function PendingRequestsPage() {
 
       {pendingUsers.length === 0 ? (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-          <Mail size={40} className="mx-auto text-gray-400 mb-3" />
-          <p className="text-gray-600">No pending requests</p>
+          <Mail size={40} className="mx-auto text-black/62 mb-3" />
+          <p className="text-black/62">No pending requests</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -234,11 +234,11 @@ export default function PendingRequestsPage() {
               className="border border-gray-200 rounded-lg p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
             >
               <div className="flex-1">
-                <h3 className="font-semibold text-gray-900">
+                <h3 className="font-normal text-black/62">
                   {user.firstName} {user.lastName}
                 </h3>
-                <p className="text-sm text-gray-600">{user.email}</p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-sm text-black/62">{user.email}</p>
+                <p className="text-xs text-black/62 mt-1">
                   Requested {new Date(user.createdAt).toLocaleDateString()}
                 </p>
               </div>
@@ -250,7 +250,7 @@ export default function PendingRequestsPage() {
                       user.id,
                       user.email,
                       user.firstName,
-                      user.lastName
+                      user.lastName,
                     )
                   }
                   disabled={approving === user.id || denying === user.id}

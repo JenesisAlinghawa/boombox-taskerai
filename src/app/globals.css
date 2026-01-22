@@ -1,60 +1,62 @@
 @import "tailwindcss";
 
-@import url('https://fonts.googleapis.com/css2?family=Inria+Sans:wght@400&display=swap');
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --font-inria-sans: 'Inria Sans', sans-serif;
-  --font-geist-mono: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
-  
-  /* Typography Sizes */
-  --font-size-title: 22px;
-  --font-size-subtitle: 18px;
-  --font-size-description: 16px;
-  --font-size-subdescription: 14px;
-}
-
-/* Compact base font for a dense, monday-like layout */
-html {
-  font-size: 13px;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #ffffff;
+    --foreground: #171717;
+    --font-inria-sans: 'Inria Sans', sans-serif;
+    --font-geist-mono: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
+    
+    /* Typography Sizes */
+    --font-size-title: 22px;
+    --font-size-subtitle: 18px;
+    --font-size-description: 16px;
+    --font-size-subdescription: 14px;
+  }
+
+  /* Compact base font for a dense, monday-like layout */
+  html {
+    font-size: 13px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: #0a0a0a;
+      --foreground: #ededed;
+    }
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-inria-sans);
+    font-weight: 400;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-inria-sans);
-  font-weight: 400;
-}
+@layer components {
+  /* Typography Classes */
+  .title {
+    font-family: var(--font-inria-sans);
+    font-size: var(--font-size-title);
+    font-weight: 400;
+  }
 
-/* Typography Classes */
-.title {
-  font-family: var(--font-inria-sans);
-  font-size: var(--font-size-title);
-  font-weight: 400;
-}
+  .subtitle {
+    font-family: var(--font-inria-sans);
+    font-size: var(--font-size-subtitle);
+    font-weight: 400;
+  }
 
-.subtitle {
-  font-family: var(--font-inria-sans);
-  font-size: var(--font-size-subtitle);
-  font-weight: 400;
-}
+  .description {
+    font-family: var(--font-inria-sans);
+    font-size: var(--font-size-description);
+    font-weight: 400;
+  }
 
-.description {
-  font-family: var(--font-inria-sans);
-  font-size: var(--font-size-description);
-  font-weight: 400;
-}
-
-.subdescription {
-  font-family: var(--font-inria-sans);
-  font-size: var(--font-size-subdescription);
-  font-weight: 400;
+  .subdescription {
+    font-family: var(--font-inria-sans);
+    font-size: var(--font-size-subdescription);
+    font-weight: 400;
+  }
 }

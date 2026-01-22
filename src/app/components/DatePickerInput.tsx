@@ -22,6 +22,7 @@ export function DatePickerInput({
   const [displayDate, setDisplayDate] = useState<Date | null>(null);
   const [hours, setHours] = useState("12");
   const [minutes, setMinutes] = useState("00");
+  const [period, setPeriod] = useState<"AM" | "PM">("AM");
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Initialize from value
@@ -30,8 +31,12 @@ export function DatePickerInput({
       try {
         const date = new Date(value);
         setDisplayDate(date);
-        setHours(String(date.getHours()).padStart(2, "0"));
+        const hour24 = date.getHours();
+        const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+        const newPeriod = hour24 >= 12 ? "PM" : "AM";
+        setHours(String(hour12).padStart(2, "0"));
         setMinutes(String(date.getMinutes()).padStart(2, "0"));
+        setPeriod(newPeriod);
       } catch (e) {
         console.error("Invalid date:", e);
       }
@@ -58,18 +63,40 @@ export function DatePickerInput({
 
   const handleDateChange = (date: Date) => {
     const newDate = new Date(date);
-    newDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+    const hour24 =
+      period === "PM"
+        ? parseInt(hours) === 12
+          ? 12
+          : parseInt(hours) + 12
+        : parseInt(hours) === 12
+          ? 0
+          : parseInt(hours);
+    newDate.setHours(hour24, parseInt(minutes), 0, 0);
     setDisplayDate(newDate);
     onChange(newDate.toISOString());
   };
 
-  const handleTimeChange = (newHours: string, newMinutes: string) => {
+  const handleTimeChange = (
+    newHours: string,
+    newMinutes: string,
+    newPeriod?: "AM" | "PM",
+  ) => {
     setHours(newHours);
     setMinutes(newMinutes);
+    if (newPeriod) setPeriod(newPeriod);
 
     if (displayDate) {
       const newDate = new Date(displayDate);
-      newDate.setHours(parseInt(newHours), parseInt(newMinutes), 0, 0);
+      const finalPeriod = newPeriod || period;
+      const hour24 =
+        finalPeriod === "PM"
+          ? parseInt(newHours) === 12
+            ? 12
+            : parseInt(newHours) + 12
+          : parseInt(newHours) === 12
+            ? 0
+            : parseInt(newHours);
+      newDate.setHours(hour24, parseInt(newMinutes), 0, 0);
       setDisplayDate(newDate);
       onChange(newDate.toISOString());
     }
@@ -99,7 +126,7 @@ export function DatePickerInput({
 
   const monthName = format(currentDate, "MMMM yyyy");
   const displayValue = displayDate
-    ? format(displayDate, "MMM dd, yyyy • HH:mm")
+    ? format(displayDate, "MMM dd, yyyy • hh:mm a")
     : "";
 
   const handlePrevMonth = () => {
@@ -335,13 +362,13 @@ export function DatePickerInput({
               </label>
               <input
                 type="number"
-                min="0"
-                max="23"
+                min="1"
+                max="12"
                 value={hours}
                 onChange={(e) =>
                   handleTimeChange(
                     String(
-                      Math.min(23, Math.max(0, parseInt(e.target.value) || 0)),
+                      Math.min(12, Math.max(1, parseInt(e.target.value) || 1)),
                     ).padStart(2, "0"),
                     minutes,
                   )
@@ -394,6 +421,72 @@ export function DatePickerInput({
                   boxSizing: "border-box",
                 }}
               />
+            </div>
+            <div style={{ flex: 0.8 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  color: "rgba(255,255,255,0.6)",
+                  marginBottom: 4,
+                  fontWeight: 600,
+                }}
+              >
+                Period
+              </label>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 4,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => handleTimeChange(hours, minutes, "AM")}
+                  style={{
+                    flex: 1,
+                    padding: "6px 0",
+                    borderRadius: 4,
+                    border:
+                      period === "AM"
+                        ? "1px solid #3b82f6"
+                        : "1px solid rgba(59, 130, 246, 0.3)",
+                    background:
+                      period === "AM"
+                        ? "rgba(59, 130, 246, 0.2)"
+                        : "rgba(0,0,0,0.1)",
+                    color: "#ffffff",
+                    cursor: "pointer",
+                    fontSize: 11,
+                    fontWeight: 600,
+                  }}
+                >
+                  AM
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleTimeChange(hours, minutes, "PM")}
+                  style={{
+                    flex: 1,
+                    padding: "6px 0",
+                    borderRadius: 4,
+                    border:
+                      period === "PM"
+                        ? "1px solid #3b82f6"
+                        : "1px solid rgba(59, 130, 246, 0.3)",
+                    background:
+                      period === "PM"
+                        ? "rgba(59, 130, 246, 0.2)"
+                        : "rgba(0,0,0,0.1)",
+                    color: "#ffffff",
+                    cursor: "pointer",
+                    fontSize: 11,
+                    fontWeight: 600,
+                  }}
+                >
+                  PM
+                </button>
+              </div>
             </div>
           </div>
 
