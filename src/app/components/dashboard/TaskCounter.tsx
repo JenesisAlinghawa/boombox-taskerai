@@ -1,5 +1,3 @@
-"use client";
-
 import React from "react";
 
 interface TaskCounterProps {
@@ -8,37 +6,22 @@ interface TaskCounterProps {
   color: "purple" | "blue" | "green" | "red";
 }
 
-const colorClasses = {
-  purple: "bg-purple-500/20 border-purple-500/30 text-purple-300",
-  blue: "bg-blue-500/20 border-blue-500/30 text-blue-300",
-  green: "bg-green-500/20 border-green-500/30 text-green-300",
-  red: "bg-red-500/20 border-red-500/30 text-red-300",
+const colorMap = {
+  purple: "bg-purple-500/10 border-purple-500/20 text-purple-400",
+  blue: "bg-blue-500/10 border-blue-500/20 text-blue-400",
+  green: "bg-green-500/10 border-green-500/20 text-green-400",
+  red: "bg-red-500/10 border-red-500/20 text-red-400",
 };
 
-const numberColorClasses = {
-  purple: "text-purple-400",
-  blue: "text-blue-400",
-  green: "text-green-400",
-  red: "text-red-400",
-};
-
-export const TaskCounter: React.FC<TaskCounterProps> = ({
-  label,
-  count,
-  color,
-}) => {
+export const TaskCounter = ({ label, count, color }: TaskCounterProps) => {
   return (
     <div
-      className={`${colorClasses[color]} rounded-lg p-6 border flex flex-col items-center justify-center min-h-[120px] backdrop-blur-md transition-all hover:shadow-lg`}
+      className={`${colorMap[color]} rounded border p-3 flex justify-between items-center`}
     >
-      <p className="text-xs sm:text-sm text-gray-300 mb-2 text-center">
-        {label}
-      </p>
-      <p
-        className={`text-3xl sm:text-4xl font-bold ${numberColorClasses[color]}`}
-      >
+      <span className="text-sm text-gray-300">{label}</span>
+      <span className={`font-bold text-lg ${colorMap[color].split(" ")[2]}`}>
         {count}
-      </p>
+      </span>
     </div>
   );
 };

@@ -2684,7 +2684,7 @@ function CreateTaskModal({
   };
 
   return (
-    <button
+    <div
       style={{
         position: "fixed",
         inset: 0,
@@ -3034,6 +3034,6 @@ function CreateTaskModal({
           </div>
         </div>
       </form>
-    </button>
+    </div>
   );
 }

@@ -32,14 +32,16 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    console.log(`Dashboard API: Found ${tasks.length} tasks for user ${numUserId}:`, tasks);
+
     // Calculate stats
     const now = new Date();
-    const pending = tasks.filter((t) => t.status === "todo" || t.status === "pending").length;
-    const inProgress = tasks.filter((t) => t.status === "inprogress" || t.status === "in-progress").length;
-    const completed = tasks.filter((t) => t.status === "completed" || t.status === "done").length;
+    const pending = tasks.filter((t) => t.status === "todo").length;
+    const inProgress = tasks.filter((t) => t.status === "inprogress").length;
+    const completed = tasks.filter((t) => t.status === "completed").length;
     const overdue = tasks.filter(
       (t) =>
-        (t.status !== "completed" && t.status !== "done") &&
+        t.status !== "completed" &&
         t.dueDate &&
         new Date(t.dueDate) < now
     ).length;
@@ -54,21 +56,21 @@ export async function GET(request: NextRequest) {
       inProgress: weekDays.map((day) =>
         tasks.filter(
           (t) =>
-            (t.status === "inprogress" || t.status === "in-progress") &&
+            t.status === "inprogress" &&
             format(new Date(t.createdAt), "yyyy-MM-dd") === format(day, "yyyy-MM-dd")
         ).length
       ),
       completed: weekDays.map((day) =>
         tasks.filter(
           (t) =>
-            (t.status === "completed" || t.status === "done") &&
+            t.status === "completed" &&
             format(new Date(t.updatedAt || now), "yyyy-MM-dd") === format(day, "yyyy-MM-dd")
         ).length
       ),
       overdue: weekDays.map((day) =>
         tasks.filter(
           (t) =>
-            (t.status !== "completed" && t.status !== "done") &&
+            t.status !== "completed" &&
             t.dueDate &&
             new Date(t.dueDate) < day
         ).length
