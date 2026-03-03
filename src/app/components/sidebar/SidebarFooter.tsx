@@ -44,37 +44,22 @@ export function SidebarFooter({ collapsed }: SidebarFooterProps) {
 
   return (
     <div
-      style={{
-        position: "relative",
-        padding: collapsed ? "12px" : "12px 16px",
-        borderTop: "1px solid rgba(255,255,255,0.25)",
-        display: "flex",
-        flexDirection: collapsed ? "column" : "row", // <-- IMPORTANT
-        alignItems: "center",
-        gap: 12,
-      }}
+      className={`relative border-t border-white/25 flex items-center gap-3 ${
+        collapsed ? "flex-col p-3" : "flex-row px-4 py-3"
+      }`}
     >
       {/* Avatar */}
       <div
         onClick={() => collapsed && setShowProfile((v) => !v)}
-        style={{
-          width: 48,
-          height: 48,
-          borderRadius: "50%",
-          background: "#798CC3",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 16,
-          cursor: collapsed ? "pointer" : "default",
-          overflow: "hidden",
-        }}
+        className={`w-12 h-12 rounded-full bg-blue-400 flex items-center justify-center text-base overflow-hidden flex-shrink-0 ${
+          collapsed ? "cursor-pointer" : "cursor-default"
+        }`}
       >
         {user.profilePicture ? (
           <img
             src={user.profilePicture}
             alt={`${user.firstName} ${user.lastName}`}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            className="w-full h-full object-cover"
           />
         ) : (
           `${user.firstName[0]}${user.lastName[0]}`
@@ -83,35 +68,20 @@ export function SidebarFooter({ collapsed }: SidebarFooterProps) {
 
       {/* Show text ONLY when sidebar is open */}
       {!collapsed && (
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <p style={{ margin: 0, fontWeight: 200, fontSize: 11 }}>
+        <div className="flex flex-col">
+          <p className="m-0 font-light text-xs">
             {user.firstName} {user.lastName} (
-            {user.role?.charAt(0).toUpperCase() + (user.role?.slice(1) || "User")}
+            {user.role?.charAt(0).toUpperCase() +
+              (user.role?.slice(1) || "User")}
             )
           </p>
-          <p style={{ margin: 0, fontSize: 8, opacity: 0.7 }}>
-            {user.email}
-          </p>
+          <p className="m-0 text-[8px] opacity-70">{user.email}</p>
         </div>
       )}
 
       {/* Collapsed popup */}
       {collapsed && showProfile && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: 48,
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "#1f2437",
-            padding: "10px 12px",
-            borderRadius: 8,
-            boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-            minWidth: 180,
-            textAlign: "center",
-            zIndex: 100,
-          }}
-        ></div>
+        <div className="absolute bottom-[48px] left-1/2 -translate-x-1/2 bg-slate-800 px-3 py-2.5 rounded-lg shadow-lg min-w-[180px] text-center z-50" />
       )}
     </div>
   );

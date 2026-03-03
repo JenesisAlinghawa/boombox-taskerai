@@ -86,122 +86,53 @@ export default function CreateChannelModal({
 
   return isOpen ? (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0, 0, 0, 0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-      }}
+      className="fixed inset-0 bg-black/50 flex justify-center items-center z-[1000] p-5"
       onClick={onClose}
     >
       <div
-        style={{
-          background: COLORS.cardBg,
-          borderRadius: "8px",
-          padding: "24px",
-          maxWidth: "400px",
-          width: "90%",
-          color: COLORS.text,
-        }}
+        className="w-[min(96%,400px)] max-w-[400px] bg-slate-900 rounded-lg border border-black/10 p-6 text-white"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 style={{ margin: "0 0 16px", fontSize: 18, fontWeight: 600 }}>
-          Create Channel
-        </h2>
-
-        <div style={{ marginBottom: "16px" }}>
-          <label
-            style={{
-              display: "block",
-              marginBottom: "6px",
-              fontSize: "13px",
-              fontWeight: 500,
-            }}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Create Channel</h2>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-300"
           >
-            Channel Name
-          </label>
+            ✕
+          </button>
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-2">Channel Name</label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="# channel-name"
-            style={{
-              width: "100%",
-              padding: "10px 12px",
-              border: `1px solid ${COLORS.border}`,
-              borderRadius: "6px",
-              background: COLORS.bg,
-              color: COLORS.text,
-              fontSize: "13px",
-              boxSizing: "border-box",
-            }}
+            className="w-full px-3 py-2 rounded-lg bg-blue-950 text-white border border-white/10"
           />
         </div>
 
-        <div style={{ marginBottom: "16px" }}>
-          <label
-            style={{
-              display: "block",
-              marginBottom: "6px",
-              fontSize: "13px",
-              fontWeight: 500,
-            }}
-          >
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-2">
             Description (optional)
           </label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="What's this channel about?"
-            style={{
-              width: "100%",
-              padding: "10px 12px",
-              border: `1px solid ${COLORS.border}`,
-              borderRadius: "6px",
-              background: COLORS.bg,
-              color: COLORS.text,
-              fontSize: "13px",
-              boxSizing: "border-box",
-              resize: "vertical",
-              minHeight: "80px",
-            }}
+            className="w-full px-3 py-2 rounded-lg bg-blue-950 text-white border border-white/10 min-h-[80px] resize-y"
           />
         </div>
 
-        <div style={{ marginBottom: "16px" }}>
-          <label
-            style={{
-              display: "block",
-              marginBottom: "6px",
-              fontSize: "13px",
-              fontWeight: 500,
-            }}
-          >
-            Add Members
-          </label>
-          <div
-            style={{
-              maxHeight: "150px",
-              overflowY: "auto",
-              border: `1px solid ${COLORS.border}`,
-              borderRadius: "6px",
-              background: COLORS.bg,
-              padding: "8px",
-            }}
-          >
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-2">Add Members</label>
+          <div className="max-h-[150px] overflow-y-auto border border-white/10 rounded-lg p-2 bg-blue-950">
             {users.map((user) => (
               <label
                 key={user.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  padding: "8px",
-                  cursor: "pointer",
-                  fontSize: "13px",
-                }}
+                className="flex items-center gap-3 p-2 cursor-pointer text-sm"
               >
                 <input
                   type="checkbox"
@@ -215,59 +146,30 @@ export default function CreateChannelModal({
                       );
                     }
                   }}
-                  style={{ marginRight: "8px", cursor: "pointer" }}
+                  className="w-4 h-4"
                 />
-                {user.name}{" "}
+                <span className="flex-1">{user.name}</span>
                 {user.id === currentUserId && (
-                  <span style={{ color: COLORS.primary, marginLeft: "4px" }}>
-                    (You)
-                  </span>
+                  <span className="text-blue-400">(You)</span>
                 )}
               </label>
             ))}
           </div>
         </div>
 
-        {error && (
-          <div
-            style={{ color: "#ef4444", marginBottom: "16px", fontSize: "13px" }}
-          >
-            {error}
-          </div>
-        )}
+        {error && <div className="text-red-500 mb-4 text-sm">{error}</div>}
 
-        <div style={{ display: "flex", gap: "8px" }}>
+        <div className="flex gap-2">
           <button
             onClick={onClose}
-            style={{
-              flex: 1,
-              padding: "10px 12px",
-              background: COLORS.border,
-              color: COLORS.text,
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer",
-              fontSize: "13px",
-              fontWeight: 500,
-            }}
+            className="flex-1 px-3 py-2 rounded-lg bg-white/5 text-white border border-white/10"
           >
             Cancel
           </button>
           <button
             onClick={handleCreate}
             disabled={loading}
-            style={{
-              flex: 1,
-              padding: "10px 12px",
-              background: COLORS.primary,
-              color: "#fff",
-              border: "none",
-              borderRadius: "6px",
-              cursor: loading ? "not-allowed" : "pointer",
-              fontSize: "13px",
-              fontWeight: 500,
-              opacity: loading ? 0.6 : 1,
-            }}
+            className="flex-1 px-3 py-2 rounded-lg bg-blue-600 text-white font-semibold disabled:opacity-60"
           >
             {loading ? "Creating..." : "Create"}
           </button>

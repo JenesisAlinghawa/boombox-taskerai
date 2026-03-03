@@ -25,7 +25,9 @@ export async function GET(request: NextRequest) {
       },
       select: {
         id: true,
+        title: true,
         status: true,
+        priority: true,
         dueDate: true,
         createdAt: true,
         updatedAt: true,
@@ -110,6 +112,14 @@ export async function GET(request: NextRequest) {
       inProgress,
       completed,
       overdue,
+      pendingTasks: tasks
+        .filter((t) => t.status === "todo")
+        .map((t) => ({
+          id: t.id,
+          title: t.title,
+          priority: t.priority || "medium",
+          dueDate: t.dueDate ? new Date(t.dueDate).toLocaleDateString() : undefined,
+        })),
       weeklyData,
       calendarTasks,
       aiInsight,

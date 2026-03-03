@@ -44,16 +44,19 @@ export default function LoginForm() {
   return (
     <div
       style={{
-        width: "100vw",
-        height: "100vh",
-        background: "transparent",
+        width: "75vw",
+        height: "80vh",
+        background: "rgba(0, 99, 200, 0.10)",
         position: "relative",
         overflow: "hidden",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        left: 100,
         bottom: 10,
+        boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+        borderRadius: 4,
+        backdropFilter: "blur(2px)",
+        WebkitBackdropFilter: "blur(5px)",
       }}
     >
       <form
@@ -70,7 +73,7 @@ export default function LoginForm() {
           padding: "40px 20px",
         }}
       >
-        <div style={{ textAlign: "center", color: "#2c3e50" }}>
+        <div style={{ textAlign: "center", color: "#ffffff" }}>
           <h1 style={{ fontSize: 24, fontWeight: 400, margin: 0 }}>
             LOGIN TO TASKERAI
           </h1>
@@ -78,7 +81,7 @@ export default function LoginForm() {
             style={{
               fontSize: 16,
               margin: "18px 40px 32px",
-              color: "#34495e",
+              color: "#ffffff",
               width: 200,
             }}
           >
@@ -155,7 +158,7 @@ export default function LoginForm() {
         <a
           href="/auth/forgotPassword"
           style={{
-            color: "#5d8bb1",
+            color: "#6495FF",
             fontSize: 12,
             textDecoration: "none",
             marginLeft: 180,
@@ -186,11 +189,11 @@ export default function LoginForm() {
         </button>
 
         {/* Create Account */}
-        <p style={{ color: "#34495e", fontSize: 14, marginTop: 20 }}>
+        <p style={{ color: "#fffffff5", fontSize: 12, marginTop: 20 }}>
           Don't have an account?{" "}
           <a
             href="/auth/register"
-            style={{ color: "#01162B", textDecoration: "none" }}
+            style={{ color: "#6495FF", textDecoration: "underlined" }}
           >
             Create one
           </a>

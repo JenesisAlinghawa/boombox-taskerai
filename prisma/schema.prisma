@@ -35,6 +35,8 @@ model User {
   active              Boolean   @default(false)
   lastActive          DateTime?
   profilePicture      String?
+  emailNotifications  Boolean   @default(true)
+  messageNotifications Boolean  @default(true)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   
@@ -49,6 +51,7 @@ model User {
   receivedDirectMessages DirectMessage[] @relation("ReceivedDirectMessages")
   notifications       Notification[]
   logs                Log[]
+  auditLogs           AuditLog[] @relation("AuditLogs")
   
   ownedTeams          Team[]    @relation("TeamOwner")
   teamMemberships     TeamMember[]
@@ -159,11 +162,16 @@ model DirectMessage {
   senderId  Int
   recipientId Int
   content   String
+  attachments String[]
+  reactions Json[]
   isRead    Boolean @default(false)
+  parentMessageId Int?
   createdAt DateTime @default(now())
 
   sender    User @relation("SentDirectMessages", fields: [senderId], references: [id], onDelete: Cascade)
   recipient User @relation("ReceivedDirectMessages", fields: [recipientId], references: [id], onDelete: Cascade)
+  parentMessage DirectMessage? @relation("DirectMessageReplies", fields: [parentMessageId], references: [id], onDelete: Cascade)
+  replies DirectMessage[] @relation("DirectMessageReplies")
 }
 
 model Notification {
@@ -213,4 +221,23 @@ model TeamMember {
   inviter User? @relation("TeamMemberInviter", fields: [inviterId], references: [id], onDelete: SetNull)
 
   @@unique([teamId, userId])
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int?
+  action     String
+  resource   String
+  resourceId Int?
+  details    Json     @default("{}")
+  ipAddress  String   @default("")
+  success    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  user       User?    @relation("AuditLogs", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([resourceId])
+  @@index([createdAt])
 }

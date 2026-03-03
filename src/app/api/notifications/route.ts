@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { createNotification } from '@/lib/notificationService'
 
 export async function GET(req: NextRequest) {
   try {
@@ -8,6 +9,20 @@ export async function GET(req: NextRequest) {
 
     if (!userId) {
       return NextResponse.json({ error: 'User ID required' }, { status: 400 })
+    }
+
+    // check user preferences
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { messageNotifications: true },
+    })
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    if (!user.messageNotifications) {
+      // user has disabled in‑app notifications; return empty list
+      return NextResponse.json({ notifications: [] })
     }
 
     const notifications = await prisma.notification.findMany({
@@ -32,6 +47,30 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ notifications: transformedNotifications })
   } catch (error: any) {
     console.error('Get notifications error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+import { sendEvent } from '@/lib/sse'
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { receiverId, type, data } = body;
+
+    if (!receiverId || !type) {
+      return NextResponse.json({ error: 'receiverId and type required' }, { status: 400 })
+    }
+
+    const notif = await createNotification({
+      receiverId: Number(receiverId),
+      type,
+      data: data || {},
+    });
+
+    return NextResponse.json({ notification: notif })
+  } catch (error: any) {
+    console.error('Create notification error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

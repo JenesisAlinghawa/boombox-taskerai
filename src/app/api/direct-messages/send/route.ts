@@ -14,11 +14,11 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { recipientId, content } = await req.json()
+    const { recipientId, content, attachments, parentMessageId } = await req.json()
 
-    if (!recipientId || !content) {
+    if (!recipientId || (!content?.trim() && (!attachments || attachments.length === 0))) {
       return NextResponse.json(
-        { error: 'Recipient ID and content required' },
+        { error: 'Recipient ID and either content or attachments required' },
         { status: 400 }
       )
     }
@@ -40,10 +40,22 @@ export async function POST(req: NextRequest) {
         senderId: user.id,
         recipientId,
         content,
+        attachments: attachments || [],
+        parentMessageId: parentMessageId ? parseInt(parentMessageId) : null,
       },
       include: {
         sender: {
           select: { id: true, firstName: true, lastName: true, profilePicture: true },
+        },
+        parentMessage: {
+          select: {
+            id: true,
+            content: true,
+            createdAt: true,
+            sender: {
+              select: { id: true, firstName: true, lastName: true, profilePicture: true },
+            },
+          },
         },
       },
     })

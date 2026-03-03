@@ -15,16 +15,14 @@ export const PageContainer = ({ children, title }: PageContainerProps) => {
         width: "100%",
         display: "flex",
         flexDirection: "column",
-        background: "rgba(0, 68, 220, 0.2)",
-        backdropFilter: "blur(1px)",
-        WebkitBackdropFilter: "blur(92px)",
-        borderRadius: 12,
-        padding: "10px 20px",
+        background: "transparent",
+        padding: 0,
+        margin: 0,
         overflow: "hidden",
       }}
     >
       {title && (
-        <div className="mb-2">
+        <div className="m-2">
           <h1
             style={{
               color: "#ffffff",

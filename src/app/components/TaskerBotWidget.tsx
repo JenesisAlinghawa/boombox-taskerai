@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Send, Loader, X, MessageCircle } from "lucide-react";
 import { getCurrentUser } from "@/utils/sessionManager";
 import {
@@ -59,6 +60,7 @@ interface TaskerBotWidgetProps {
 export const TaskerBotWidget: React.FC<TaskerBotWidgetProps> = ({
   excludePages = ["/settings"],
 }) => {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [messages, setMessages] = useState<BotMessage[]>([]);
@@ -67,6 +69,10 @@ export const TaskerBotWidget: React.FC<TaskerBotWidgetProps> = ({
   const [initialized, setInitialized] = useState(false);
   const [teamMembers, setTeamMembers] = useState<User[]>([]);
   const [shouldShow, setShouldShow] = useState(true);
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionMatches, setMentionMatches] = useState<User[]>([]);
+  const [existingTasks, setExistingTasks] = useState<any[]>([]);
 
   // Task creation state
   const [creationStep, setCreationStep] = useState<TaskCreationStep>(null);
@@ -98,30 +104,57 @@ export const TaskerBotWidget: React.FC<TaskerBotWidgetProps> = ({
 
             // Fetch team members
             try {
-              const membersRes = await fetch("/api/users/assignable");
+              const membersRes = await fetch("/api/users/assignable", {
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-user-id": String(user.id),
+                },
+              });
               if (membersRes.ok) {
                 const data = await membersRes.json();
+                console.log("Fetched team members:", data);
                 setTeamMembers(data.users || []);
+              } else {
+                console.error(
+                  "Failed to fetch team members:",
+                  membersRes.status,
+                );
               }
             } catch (e) {
               console.error("Failed to fetch team members", e);
             }
 
-            if (messages.length === 0) {
-              setMessages([
-                {
-                  id: "welcome",
-                  type: "bot",
-                  message:
-                    "👋 Hi! I'm TaskerBot, your task assistant. What would you like to do?",
-                  timestamp: new Date().toLocaleTimeString(),
-                  buttons: [
-                    { label: "Create tasks", action: "start_creation" },
-                    { label: "Optimize tasks", action: "optimize" },
-                  ],
+            // Fetch existing tasks to provide context to AI
+            try {
+              const tasksRes = await fetch("/api/tasks", {
+                headers: {
+                  "x-user-id": String(user.id),
                 },
-              ]);
+              });
+              if (tasksRes.ok) {
+                const tasksData = await tasksRes.json();
+                const tasks = Array.isArray(tasksData?.tasks)
+                  ? tasksData.tasks
+                  : [];
+                setExistingTasks(tasks);
+                console.log("Fetched tasks for AI context:", tasks);
+              }
+            } catch (e) {
+              console.error("Failed to fetch tasks", e);
             }
+
+            // Request initial greeting from AI
+            if (messages.length === 0) {
+              try {
+                const aiResponse = await generateAIResponse(
+                  "Greet the user and introduce yourself as TaskerBot. Mention that you can help them create tasks or optimize existing tasks. Keep it brief and friendly.",
+                );
+                addBotMessage(aiResponse.response, aiResponse.buttons);
+              } catch (error) {
+                console.error("Failed to get initial greeting", error);
+              }
+            }
+
             setInitialized(true);
           }
         } catch (e) {
@@ -167,6 +200,10 @@ export const TaskerBotWidget: React.FC<TaskerBotWidgetProps> = ({
         undefined,
         "title",
       );
+    } else if (action === "view_tasks") {
+      // Redirect to tasks page
+      setIsOpen(false);
+      router.push("/tasks");
     } else if (action === "optimize") {
       setCreationStep(null);
       // Handle optimization
@@ -337,6 +374,33 @@ export const TaskerBotWidget: React.FC<TaskerBotWidgetProps> = ({
       return true;
     }
 
+    // If we're expecting an assignee
+    if (creationStep === "assignee") {
+      console.log("handleNaturalLanguage - assignee step, text:", text);
+      // Check if the user mentioned someone
+      const mentionedUserId = extractMentionedUserId(text);
+      console.log("handleNaturalLanguage - mentionedUserId:", mentionedUserId);
+      if (mentionedUserId) {
+        setTaskData((prev) => ({ ...prev, assigneeId: mentionedUserId }));
+        setCreationStep("duedate");
+        addBotMessage(
+          "When is this task due? (You can say 'no due date')",
+          undefined,
+          "duedate",
+        );
+        return true;
+      }
+
+      // Otherwise, skip assignee and move to due date
+      setCreationStep("duedate");
+      addBotMessage(
+        "When is this task due? (You can say 'no due date')",
+        undefined,
+        "duedate",
+      );
+      return true;
+    }
+
     // If we're expecting a due date
     if (creationStep === "duedate") {
       setTaskData((prev) => ({ ...prev, dueDate: text }));
@@ -447,13 +511,24 @@ export const TaskerBotWidget: React.FC<TaskerBotWidgetProps> = ({
     input: string,
   ): Promise<{ response: string; buttons?: BotButton[] }> => {
     try {
+      // Build task context for the AI
+      let taskContext = "";
+      if (existingTasks.length > 0) {
+        taskContext = `\n\nCurrent user tasks:\n${existingTasks
+          .map(
+            (task) =>
+              `- ${task.title} (Status: ${task.status}, Priority: ${task.priority || "N/A"})`,
+          )
+          .join("\n")}`;
+      }
+
       const response = await fetch("/api/task-chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          message: input,
+          message: input + taskContext,
           userId: currentUser?.id,
         }),
       });
@@ -488,23 +563,46 @@ export const TaskerBotWidget: React.FC<TaskerBotWidgetProps> = ({
         body: JSON.stringify({
           title: taskData.title,
           description: taskData.description || "",
-          status: "pending",
+          status: "todo",
           priority: taskData.priority || "medium",
           dueDate: taskData.dueDate,
-          assignedToId: taskData.assigneeId,
+          assigneeId: taskData.assigneeId,
           tags: ["taskerbot"],
         }),
       });
 
       if (response.ok) {
         const created = await response.json();
+
+        // Refresh existing tasks list so AI has updated context
+        try {
+          const tasksRes = await fetch("/api/tasks", {
+            headers: {
+              "x-user-id": String(currentUser?.id),
+            },
+          });
+          if (tasksRes.ok) {
+            const tasksData = await tasksRes.json();
+            const tasks = Array.isArray(tasksData?.tasks)
+              ? tasksData.tasks
+              : [];
+            setExistingTasks(tasks);
+          }
+        } catch (e) {
+          console.error("Failed to refresh tasks", e);
+        }
+
         addBotMessage(
           `🎉 Task created! "${taskData.title}"\n\n✅ Ready to create another?`,
           [
             { label: "Create another task", action: "start_creation" },
-            { label: "Optimize tasks", action: "optimize" },
+            { label: "View in Tasks", action: "view_tasks" },
           ],
         );
+
+        // Reset task creation state for next task
+        setTaskData({});
+        setCreationStep(null);
       } else {
         addBotMessage("❌ Failed to create task. Please try again.");
       }
@@ -514,11 +612,118 @@ export const TaskerBotWidget: React.FC<TaskerBotWidgetProps> = ({
     }
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInput(value);
+
+    // Check for @ mention
+    const lastAtIndex = value.lastIndexOf("@");
+    if (lastAtIndex !== -1 && lastAtIndex === value.length - 1) {
+      // Just typed @ with nothing after - show all members except self
+      setMentionQuery("");
+      const filteredMembers = teamMembers.filter(
+        (m) => m.id !== currentUser?.id,
+      );
+      setMentionMatches(filteredMembers);
+      setShowMentions(filteredMembers.length > 0);
+    } else if (lastAtIndex !== -1) {
+      const afterAt = value.substring(lastAtIndex + 1);
+      // Only show mentions if we're in the middle of typing a mention (no spaces after @)
+      if (!afterAt.includes(" ")) {
+        const query = afterAt.toLowerCase();
+        setMentionQuery(query);
+        const matches = teamMembers
+          .filter((m) => m.id !== currentUser?.id) // Exclude self
+          .filter(
+            (member) =>
+              `${member.firstName} ${member.lastName}`
+                .toLowerCase()
+                .includes(query) || member.email.toLowerCase().includes(query),
+          );
+        setMentionMatches(matches);
+        setShowMentions(matches.length > 0);
+      } else {
+        setShowMentions(false);
+      }
+    } else {
+      setShowMentions(false);
+    }
+  };
+
+  const handleSelectMention = (user: User) => {
+    const lastAtIndex = input.lastIndexOf("@");
+    const beforeAt = input.substring(0, lastAtIndex);
+    const mentionText = `@${user.firstName} ${user.lastName}`;
+    setInput(beforeAt + mentionText + " ");
+    setShowMentions(false);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey && !sending) {
       e.preventDefault();
       handleSendMessage();
     }
+  };
+
+  const extractMentionedUserId = (message: string): number | null => {
+    // Parse mentions in the format @FirstName LastName
+    const mentionRegex = /@([A-Za-z]+\s+[A-Za-z]+)/;
+    const match = message.match(mentionRegex);
+
+    console.log("extractMentionedUserId - message:", message);
+    console.log("extractMentionedUserId - match:", match);
+    console.log("extractMentionedUserId - teamMembers:", teamMembers);
+
+    if (match && match[1]) {
+      const mentionedName = match[1];
+      console.log("extractMentionedUserId - mentionedName:", mentionedName);
+      // Find the user with matching name
+      const mentionedUser = teamMembers.find(
+        (member) =>
+          `${member.firstName} ${member.lastName}`.toLowerCase() ===
+          mentionedName.toLowerCase(),
+      );
+      console.log("extractMentionedUserId - mentionedUser:", mentionedUser);
+      return mentionedUser?.id || null;
+    }
+    return null;
+  };
+
+  const renderMessageWithMentions = (message: string) => {
+    // Parse mentions in the format @FirstName LastName
+    const mentionRegex = /@([A-Za-z]+\s+[A-Za-z]+)/g;
+    const parts: (string | React.ReactNode)[] = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = mentionRegex.exec(message)) !== null) {
+      // Add text before mention
+      if (match.index > lastIndex) {
+        parts.push(message.substring(lastIndex, match.index));
+      }
+
+      // Add mention with blue font color
+      parts.push(
+        <span
+          key={`mention-${match.index}`}
+          style={{
+            color: "#60a5fa",
+            fontWeight: "600",
+          }}
+        >
+          {match[0]}
+        </span>,
+      );
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Add remaining text
+    if (lastIndex < message.length) {
+      parts.push(message.substring(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : message;
   };
 
   if (!shouldShow) return null;
@@ -644,7 +849,7 @@ export const TaskerBotWidget: React.FC<TaskerBotWidgetProps> = ({
                         wordBreak: "break-word",
                       }}
                     >
-                      {msg.message}
+                      {renderMessageWithMentions(msg.message)}
                     </div>
                   </div>
                 ) : (
@@ -753,27 +958,81 @@ export const TaskerBotWidget: React.FC<TaskerBotWidgetProps> = ({
               borderTop: "1px solid rgba(255,255,255,0.1)",
               display: "flex",
               gap: "8px",
-              alignItems: "center",
+              alignItems: "flex-start",
               background: "rgba(0,0,0,0.2)",
+              position: "relative",
             }}
           >
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask or create a task..."
-              style={{
-                flex: 1,
-                padding: "8px 12px",
-                borderRadius: "20px",
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.15)",
-                color: "#fff",
-                fontSize: "12px",
-                outline: "none",
-              }}
-              disabled={sending}
-            />
+            <div style={{ flex: 1, position: "relative" }}>
+              <input
+                value={input}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask or create a task... (type @ to mention)"
+                style={{
+                  width: "100%",
+                  padding: "8px 12px",
+                  borderRadius: "20px",
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  color: "#fff",
+                  fontSize: "12px",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+                disabled={sending}
+              />
+              {/* Mentions Dropdown */}
+              {showMentions && mentionMatches.length > 0 && (
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: "100%",
+                    left: 0,
+                    right: 0,
+                    background: "rgba(30, 30, 40, 0.95)",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                    borderRadius: "8px",
+                    maxHeight: "200px",
+                    overflowY: "auto",
+                    marginBottom: "4px",
+                    zIndex: 1000,
+                  }}
+                >
+                  {mentionMatches.map((user) => (
+                    <div
+                      key={user.id}
+                      onClick={() => handleSelectMention(user)}
+                      style={{
+                        padding: "8px 12px",
+                        cursor: "pointer",
+                        borderBottom: "1px solid rgba(255,255,255,0.05)",
+                        transition: "background 0.2s",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background =
+                          "rgba(255,255,255,0.1)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                      }}
+                    >
+                      <div style={{ color: "#fff", fontSize: "12px" }}>
+                        {user.firstName} {user.lastName}
+                      </div>
+                      <div
+                        style={{
+                          color: "rgba(255,255,255,0.6)",
+                          fontSize: "11px",
+                        }}
+                      >
+                        {user.email}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <button
               onClick={handleSendMessage}
               disabled={sending || !input.trim()}

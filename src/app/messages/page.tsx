@@ -9,7 +9,6 @@ import {
   MessageSquare,
   Clock,
   Paperclip,
-  MoreVertical,
   Edit2,
   Trash2,
   Reply,
@@ -65,6 +64,20 @@ interface Message {
   isEdited: boolean;
   isDeleted?: boolean;
   parentMessageId?: number;
+  parentMessage?: {
+    id: number;
+    content: string;
+    createdAt: string;
+    sender: {
+      id: number;
+      firstName: string;
+      lastName: string;
+      profilePicture?: string;
+    };
+  };
+  _count?: {
+    replies: number;
+  };
   createdAt: string;
   sender: User;
 }
@@ -75,9 +88,11 @@ type ViewType = "channels" | "dms";
 const ChannelListItem = React.memo(function ChannelListItem({
   channel,
   onSelect,
+  unreadCount,
 }: {
   channel: Channel;
   onSelect: (channel: Channel) => void;
+  unreadCount?: number;
 }) {
   const [showTooltip, setShowTooltip] = React.useState(false);
 
@@ -86,81 +101,36 @@ const ChannelListItem = React.memo(function ChannelListItem({
       onClick={() => onSelect(channel)}
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "4px 4px 4px 4px",
-        cursor: "pointer",
-        borderRadius: "8px",
-        background: "transparent",
-        position: "relative",
-        width: "fit-content",
-      }}
+      className="relative flex items-center justify-center p-1 rounded-md cursor-pointer w-fit"
     >
-      <div
-        style={{
-          width: "32px",
-          height: "32px",
-          borderRadius: "50%",
-          background: "#fff",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: "16px",
-          color: "#798CC3",
-          fontWeight: "600",
-          flexShrink: 0,
-          position: "relative",
-        }}
-      >
+      <div className="relative w-8 h-8 rounded-full bg-white flex items-center justify-center text-[16px] text-[#798CC3] font-semibold overflow-hidden">
         {channel.profilePicture ? (
           <img
             src={channel.profilePicture}
             alt={channel.name}
-            style={{
-              width: "100%",
-              height: "100%",
-              borderRadius: "50%",
-              objectFit: "cover",
-            }}
+            className="w-full h-full rounded-full object-cover"
           />
         ) : (
           channel.name[0].toUpperCase()
         )}
+
+        {unreadCount && unreadCount > 0 && (
+          <div
+            className="absolute -bottom-1 -right-1 h-3 min-w-[14px] rounded-full bg-red-500 text-white text-[7px] font-extrabold flex items-center justify-center px-1"
+            style={{ fontFamily: "var(--font-inria-sans)" }}
+          >
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </div>
+        )}
       </div>
+
       {showTooltip && (
         <div
-          style={{
-            position: "absolute",
-            bottom: "100%",
-            left: "50%",
-            transform: "translateX(-50%)",
-            marginBottom: "8px",
-            background: "rgba(0, 0, 0, 0.9)",
-            color: "#fff",
-            padding: "6px 10px 6px 10px",
-            borderRadius: "6px",
-            fontSize: "13px",
-            fontFamily: "var(--font-inria-sans)",
-            whiteSpace: "nowrap",
-            zIndex: 1000,
-            pointerEvents: "none",
-            animation: "fadeIn 0.2s",
-          }}
+          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black/90 text-white text-xs rounded-md px-2 py-1 z-50 whitespace-nowrap pointer-events-none"
+          style={{ fontFamily: "var(--font-inria-sans)" }}
         >
           {channel.name}
-          <div
-            style={{
-              position: "absolute",
-              top: "100%",
-              left: "50%",
-              transform: "translateX(-50%)",
-              borderLeft: "4px solid transparent",
-              borderRight: "4px solid transparent",
-              borderTop: "4px solid rgba(0, 0, 0, 0.9)",
-            }}
-          />
+          <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-black/90" />
         </div>
       )}
     </div>
@@ -184,102 +154,32 @@ const UserListItem = React.memo(function UserListItem({
       onClick={() => onSelect(user)}
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "4px 4px 4px 4px",
-        cursor: "pointer",
-        borderRadius: "8px",
-        background: "transparent",
-        position: "relative",
-        width: "fit-content",
-      }}
+      className="relative flex items-center justify-center p-1 rounded-md cursor-pointer w-fit"
     >
-      <div
-        style={{
-          position: "relative",
-          width: "32px",
-          height: "32px",
-          flexShrink: 0,
-        }}
-      >
-        <div
-          style={{
-            width: "32px",
-            height: "32px",
-            borderRadius: "50%",
-            background: "#fff",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "16px",
-            color: "#798CC3",
-            fontWeight: "600",
-            position: "relative",
-          }}
-        >
+      <div className="relative w-8 h-8 flex-shrink-0">
+        <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-[16px] text-[#798CC3] font-semibold overflow-hidden">
           {user.profilePicture ? (
             <img
               src={user.profilePicture}
               alt={user.firstName}
-              style={{
-                width: "100%",
-                height: "100%",
-                borderRadius: "50%",
-                objectFit: "cover",
-              }}
+              className="w-full h-full rounded-full object-cover"
             />
           ) : (
             `${user.firstName[0]}${user.lastName[0]}`
           )}
         </div>
         <div
-          style={{
-            position: "absolute",
-            bottom: "-2px",
-            right: "-2px",
-            width: "12px",
-            height: "12px",
-            borderRadius: "50%",
-            background: isOnline ? "#10b981" : "#6b7280",
-            border: "2px solid rgba(13, 27, 42, 1)",
-            boxShadow: "0 0 0 1px rgba(30, 41, 59, 0.8)",
-          }}
+          className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 ${isOnline ? "bg-emerald-500" : "bg-gray-500"} border-[rgba(13,27,42,1)]`}
         />
       </div>
+
       {showTooltip && (
         <div
-          style={{
-            position: "absolute",
-            bottom: "100%",
-            left: "50%",
-            transform: "translateX(-50%)",
-            marginBottom: "8px",
-            background: "rgba(0, 0, 0, 0.9)",
-            color: "#fff",
-            padding: "6px 10px 6px 10px",
-            borderRadius: "6px",
-            fontSize: "13px",
-            fontFamily: "var(--font-inria-sans)",
-            whiteSpace: "nowrap",
-            zIndex: 1000,
-            pointerEvents: "none",
-            animation: "fadeIn 0.2s",
-          }}
+          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black/90 text-white text-xs rounded-md px-2 py-1 z-50 whitespace-nowrap pointer-events-none"
+          style={{ fontFamily: "var(--font-inria-sans)" }}
         >
           {user.firstName} {user.lastName}
-          <div
-            style={{
-              position: "absolute",
-              top: "100%",
-              left: "50%",
-              transform: "translateX(-50%)",
-              borderLeft: "4px solid transparent",
-              borderRight: "4px solid transparent",
-              borderTop: "4px solid rgba(0, 0, 0, 0.9)",
-            }}
-          />
+          <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-black/90" />
         </div>
       )}
     </div>
@@ -294,6 +194,9 @@ export default function MessagesPage() {
   const [selectedDMUser, setSelectedDMUser] = useState<User | null>(null);
 
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [channelUnreadCounts, setChannelUnreadCounts] = useState<
+    Record<number, number>
+  >({});
   const [dmConversations, setDmConversations] = useState<User[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [filteredMessages, setFilteredMessages] = useState<Message[]>([]);
@@ -305,9 +208,12 @@ export default function MessagesPage() {
   const [messageSearch, setMessageSearch] = useState("");
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const socketRef = useRef<Socket | null>(null);
 
   const [selectedUserTasks, setSelectedUserTasks] = useState<any[]>([]);
@@ -338,6 +244,33 @@ export default function MessagesPage() {
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  // Fetch channel unread counts periodically
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const fetchChannelUnreadCounts = async () => {
+      try {
+        const res = await fetch("/api/channels/unread", {
+          headers: {
+            "x-user-id": String(currentUser.id),
+          },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setChannelUnreadCounts(data.unreadCounts || {});
+        }
+      } catch (err) {
+        console.error("Failed to fetch channel unread counts:", err);
+      }
+    };
+
+    fetchChannelUnreadCounts();
+    const interval = setInterval(fetchChannelUnreadCounts, 3000);
+
+    return () => clearInterval(interval);
+  }, [currentUser]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -378,6 +311,22 @@ export default function MessagesPage() {
 
     socket.on("message:new", (newMessage: Message) => {
       setMessages((prev) => [...prev, newMessage]);
+
+      // Mark message as read if it's from the currently open DM user
+      if (
+        selectedDMUser &&
+        newMessage.sender.id === selectedDMUser.id &&
+        currentUser
+      ) {
+        fetch("/api/direct-messages/mark-as-read", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-id": String(currentUser.id),
+          },
+          body: JSON.stringify({ senderId: selectedDMUser.id }),
+        }).catch((err) => console.error("Failed to mark as read:", err));
+      }
     });
 
     socket.on("message:edited", (editedMessage: Message) => {
@@ -433,8 +382,33 @@ export default function MessagesPage() {
         done: 0,
         total: 0,
       });
+
+      // Subscribe to this specific channel room for real-time messages
+      if (currentUser && socketRef.current) {
+        socketRef.current.emit("channel:join", {
+          userId: currentUser.id,
+          channelId: selectedChannel.id,
+        });
+      }
+
+      // Poll for new messages every 2 seconds when viewing channels
+      const pollInterval = setInterval(fetchChannelMessages, 2000);
+
+      return () => clearInterval(pollInterval);
     } else if (selectedDMUser) {
       fetchDMMessages();
+
+      // Subscribe to this specific DM room for real-time messages
+      if (currentUser && socketRef.current) {
+        socketRef.current.emit("dm:join", {
+          userId: currentUser.id,
+          otherUserId: selectedDMUser.id,
+        });
+      }
+
+      // Poll for new messages every 2 seconds when viewing DMs
+      const pollInterval = setInterval(fetchDMMessages, 2000);
+
       if (currentUser && canViewUserTaskProgress(currentUser.role)) {
         fetchUserTaskProgress(selectedDMUser);
       } else {
@@ -447,6 +421,8 @@ export default function MessagesPage() {
           total: 0,
         });
       }
+
+      return () => clearInterval(pollInterval);
     } else {
       setMessages([]);
     }
@@ -569,7 +545,6 @@ export default function MessagesPage() {
   const fetchChannelMessages = async () => {
     if (!selectedChannel || !currentUser) return;
     try {
-      setMessages([]);
       const res = await fetch(
         `/api/messages?channelId=${selectedChannel.id}&limit=50`,
         {
@@ -580,7 +555,47 @@ export default function MessagesPage() {
       );
       if (res.ok) {
         const data = await res.json();
-        setMessages(data.messages || []);
+        const newMessages = data.messages || [];
+
+        // Only update if messages actually changed (avoid re-renders)
+        setMessages((prev) => {
+          const prevIds = new Set(prev.map((m: Message) => m.id));
+          const newIds = new Set(newMessages.map((m: Message) => m.id));
+
+          // If message count changed or IDs changed, update
+          if (
+            prev.length !== newMessages.length ||
+            ![...prevIds].every((id) => newIds.has(id))
+          ) {
+            return newMessages;
+          }
+          return prev;
+        });
+
+        // Mark messages in this channel as read in the database
+        try {
+          await fetch(`/api/channels/${selectedChannel.id}/mark-as-read`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-user-id": String(currentUser.id),
+            },
+          });
+          // Clear the unread count for this channel
+          setChannelUnreadCounts((prev) => ({
+            ...prev,
+            [selectedChannel.id]: 0,
+          }));
+          console.log(
+            "[Messages] Marked messages as read in channel:",
+            selectedChannel.id,
+          );
+        } catch (markErr) {
+          console.error(
+            "[Messages] Failed to mark channel messages as read:",
+            markErr,
+          );
+        }
       }
     } catch (err) {
       setError("Failed to fetch messages");
@@ -590,7 +605,6 @@ export default function MessagesPage() {
   const fetchDMMessages = async () => {
     if (!selectedDMUser || !currentUser) return;
     try {
-      setMessages([]);
       const res = await fetch(
         `/api/direct-messages?userId=${selectedDMUser.id}`,
         {
@@ -601,7 +615,40 @@ export default function MessagesPage() {
       );
       if (res.ok) {
         const data = await res.json();
-        setMessages(data.messages || []);
+        const newMessages = data.messages || [];
+
+        // Only update if messages actually changed (avoid re-renders)
+        setMessages((prev) => {
+          const prevIds = new Set(prev.map((m: Message) => m.id));
+          const newIds = new Set(newMessages.map((m: Message) => m.id));
+
+          // If message count changed or IDs changed, update
+          if (
+            prev.length !== newMessages.length ||
+            ![...prevIds].every((id) => newIds.has(id))
+          ) {
+            return newMessages;
+          }
+          return prev;
+        });
+
+        // Mark messages from this sender as read in the database
+        try {
+          await fetch("/api/direct-messages/mark-as-read", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-user-id": String(currentUser.id),
+            },
+            body: JSON.stringify({ senderId: selectedDMUser.id }),
+          });
+          console.log(
+            "[Messages] Marked messages as read from user:",
+            selectedDMUser.id,
+          );
+        } catch (markErr) {
+          console.error("[Messages] Failed to mark messages as read:", markErr);
+        }
       }
     } catch (err) {
       setError("Failed to fetch messages");
@@ -738,11 +785,49 @@ export default function MessagesPage() {
     }
   };
 
+  const handleAttachmentSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.[0]) {
+      setAttachmentFile(e.target.files[0]);
+    }
+  };
+
+  const uploadAttachment = async () => {
+    if (!attachmentFile) return;
+
+    setUploadingAttachment(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", attachmentFile);
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Failed to upload attachment");
+
+      const data = await res.json();
+      return data.url;
+    } catch (err) {
+      console.error("Error uploading attachment:", err);
+      alert("Failed to upload attachment");
+      return null;
+    } finally {
+      setUploadingAttachment(false);
+    }
+  };
+
   const sendMessage = async () => {
-    if (!messageInput.trim()) return;
+    if (!messageInput.trim() && !attachmentFile) return;
 
     setSendingMessage(true);
     try {
+      // Upload attachment if present
+      let attachmentUrl: string | null = null;
+      if (attachmentFile) {
+        attachmentUrl = await uploadAttachment();
+      }
+
       // Check if this is an optimization query and get AI response
       const optimizationResponse = await handleOptimizationQuery(messageInput);
 
@@ -756,6 +841,7 @@ export default function MessagesPage() {
               channelId: selectedChannel.id,
               content: messageInput,
               userId: currentUser.id,
+              attachments: attachmentUrl ? [attachmentUrl] : [],
               parentMessageId: replyingTo || undefined,
             }),
           },
@@ -773,6 +859,8 @@ export default function MessagesPage() {
 
         const data = await res.json();
         const newMessage = data.message;
+        // Ensure the message has the current user's full profile including picture
+        newMessage.sender = currentUser;
         setMessages([...messages, newMessage]);
 
         // If this was an optimization query, add bot response
@@ -804,6 +892,7 @@ export default function MessagesPage() {
         }
 
         setMessageInput("");
+        setAttachmentFile(null);
         setReplyingTo(null);
         setError("");
         setSendingMessage(false);
@@ -817,6 +906,7 @@ export default function MessagesPage() {
           body: JSON.stringify({
             recipientId: selectedDMUser.id,
             content: messageInput,
+            attachments: attachmentUrl ? [attachmentUrl] : [],
             parentMessageId: replyingTo || undefined,
           }),
         });
@@ -833,6 +923,8 @@ export default function MessagesPage() {
 
         const data = await res.json();
         const newMessage = data.message;
+        // Ensure the message has the current user's full profile including picture
+        newMessage.sender = currentUser;
         setMessages([...messages, newMessage]);
 
         // If this was an optimization query, add bot response
@@ -864,6 +956,7 @@ export default function MessagesPage() {
         }
 
         setMessageInput("");
+        setAttachmentFile(null);
         setReplyingTo(null);
         setError("");
       }
@@ -948,8 +1041,27 @@ export default function MessagesPage() {
     return false;
   };
 
+  // track messages that are currently being reacted to to prevent spam
+  const [reactingIds, setReactingIds] = useState<Set<number>>(new Set());
+
   const addReaction = async (messageId: number, emoji: string) => {
     if (!currentUser || (!selectedChannel && !selectedDMUser)) return;
+
+    // do not fire another request while one is in progress for this message
+    if (reactingIds.has(messageId)) return;
+
+    // if user already reacted with the same emoji, don't send another request
+    const existing = messages
+      .find((m) => m.id === messageId)
+      ?.reactions?.some(
+        (r) => r.emoji === emoji && r.userId === currentUser.id,
+      );
+    if (existing) {
+      // already reacted; nothing to do (we no longer toggle off)
+      return;
+    }
+
+    setReactingIds((prev) => new Set(prev).add(messageId));
 
     try {
       const endpoint = selectedChannel
@@ -970,6 +1082,12 @@ export default function MessagesPage() {
       );
     } catch (err) {
       console.error("Error adding reaction:", err);
+    } finally {
+      setReactingIds((prev) => {
+        const s = new Set(prev);
+        s.delete(messageId);
+        return s;
+      });
     }
   };
 
@@ -1136,60 +1254,25 @@ export default function MessagesPage() {
           }
         }
       `}</style>
-      <div style={{ display: "flex", height: "100%", gap: "12px" }}>
+      <div className="flex h-full gap-3">
         {/* Left Sidebar */}
-        <div
-          style={{
-            width: "56px",
-            flexShrink: 0,
-            display: "flex",
-            flexDirection: "column",
-            gap: "16px",
-          }}
-        >
+        <div className="w-14 flex-shrink-0 flex flex-col gap-4">
           {/* Channels Container */}
-          <PageContentCon
-            style={{
-              height: "40%",
-              minHeight: "200px",
-              maxHeight: "320px",
-              overflow: "visible",
-              display: "flex",
-              flexDirection: "column",
-              paddingTop: "16px",
-              paddingLeft: "8px",
-              paddingRight: "8px",
-              paddingBottom: "16px",
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: "12px",
-              backdropFilter: "blur(4px)",
-            }}
-          >
+          <div className="h-[40%] min-h-[200px] max-h-[320px] overflow-visible flex flex-col pt-4 px-0 pl-0 pr-0 pb-4 bg-white/6 border border-white/12 rounded-xl backdrop-blur-sm">
             {/* Channels Section */}
             <div
               style={{
+                   paddingLeft: "0px",
+                paddingRight: "0px",
                 display: "flex",
                 flexDirection: "column",
                 height: "100%",
               }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  marginBottom: "16px",
-                  paddingBottom: "12px",
-                  borderBottom: "1px solid rgba(255,255,255,0.1)",
-                }}
-              >
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
                 <h2
+                  className="text-[11px] font-normal m-0 text-white"
                   style={{
-                    fontSize: "11px",
-                    fontWeight: "400",
-                    margin: 0,
-                    color: "#fff",
                     fontFamily: "var(--font-inria-sans)",
                     letterSpacing: "0.3px",
                   }}
@@ -1197,34 +1280,19 @@ export default function MessagesPage() {
                   Channels
                 </h2>
                 <button
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "rgba(255,255,255,0.6)",
-                    padding: "0px 0px 0px 0px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
+                  onClick={() => setIsChannelModalOpen(true)}
+                  aria-label="Create channel"
+                  className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-500"
                 >
-                  <MoreVertical size={20} />
+                  <Plus size={14} />
                 </button>
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "12px",
-                  overflowY: "auto",
-                  overflowX: "hidden",
-                  flex: 1,
-                }}
-              >
+              <div className="flex flex-col items-center gap-3 overflow-y-auto overflow-x-hidden flex-1">
                 {filteredChannels.map((channel) => (
                   <ChannelListItem
                     key={channel.id}
                     channel={channel}
+                    unreadCount={channelUnreadCounts[channel.id] || 0}
                     onSelect={(ch) => {
                       setSelectedChannel(ch);
                       setSelectedDMUser(null);
@@ -1233,51 +1301,24 @@ export default function MessagesPage() {
                 ))}
               </div>
             </div>
-          </PageContentCon>
+          </div>
 
           {/* Conversations Container */}
-          <PageContentCon
-            style={{
-              flex: 1,
-              minHeight: "200px",
-              maxHeight: "420px",
-              overflow: "visible",
-              display: "flex",
-              flexDirection: "column",
-              paddingTop: "16px",
-              paddingLeft: "8px",
-              paddingRight: "8px",
-              paddingBottom: "16px",
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: "12px",
-              backdropFilter: "blur(4px)",
-            }}
-          >
+          <div className="flex-1 min-h-[200px] max-h-[420px] overflow-visible flex flex-col pt-4 px-0 pl-0 pr-0 pb-4 bg-white/6 border border-white/12 rounded-xl backdrop-blur-sm">
             {/* Conversation Section */}
             <div
               style={{
+                paddingLeft: "0px",
+                paddingRight: "0px",
                 display: "flex",
                 flexDirection: "column",
                 height: "100%",
               }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  marginBottom: "16px",
-                  paddingBottom: "12px",
-                  borderBottom: "1px solid rgba(255,255,255,0.1)",
-                }}
-              >
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
                 <h2
+                  className="text-[11px] font-normal m-0 text-white"
                   style={{
-                    fontSize: "11px",
-                    fontWeight: "400",
-                    margin: 0,
-                    color: "#fff",
                     fontFamily: "var(--font-inria-sans)",
                     letterSpacing: "0.3px",
                   }}
@@ -1285,16 +1326,7 @@ export default function MessagesPage() {
                   TEAM
                 </h2>
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "12px",
-                  overflowY: "auto",
-                  overflowX: "hidden",
-                  flex: 1,
-                }}
-              >
+              <div className="flex flex-col items-center gap-3 overflow-y-auto overflow-x-hidden flex-1">
                 {filteredDMs
                   .filter((u) => u && u.firstName && u.lastName)
                   .map((user) => {
@@ -1316,51 +1348,48 @@ export default function MessagesPage() {
                   })}
               </div>
             </div>
-          </PageContentCon>
+          </div>
         </div>
 
         {/* Main Chat Area */}
-        <PageContentCon
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          }}
-        >
+        <PageContentCon className="flex-1 flex flex-col overflow-hidden">
           {selectedChannel || selectedDMUser ? (
             <>
               {/* Header */}
-              <div
-                style={{
-                  paddingBottom: "16px",
-                  borderBottom: "1px solid rgba(255,255,255,0.1)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  justifyContent: "space-between",
-                }}
-              >
+              <div className="pb-4 border-b border-white/10 flex items-center gap-3 justify-between">
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: "50%",
-                      background: "#798CC3",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 14,
-                      color: "#fff",
-                      fontWeight: "600",
-                    }}
-                  >
-                    {selectedDMUser
-                      ? `${selectedDMUser.firstName[0]}${selectedDMUser.lastName[0]}`
-                      : selectedChannel
-                        ? selectedChannel.name[0].toUpperCase()
-                        : ""}
+                  <div className="w-11 h-11 rounded-full bg-[#798CC3] flex items-center justify-center text-white font-semibold overflow-hidden">
+                    {selectedDMUser ? (
+                      selectedDMUser.profilePicture ? (
+                        <img
+                          src={selectedDMUser.profilePicture}
+                          alt={selectedDMUser.firstName}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                        />
+                      ) : (
+                        `${selectedDMUser.firstName[0]}${selectedDMUser.lastName[0]}`
+                      )
+                    ) : selectedChannel ? (
+                      selectedChannel.profilePicture ? (
+                        <img
+                          src={selectedChannel.profilePicture}
+                          alt={selectedChannel.name}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                        />
+                      ) : (
+                        selectedChannel.name[0].toUpperCase()
+                      )
+                    ) : (
+                      ""
+                    )}
                   </div>
                   <div>
                     <div
@@ -1395,17 +1424,7 @@ export default function MessagesPage() {
               </div>
 
               {/* Messages */}
-              <div
-                style={{
-                  flex: 1,
-                  overflowY: "auto",
-                  padding: "16px 20px 16px 20px",
-                  marginTop: "16px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "12px",
-                }}
-              >
+              <div className="flex-1 overflow-y-auto px-5 pt-4 mt-4 flex flex-col gap-3">
                 {filteredMessages.map((msg, index) => {
                   const showTimestamp = shouldShowTimestamp(
                     msg,
@@ -1413,56 +1432,110 @@ export default function MessagesPage() {
                     filteredMessages,
                   );
                   return (
-                    <div key={msg.id}>
-                      {showTimestamp && (
+                    <div
+                      key={msg.id}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: msg.parentMessageId ? "4px" : "0",
+                      }}
+                    >
+                      {/* Render parent message if this is a reply */}
+                      {msg.parentMessage && (
                         <div
+                          id={`message-${msg.parentMessage.id}`}
                           style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            margin: "16px 0",
-                            gap: "12px",
+                            opacity: 0.65,
                           }}
                         >
-                          <div
-                            style={{
-                              flex: 1,
-                              height: "1px",
-                              background: "rgba(255,255,255,0.1)",
-                            }}
-                          />
-                          <p
-                            style={{
-                              fontSize: "11px",
-                              color: "rgba(255,255,255,0.5)",
-                              margin: 0,
-                              fontFamily: "var(--font-inria-sans)",
-                            }}
-                          >
-                            {formatMessageTime(msg.createdAt)}
-                          </p>
-                          <div
-                            style={{
-                              flex: 1,
-                              height: "1px",
-                              background: "rgba(255,255,255,0.1)",
-                            }}
+                          <MessageBubble
+                            message={
+                              {
+                                id: msg.parentMessage.id,
+                                content: msg.parentMessage.content,
+                                createdAt: msg.parentMessage.createdAt,
+                                isEdited: false,
+                                isDeleted: false,
+                                sender: msg.parentMessage.sender as any,
+                                attachments: [],
+                                reactions: [],
+                                _count: { replies: 0 },
+                              } as any
+                            }
+                            isCurrentUser={
+                              msg.parentMessage.sender.id === currentUser?.id
+                            }
+                            onAddReaction={() => {}}
+                            onDelete={() => {}}
+                            onEdit={() => {}}
+                            onReply={() => setReplyingTo(msg.parentMessage!.id)}
+                            currentUserId={currentUser?.id || 0}
                           />
                         </div>
                       )}
-                      <MessageBubble
-                        message={msg}
-                        isCurrentUser={msg.sender.id === currentUser?.id}
-                        onAddReaction={(messageId, emoji) =>
-                          addReaction(messageId, emoji)
-                        }
-                        onDelete={(messageId) => deleteMessage(messageId)}
-                        onEdit={(messageId, newContent) =>
-                          editMessage(messageId, newContent)
-                        }
-                        onReply={(messageId) => setReplyingTo(messageId)}
-                        currentUserId={currentUser?.id || 0}
-                      />
+
+                      {/* Render actual message with optional reply styling */}
+                      <div
+                        id={`message-${msg.id}`}
+                        data-parent-id={msg.parentMessageId || undefined}
+                        style={{
+                          marginLeft: msg.parentMessageId ? "24px" : "0",
+                          paddingLeft: msg.parentMessageId ? "12px" : "0",
+                          borderLeft: msg.parentMessageId
+                            ? "3px solid rgba(96, 165, 250, 0.4)"
+                            : "none",
+                        }}
+                      >
+                        {showTimestamp && (
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              margin: "16px 0",
+                              gap: "12px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                flex: 1,
+                                height: "1px",
+                                background: "rgba(255,255,255,0.1)",
+                              }}
+                            />
+                            <p
+                              style={{
+                                fontSize: "11px",
+                                color: "rgba(255,255,255,0.5)",
+                                margin: 0,
+                                fontFamily: "var(--font-inria-sans)",
+                              }}
+                            >
+                              {formatMessageTime(msg.createdAt)}
+                            </p>
+                            <div
+                              style={{
+                                flex: 1,
+                                height: "1px",
+                                background: "rgba(255,255,255,0.1)",
+                              }}
+                            />
+                          </div>
+                        )}
+                        <MessageBubble
+                          message={msg}
+                          isCurrentUser={msg.sender.id === currentUser?.id}
+                          onAddReaction={(messageId, emoji) =>
+                            addReaction(messageId, emoji)
+                          }
+                          onDelete={(messageId) => deleteMessage(messageId)}
+                          onEdit={(messageId, newContent) =>
+                            editMessage(messageId, newContent)
+                          }
+                          onReply={(messageId) => setReplyingTo(messageId)}
+                          currentUserId={currentUser?.id || 0}
+                        />
+                      </div>
                     </div>
                   );
                 })}
@@ -1470,16 +1543,11 @@ export default function MessagesPage() {
               </div>
 
               {/* Input Area */}
-              <div
-                style={{
-                  paddingTop: "16px",
-                  borderTop: "1px solid rgba(255,255,255,0.1)",
-                }}
-              >
+              <div className="pt-4 border-t border-white/10">
                 {replyingTo && (
                   <div
                     style={{
-                      padding: "12px 12px 12px 12px",
+                      padding: "12px",
                       background: "rgba(255,255,255,0.05)",
                       borderRadius: "8px",
                       marginBottom: "12px",
@@ -1489,15 +1557,39 @@ export default function MessagesPage() {
                     }}
                   >
                     <Reply size={16} />
-                    <span
-                      style={{
-                        fontSize: "12px",
-                        opacity: 0.7,
-                        fontFamily: "var(--font-inria-sans)",
-                      }}
-                    >
-                      Replying to message
-                    </span>
+                    <div style={{ flex: 1, overflow: "hidden" }}>
+                      {(() => {
+                        const parent = messages.find(
+                          (m) => m.id === replyingTo,
+                        );
+                        if (!parent)
+                          return (
+                            <span
+                              style={{
+                                fontSize: "12px",
+                                opacity: 0.7,
+                                fontFamily: "var(--font-inria-sans)",
+                              }}
+                            >
+                              Replying to message
+                            </span>
+                          );
+                        return (
+                          <span
+                            style={{
+                              fontSize: "12px",
+                              opacity: 0.7,
+                              fontFamily: "var(--font-inria-sans)",
+                              whiteSpace: "nowrap",
+                              textOverflow: "ellipsis",
+                              overflow: "hidden",
+                            }}
+                          >
+                            {parent.sender.firstName}: {parent.content}
+                          </span>
+                        );
+                      })()}
+                    </div>
                     <button
                       onClick={() => setReplyingTo(null)}
                       style={{
@@ -1512,36 +1604,69 @@ export default function MessagesPage() {
                     </button>
                   </div>
                 )}
-                <div
-                  style={{ display: "flex", gap: "12px", alignItems: "center" }}
-                >
-                  <button
+
+                {/* Attachment Preview */}
+                {attachmentFile && (
+                  <div
                     style={{
-                      background: "transparent",
-                      border: "none",
-                      cursor: "pointer",
-                      color: "rgba(255,255,255,0.6)",
-                      padding: "0px 0px 0px 0px",
+                      padding: "12px 12px 12px 12px",
+                      background: "rgba(255,255,255,0.05)",
+                      borderRadius: "8px",
+                      marginBottom: "12px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
                     }}
+                  >
+                    <Paperclip size={16} />
+                    <span
+                      style={{
+                        fontSize: "12px",
+                        color: "#fff",
+                        fontFamily: "var(--font-inria-sans)",
+                        flex: 1,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {attachmentFile.name}
+                    </span>
+                    <button
+                      onClick={() => setAttachmentFile(null)}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        color: "#fff",
+                      }}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex gap-3 items-center">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingAttachment}
+                    className="bg-transparent border-none cursor-pointer text-white/70 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Paperclip size={20} />
                   </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    onChange={handleAttachmentSelect}
+                    style={{ display: "none" }}
+                    disabled={uploadingAttachment}
+                  />
                   <input
                     value={messageInput}
                     onChange={(e) => setMessageInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="Type a message..."
-                    style={{
-                      flex: 1,
-                      padding: "12px 16px 12px 16px",
-                      borderRadius: "24px",
-                      background: "rgba(255,255,255,0.08)",
-                      border: "1px solid rgba(255,255,255,0.15)",
-                      color: "#fff",
-                      fontSize: "14px",
-                      outline: "none",
-                      fontFamily: "var(--font-inria-sans)",
-                    }}
+                    className="flex-1 px-4 py-3 rounded-full bg-white/8 border border-white/15 text-white text-sm outline-none"
                   />
                   <button
                     onClick={sendMessage}
@@ -1610,13 +1735,40 @@ export default function MessagesPage() {
                       fontSize: 18,
                       color: "#fff",
                       fontWeight: "600",
+                      overflow: "hidden",
                     }}
                   >
-                    {selectedDMUser
-                      ? `${selectedDMUser.firstName[0]}${selectedDMUser.lastName[0]}`
-                      : selectedChannel
-                        ? selectedChannel.name[0].toUpperCase()
-                        : ""}
+                    {selectedDMUser ? (
+                      selectedDMUser.profilePicture ? (
+                        <img
+                          src={selectedDMUser.profilePicture}
+                          alt={selectedDMUser.firstName}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                        />
+                      ) : (
+                        `${selectedDMUser.firstName[0]}${selectedDMUser.lastName[0]}`
+                      )
+                    ) : selectedChannel ? (
+                      selectedChannel.profilePicture ? (
+                        <img
+                          src={selectedChannel.profilePicture}
+                          alt={selectedChannel.name}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                        />
+                      ) : (
+                        selectedChannel.name[0].toUpperCase()
+                      )
+                    ) : (
+                      ""
+                    )}
                   </div>
                   <div>
                     <div

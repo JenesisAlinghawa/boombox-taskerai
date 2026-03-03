@@ -20,14 +20,16 @@ export default function ClientLayout({
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden">
-      {/* Background Image Wrapper */}
-      <div
-        className="fixed inset-0 z-[-1] bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage: "url('/assets/images/taskerBg.jpg')",
-          backgroundColor: "#01162B",
-        }}
-      />
+<div
+    className="fixed inset-0 z-[-1] bg-cover bg-center bg-no-repeat"
+    style={{
+      backgroundImage: "url('/assets/images/taskerBg.jpg')",
+      backgroundColor: "#01162B", 
+    }}
+  />
+
+  {/* Frosted overlay that covers the whole screen */}
+  <div className="fixed inset-0 bg-[rgba(0,32,55,0.32)] backdrop-blur-lg z-[-0.5]" />
 
       <div className="flex h-screen w-full">
         {/* Conditional Rendering: SidePanel only shows if NOT an auth page */}

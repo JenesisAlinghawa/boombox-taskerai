@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { sendEvent } from '@/lib/sse'
+import { createNotification } from '@/lib/notificationService'
 
 export async function GET(
   req: NextRequest,
@@ -74,27 +75,16 @@ export async function POST(req: NextRequest) {
     })
 
     for (const member of channelMembers) {
-      await prisma.notification.create({
+      // Respect the recipient's notification preferences
+      await createNotification({
+        receiverId: member.userId,
+        type: 'channel_message',
         data: {
-          receiverId: member.userId,
-          type: 'channel_message',
-          data: {
-            title: `New message in #${channel?.name}`,
-            message: content,
-            channelId,
-          },
-        },
-      })
-      try {
-        sendEvent(member.userId, 'notification', {
-          type: 'channel_message',
           title: `New message in #${channel?.name}`,
           message: content,
-          relatedId: channelId,
-        })
-      } catch (e) {
-        console.error('SSE push error:', e)
-      }
+          channelId,
+        },
+      });
     }
 
     return NextResponse.json({ success: true, message })

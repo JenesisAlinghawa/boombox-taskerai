@@ -1,7 +1,13 @@
 import { PrismaClient } from '@prisma/client'
+import { setupAuditMiddleware } from './auditMiddleware.js'
 
 const prismaClientSingleton = () => {
-  return new PrismaClient()
+  const client = new PrismaClient()
+  
+  // Initialize audit middleware for automatic Task operation logging
+  setupAuditMiddleware(client)
+  
+  return client
 }
 
 declare global {

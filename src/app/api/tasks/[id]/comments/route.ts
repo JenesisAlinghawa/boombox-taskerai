@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { logCommentEvent, getIpAddress } from "@/lib/auditLog";
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -82,6 +83,15 @@ export async function POST(request: NextRequest, { params }: Params) {
       where: { id: comment.id }, 
       include: { user: { select: { id: true, firstName: true, lastName: true } } } 
     });
+    // Audit log
+    await logCommentEvent({
+      userId: userId,
+      action: "COMMENT_CREATED",
+      commentId: full?.id || comment.id,
+      taskId: taskId,
+      ipAddress: getIpAddress(request as any),
+    });
+
     return NextResponse.json({ comment: full });
   } catch (error) {
     console.error('Create comment error:', error);

@@ -2,6 +2,9 @@ import { createServer } from "http";
 import { parse } from "url";
 import next from "next";
 import { Server as SocketIOServer } from "socket.io";
+import prisma from "./src/lib/prisma.js";
+import { sendEvent } from "./src/lib/sse.js";
+import { createNotification } from "./src/lib/notificationService.ts";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME || "localhost";
@@ -135,12 +138,85 @@ app.prepare().then(() => {
     });
   });
 
+  // Scheduler: reminders for upcoming due dates (24h and 1h before)
+  const CHECK_INTERVAL_MS = 60 * 1000; // check every minute
+  const REMINDERS = [
+    { type: "24h", ms: 24 * 60 * 60 * 1000, label: "24 hours" },
+    { type: "1h", ms: 60 * 60 * 1000, label: "1 hour" },
+  ];
+
+  async function checkReminders() {
+    try {
+      const now = new Date();
+
+      for (const r of REMINDERS) {
+        const windowStart = new Date(now.getTime() + r.ms - CHECK_INTERVAL_MS / 2);
+        const windowEnd = new Date(now.getTime() + r.ms + CHECK_INTERVAL_MS / 2);
+
+        // Find tasks with dueDate in the small window and not completed
+        const tasks = await prisma.task.findMany({
+          where: {
+            dueDate: { gte: windowStart, lte: windowEnd },
+            status: { not: "completed" },
+          },
+          include: { assignee: true, createdBy: true },
+        });
+
+        for (const task of tasks) {
+          const recipients = new Set<number>();
+          if (task.assigneeId) recipients.add(task.assigneeId);
+          if (task.createdById) recipients.add(task.createdById);
+
+          for (const rid of recipients) {
+            // Ensure we haven't already created this reminder for this task+recipient
+            const existing: any = await prisma.$queryRaw`
+              SELECT id FROM "Notification"
+              WHERE "receiverId" = ${rid}
+                AND type = 'task_reminder'
+                AND (data->>'relatedId')::int = ${task.id}
+                AND data->>'reminderType' = ${r.type}
+              LIMIT 1
+            `;
+
+            if (existing && existing.length && existing.length > 0) {
+              continue; // reminder already sent
+            }
+
+            const title = `Task due in ${r.label}`;
+            const message = `Task "${task.title}" is due in ${r.label}.`;
+
+            await createNotification({
+              receiverId: rid,
+              type: "task_reminder",
+              data: {
+                title,
+                message,
+                relatedId: task.id,
+                relatedType: "task",
+                reminderType: r.type,
+                dueDate: task.dueDate,
+              },
+            });
+
+          }
+        }
+      }
+    } catch (err) {
+      console.error("CheckReminders error:", err);
+    }
+  }
+
+  // Start periodic checks
+  setInterval(() => {
+    void checkReminders();
+  }, CHECK_INTERVAL_MS);
+
   // Start the server
   httpServer.listen(port, () => {
     console.log(`
     ✓ Server running at http://${hostname}:${port}
     ✓ Socket.io connected
-    ✓ Ready for real-time messaging
+    ✓ Scheduled reminders active (24h & 1h)
     `);
   });
 });

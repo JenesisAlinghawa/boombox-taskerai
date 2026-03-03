@@ -15,7 +15,7 @@ export const PageContentCon = ({
     <div
       className={className}
       style={{
-        background: "rgba(255, 255, 255, 0.22)",
+        background: "rgba(96, 165, 250, 0.1)",
         backdropFilter: "blur(2px)",
         WebkitBackdropFilter: "blur(5px)",
         border: "1px solid rgba(255, 255, 255, 0.10)",

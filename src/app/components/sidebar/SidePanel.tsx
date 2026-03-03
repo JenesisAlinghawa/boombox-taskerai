@@ -8,10 +8,10 @@ import { SidebarFooter } from "./SidebarFooter";
 export function SidePanel() {
   const [collapsed, setCollapsed] = useState(true);
 
-  const width = collapsed ? 64 : 155;
-  const leftGap = 10;
-  const rightGap = 10;
-  const verticalGap = 10;
+  const width = collapsed ? 72 : 164;
+  const leftGap = 8;
+  const rightGap = 8;
+  const verticalGap = 12;
 
   useEffect(() => {
     const main = document.querySelector("main");
@@ -25,21 +25,11 @@ export function SidePanel() {
     <aside
       style={{
         width,
-        background: "rgba(0, 68, 220, 0.40)",
-        color: "#ffffff",
         height: `calc(100vh - ${verticalGap * 2}px)`,
-        position: "fixed",
         left: leftGap,
         top: verticalGap,
-        zIndex: 50,
-        display: "flex",
-        flexDirection: "column",
-        borderRadius: 12,
-        backdropFilter: "blur(2px)",
-        WebkitBackdropFilter: "blur(5px)",
-        transition: "width 0.3s ease",
-        overflow: "hidden",
       }}
+      className="fixed bg-blue-600/50 text-white pr-1.25 z-50 shadow-lg flex flex-col rounded overflow-hidden backdrop-blur-sm transition-all duration-300"
     >
       <SidebarHeader collapsed={collapsed} setCollapsed={setCollapsed} />
       <NavigationMenu collapsed={collapsed} />

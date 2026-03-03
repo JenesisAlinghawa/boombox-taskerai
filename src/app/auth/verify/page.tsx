@@ -3,6 +3,7 @@ import React from "react";
 import VerifyResultClient from "../VerifyResultClient";
 import prisma from "@/lib/prisma";
 import { sendEvent } from "@/lib/sse";
+import { createNotification } from "@/lib/notificationService";
 
 const secret = process.env.JWT_SECRET || "your-secret-key";
 
@@ -62,18 +63,16 @@ export default async function VerifyPage({ searchParams }: Props) {
             });
 
             if (owner) {
-              await prisma.notification.create({
+              await createNotification({
+                receiverId: owner.id,
+                type: "new_user_registration",
                 data: {
-                  receiverId: owner.id,
-                  type: "new_user_registration",
-                  data: {
-                    userId: newUser.id,
-                    userName: `${newUser.firstName} ${newUser.lastName}`,
-                    email: newUser.email,
-                    status: "pending",
-                    title: "New User Registration",
-                    message: `${newUser.firstName} ${newUser.lastName} (${newUser.email}) verified their email. Click to review in Team Management.`,
-                  },
+                  userId: newUser.id,
+                  userName: `${newUser.firstName} ${newUser.lastName}`,
+                  email: newUser.email,
+                  status: "pending",
+                  title: "New User Registration",
+                  message: `${newUser.firstName} ${newUser.lastName} (${newUser.email}) verified their email. Click to review in Team Management.",
                 },
               });
             }
@@ -102,23 +101,15 @@ export default async function VerifyPage({ searchParams }: Props) {
 
           // create welcome notification
           try {
-            const notification = await prisma.notification.create({
+            await createNotification({
+              receiverId: updatedUser.id,
+              type: "welcome",
               data: {
-                receiverId: updatedUser.id,
-                type: "welcome",
-                data: {
-                  title: "Welcome to TaskerAI",
-                  message:
-                    "Welcome to TaskerAI — your email has been successfully verified!",
-                },
+                title: "Welcome to TaskerAI",
+                message:
+                  "Welcome to TaskerAI — your email has been successfully verified!",
               },
             });
-
-            try {
-              sendEvent(updatedUser.id, "notification", { notification });
-            } catch (e) {
-              console.error("SSE push error (welcome):", e);
-            }
           } catch (e) {
             console.error("Failed to create welcome notification:", e);
           }

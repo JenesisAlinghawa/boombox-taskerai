@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 import { PrismaClient } from '@prisma/client'
 import { sendEvent } from '@/lib/sse'
+import { createNotification } from '@/lib/notificationService'
 
 const prisma = new PrismaClient()
 const secret = process.env.JWT_SECRET || 'your-secret-key'
@@ -46,25 +47,16 @@ export async function POST(req: NextRequest) {
       data: { isVerified: true },
     })
 
-    // Create welcome notification
+    // Create welcome notification (respects preferences)
     try {
-      const notification = await prisma.notification.create({
+      await createNotification({
+        receiverId: updatedUser.id,
+        type: 'welcome',
         data: {
-          receiverId: updatedUser.id,
-          type: 'welcome',
-          data: {
-            title: 'Welcome to TaskerAI',
-            message: 'Welcome to TaskerAI — your email has been successfully verified!',
-          },
+          title: 'Welcome to TaskerAI',
+          message: 'Welcome to TaskerAI — your email has been successfully verified!',
         },
-      })
-
-      // Push SSE event to the newly verified user
-      try {
-        sendEvent(updatedUser.id, 'notification', { notification })
-      } catch (e) {
-        console.error('SSE push error (welcome):', e)
-      }
+      });
     } catch (e) {
       console.error('Failed to create welcome notification:', e)
     }

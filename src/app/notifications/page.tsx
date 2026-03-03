@@ -35,6 +35,13 @@ export default function NotificationsPage() {
   }, []);
 
   const fetchNotifications = async () => {
+    if (currentUser?.messageNotifications === false) {
+      // nothing to fetch, API now returns [] anyway, but avoid network call
+      setNotifications([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch(`/api/notifications?userId=${currentUser?.id}`);
       const data = await res.json();
@@ -140,6 +147,13 @@ export default function NotificationsPage() {
 
   return (
     <PageContainer title="NOTIFICATIONS">
+      {currentUser?.messageNotifications === false && (
+        <div className="p-4 mb-6 bg-yellow-100 text-yellow-800 rounded-lg text-center">
+          You have <strong>disabled in‑app notifications</strong> in your
+          settings. This page will not show new alerts until you turn them back
+          on.
+        </div>
+      )}
       {loading ? (
         <div style={{ color: "#333", textAlign: "center", padding: "40px" }}>
           Loading notifications...
@@ -164,11 +178,13 @@ export default function NotificationsPage() {
             <div
               key={notification.id}
               style={{
-                 background: "rgba(255, 255, 255, 0.12)",
-                 backdropFilter: "blur(2px)",
-                 WebkitBackdropFilter: "blur(5px)",
-                 border: `1px solid ${
-                 notification.isRead ? "rgba(0,0,0,0.12)" : "rgba(239, 68, 68, 0.23)"
+                background: "rgba(255, 255, 255, 0.12)",
+                backdropFilter: "blur(2px)",
+                WebkitBackdropFilter: "blur(5px)",
+                border: `1px solid ${
+                  notification.isRead
+                    ? "rgba(0,0,0,0.12)"
+                    : "rgba(239, 68, 68, 0.23)"
                 }`,
                 filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
                 borderRadius: "12px",
@@ -187,7 +203,8 @@ export default function NotificationsPage() {
                   "rgba(255, 255, 255, 0.22)";
               }}
               onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.background = "rgba(255, 255, 255, 0.22)";
+                (e.currentTarget as HTMLElement).style.background =
+                  "rgba(255, 255, 255, 0.22)";
                 (e.currentTarget as HTMLElement).style.borderColor =
                   notification.isRead
                     ? "rgba(255, 255, 255, 0.1)"
@@ -294,7 +311,8 @@ export default function NotificationsPage() {
                   }}
                   onMouseLeave={(e) => {
                     (e.currentTarget as HTMLElement).style.background =
-                      "rgba(255, 255, 255, 0.22)";                  }}
+                      "rgba(255, 255, 255, 0.22)";
+                  }}
                 >
                   Dismiss
                 </button>

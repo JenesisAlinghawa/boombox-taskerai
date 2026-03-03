@@ -34,7 +34,30 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           content: true,
+          attachments: true,
+          reactions: true,
           isRead: true,
+          parentMessageId: true,
+          parentMessage: {
+            select: {
+              id: true,
+              content: true,
+              createdAt: true,
+              sender: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  profilePicture: true,
+                },
+              },
+            },
+          },
+          _count: {
+            select: {
+              replies: true,
+            },
+          },
           createdAt: true,
           sender: {
             select: {

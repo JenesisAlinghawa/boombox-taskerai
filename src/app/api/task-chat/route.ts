@@ -70,47 +70,62 @@ function updateTaskState(sessionId: string, updates: Partial<TaskState>) {
   taskStateStore.set(sessionId, state);
 }
 
-const SYSTEM_PROMPT = `You are TaskerBot, a super smart, witty, and genuinely helpful task assistant inspired by Grok and Claude.
+const SYSTEM_PROMPT = `You are TaskerBot, a super smart, professional, and helpful task assistant that's patient, user-friendly, and always ready to adapt.
 
-You're conversational, intelligent, and adaptable. You understand natural language extremely well — typos, abbreviations, incomplete sentences, vague requests, all mixed together — you roll with it and figure it out.
+You're conversational, intelligent, and flexible. You handle natural language like a pro — dealing with typos, abbreviations, incomplete thoughts, vague ideas, or even mixed-up requests without missing a beat. You figure it out and keep things flowing smoothly.
+
+## Language Style:
+- Use clear, direct, and literal language.
+- Avoid idioms, metaphors, and excessive enthusiasm.
+- Keep responses professional, friendly, and natural—no stiff formality or over-the-top excitement.
+
+## Handling Casual, Greetings, or Off-Topic Inputs:
+- This covers greetings ("hi", "hey", "hello", etc.), casual check-ins, jokes, random questions, or any non-task-related messages:
+  - Respond naturally and conversationally first — acknowledge the greeting or casual remark in a friendly, brief way (e.g., greet back and react appropriately).
+  - Mirror the user's tone lightly to keep it engaging.
+  - Then smoothly and gently transition to offering task help (e.g., "How can I assist with tasks today?" or "Anything task-related I can help with?").
+  - Keep the overall response concise and professional.
+  - Do NOT interpret greetings or casual messages as task requests.
+  - Do NOT mention or assume any past/completed tasks.
+  - Only extend casual chat if the user clearly continues it; otherwise, redirect toward tasks.
 
 ## Your Core Behavior:
 
-**If the user is talking about tasks or work**, you're in "task mode":
-- Listen carefully to what they're trying to accomplish
-- Extract or ask for key details: title, description, assignee, due date, priority
-- Guide them conversationally through the task creation process
-- Don't force JSON output until the task is ready to create
-- Be encouraging and help them think through requirements
+**When the conversation is about tasks or work**, switch to "task mode":
+- Pay close attention to their goals and what they're trying to get done.
+- Pull out or politely ask for essential details like title, description, assignee, due date, and priority.
+- Guide them through the process in a natural, back-and-forth chat — no rushing or overwhelming with questions.
+- Hold off on any structured output until the task is fully fleshed out and they're ready.
+- Be supportive, brainstorm ideas if needed, and help refine their thoughts.
 
-**If the user is off-topic, making jokes, asking random questions, or just chatting**:
-- Respond naturally and authentically—be witty, helpful, friendly
-- Match their energy and tone
-- NEVER give a canned response like "I'm just a task assistant!"
-- If they've been working on a task, gently redirect after your response (e.g., "By the way, were you done describing that bug fix task?")
-- Be human-like, not robotic
+## Handling Idle or No Active Task:
+- When Current Task State shows no task in progress:
+  - Focus primarily on task-related help (e.g., offering to create or plan a new task).
+  - Never mention, list, or assume the existence of past or completed tasks—we do not track them.
+  - Respond conversationally but keep the focus on tasks.
 
 ## Task Information:
 
 Available team members:
 {TEAM_MEMBERS}
 
-When extracting dates, interpret natural language:
-- "tomorrow" = next day
-- "next Friday" = upcoming Friday
-- "in 3 days" = 3 days from now
-- ISO format: YYYY-MM-DD
+For dates, smartly interpret everyday language:
+- "tomorrow" means the next day from now.
+- "next Friday" is the upcoming Friday.
+- "in 3 days" adds three days to today.
+- Always use ISO format internally: YYYY-MM-DD.
+- If something's unclear, ask for clarification politely.
 
 ## Current Task State:
 {TASK_STATE}
 
 ## Response Modes:
 
-**Mode 1: Conversational (during task building)**
-Just respond naturally in your message. Help guide them through the process. Extract info as they provide it.
+**Mode 1: Conversational (while building a task)**
+Respond in plain, natural language. Guide step by step, confirm bits as you go, and build on what they've shared. Extract info organically and double-check if needed.
 
-**Mode 2: Task Confirmation (when ready)**
-If the user confirms they want to create a task and you have all key info (or reasonable defaults), output JSON:
+**Mode 2: Task Confirmation (when everything's set)**
+Only when they've confirmed creation and you have solid info (or smart defaults), output clean JSON:
 {
   "action": "create",
   "title": "...",
@@ -118,25 +133,27 @@ If the user confirms they want to create a task and you have all key info (or re
   "assigneeEmail": "...",
   "dueDate": "...",
   "priority": "low|medium|high",
-  "message": "friendly confirmation"
+  "message": "Task created."
 }
+No extra text outside the JSON in this mode.
 
-**Mode 3: Off-Topic Banter (jokes, random q's)**
-Just chat naturally. No JSON. Be genuine and funny when it fits.
+**Mode 3: Casual Chat (for everything else)**
+Chat naturally and professionally. Keep it brief and redirect to tasks when possible.
 
 ## Smart Matching:
-- Match assignees by first name, last name, or email prefix (fuzzy matching is okay)
-- If ambiguous, ask which one they meant
-- Confirm before finalizing
+- Fuzzy-match assignees by first name, last name, nicknames, or email bits — be clever about it.
+- If it's unclear, ask casually which one they mean, listing options if helpful.
+- Always confirm key details before locking in a task.
 
 ## Golden Rules:
-1. NEVER output static, precoded responses
-2. Always sound like a real person having a conversation
-3. Remember the context of what they've told you
-4. Be forgiving and adaptable
-5. Use light humor, but keep it professional and friendly
-6. Output JSON ONLY when creating a confirmed task
-7. Until then, respond in natural language`;
+1. Avoid canned or repetitive responses — make each one fresh and tailored.
+2. Sound professional, friendly, and natural.
+3. Track the full context and build on previous messages.
+4. Be very forgiving with inputs and adjust as needed.
+5. Keep it professional, friendly, and efficient.
+6. JSON output only for confirmed task creation — everything else is natural chat.
+7. Stay in character until the task is ready, then confirm and proceed.
+8. Never invent or reference tasks that are not in the current task state.`;
 
 function formatTaskState(state: TaskState): string {
   const filled = [];
@@ -147,7 +164,7 @@ function formatTaskState(state: TaskState): string {
   if (state.priority) filled.push(`Priority: ${state.priority}`);
   
   if (filled.length === 0) {
-    return "No task in progress — starting fresh!";
+    return "No task in progress...";
   }
   
   const missing = [];
@@ -167,18 +184,6 @@ function formatTeamMembers(members: TeamMember[]): string {
   return members.map((m) => `- ${m.name} (${m.email})`).join("\n");
 }
 
-function isTaskRelated(message: string): boolean {
-  const taskKeywords = [
-    "task", "create", "make", "add", "assign", "due", "priority", "deadline",
-    "bug", "feature", "fix", "update", "delete", "remove", "done", "complete",
-    "work", "project", "milestone", "checklist", "todo", "urgent", "asap",
-    "when", "date", "who", "responsible", "owner", "description", "details",
-  ];
-  
-  const lower = message.toLowerCase();
-  return taskKeywords.some(keyword => lower.includes(keyword));
-}
-
 function calculateDueDate(dueString: string | null): string | null {
   if (!dueString) return null;
 
@@ -195,7 +200,8 @@ function calculateDueDate(dueString: string | null): string | null {
     const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
     for (let i = 0; i < dayNames.length; i++) {
       if (lower.includes(dayNames[i])) {
-        const daysAhead = (i - today.getDay() + 7) % 7 || 7;
+        let daysAhead = (i - today.getDay() + 7) % 7;
+        if (daysAhead === 0) daysAhead = 7;
         const nextDate = new Date(today);
         nextDate.setDate(nextDate.getDate() + daysAhead);
         return nextDate.toISOString().split("T")[0];
@@ -204,17 +210,19 @@ function calculateDueDate(dueString: string | null): string | null {
   }
 
   if (lower.includes("in")) {
-    const match = lower.match(/in\s+(\d+)\s+(day|week|month)/i);
+    const match = lower.match(/in\s+(\d+)\s+(hour|hours|day|days|week|weeks|month|months)/i);
     if (match) {
       const num = parseInt(match[1]);
       const unit = match[2].toLowerCase();
       const resultDate = new Date(today);
 
-      if (unit === "day" || unit === "days") {
+      if (unit.startsWith('hour')) {
+        resultDate.setHours(resultDate.getHours() + num);
+      } else if (unit.startsWith('day')) {
         resultDate.setDate(resultDate.getDate() + num);
-      } else if (unit === "week" || unit === "weeks") {
+      } else if (unit.startsWith('week')) {
         resultDate.setDate(resultDate.getDate() + num * 7);
-      } else if (unit === "month" || unit === "months") {
+      } else if (unit.startsWith('month')) {
         resultDate.setMonth(resultDate.getMonth() + num);
       }
 
@@ -227,6 +235,23 @@ function calculateDueDate(dueString: string | null): string | null {
   }
 
   return null;
+}
+
+async function callHfWithRetry(messages: any[], retries = 3): Promise<any> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await inference.chatCompletion({
+        model: "meta-llama/Llama-3.1-8B-Instruct",
+        messages,
+        max_tokens: 1500, // Increased for longer responses
+        temperature: 0.7, // Lower for consistency
+      });
+    } catch (error) {
+      console.error(`HF attempt ${i + 1} failed:`, error);
+      await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i))); // Exponential backoff
+    }
+  }
+  throw new Error('HF call failed after retries');
 }
 
 export async function POST(req: NextRequest) {
@@ -267,6 +292,12 @@ export async function POST(req: NextRequest) {
 
     // Get or create task state for this session
     const taskState = getOrCreateTaskState(sessionId);
+    
+    // Limit history to prevent bloat
+    if (taskState.conversationHistory.length > 20) {
+      taskState.conversationHistory = taskState.conversationHistory.slice(-20);
+    }
+    
     taskState.conversationHistory.push({ role: "user", content: message });
 
     const teamContext = `Available team members:\n${formatTeamMembers(teamMembers)}`;
@@ -292,22 +323,14 @@ export async function POST(req: NextRequest) {
     let responseText = "";
 
     try {
-      const response = await inference.chatCompletion({
-        model: "meta-llama/Llama-3.1-8B-Instruct",
-        messages: messages,
-        max_tokens: 900,
-        temperature: 0.9,
-      });
-
+      const response = await callHfWithRetry(messages);
       responseText = response?.choices?.[0]?.message?.content?.trim() || "";
-
       if (!responseText) {
         throw new Error("Empty content in HF response");
       }
-
       console.log("HF raw response:", responseText.slice(0, 250));
     } catch (hfError) {
-      console.error("Hugging Face API error:", hfError);
+      console.error("Hugging Face API error after retries:", hfError);
       return NextResponse.json(
         {
           action: null,
@@ -322,20 +345,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Try to parse JSON if it looks like a task confirmation
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    const hasJsonStructure = jsonMatch !== null;
-
+    // Try to parse if it's pure JSON
     let parsed: TaskerBotResponse | null = null;
-
-    if (hasJsonStructure) {
-      try {
-        parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
-        console.log("Parsed JSON (potential task):", parsed);
-      } catch (parseError) {
-        console.log("JSON in response but failed to parse, treating as natural response");
-        parsed = null;
+    try {
+      const potentialJson = JSON.parse(responseText);
+      // Manual validation: Check for required keys
+      if (
+        typeof potentialJson === 'object' &&
+        'message' in potentialJson &&
+        typeof potentialJson.message === 'string'
+      ) {
+        parsed = potentialJson as TaskerBotResponse;
       }
+      console.log("Parsed JSON (potential task):", parsed);
+    } catch (parseError) {
+      console.log("Not pure JSON or invalid structure, treating as natural response");
+      parsed = null;
     }
 
     // If no valid JSON parsed, return as natural language response
@@ -343,7 +368,6 @@ export async function POST(req: NextRequest) {
       // Add assistant response to history
       taskState.conversationHistory.push({ role: "assistant", content: responseText });
       updateTaskState(sessionId, { conversationHistory: taskState.conversationHistory });
-
       return NextResponse.json(
         {
           action: null,
@@ -358,7 +382,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // If JSON was parsed, validate it's a proper task creation
+    // If JSON was parsed, ensure message is set
     if (!parsed.message || typeof parsed.message !== "string") {
       parsed.message = "Got it!";
     }
@@ -383,34 +407,41 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // If action is "create" and we have essentials, update state and confirm
-    if (parsed.action === "create") {
-      if (parsed.title) {
-        updateTaskState(sessionId, {
-          title: parsed.title,
-          description: parsed.description,
-          assigneeEmail: parsed.assigneeEmail,
-          dueDate: parsed.dueDate,
-          priority: parsed.priority || "medium",
-          conversationHistory: [
-            ...taskState.conversationHistory,
-            { role: "assistant", content: parsed.message },
-          ],
-        });
-        
-        // Clear state after task creation for next task
-        setTimeout(() => {
-          updateTaskState(sessionId, {
-            title: null,
-            description: null,
-            assigneeEmail: null,
-            dueDate: null,
-            priority: null,
-          });
-        }, 500);
+    // Handle different actions (expandable)
+    if (parsed.action) {
+      switch (parsed.action) {
+        case 'create':
+          if (parsed.title) {
+            updateTaskState(sessionId, {
+              title: parsed.title,
+              description: parsed.description,
+              assigneeEmail: parsed.assigneeEmail,
+              dueDate: parsed.dueDate,
+              priority: parsed.priority || "medium",
+              conversationHistory: [
+                ...taskState.conversationHistory,
+                { role: "assistant", content: parsed.message },
+              ],
+            });
+            
+            // Clear task fields immediately for next task, keep history limited
+            updateTaskState(sessionId, {
+              title: null,
+              description: null,
+              assigneeEmail: null,
+              dueDate: null,
+              priority: null,
+            });
+          }
+          break;
+        // Add cases for 'assign', 'update', etc., as needed
+        default:
+          // Fallback to adding to history
+          taskState.conversationHistory.push({ role: "assistant", content: parsed.message });
+          updateTaskState(sessionId, { conversationHistory: taskState.conversationHistory });
       }
     } else {
-      // For other actions or if not a pure creation, add to history
+      // For null action, add to history
       taskState.conversationHistory.push({ role: "assistant", content: parsed.message });
       updateTaskState(sessionId, { conversationHistory: taskState.conversationHistory });
     }

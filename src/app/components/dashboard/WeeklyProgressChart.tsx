@@ -31,17 +31,14 @@ const WeeklyProgressChart = ({ data }: WeeklyProgressChartProps) => {
   }));
 
   return (
-    <div className="bg-white/10 backdrop-blur rounded-xl p-4 h-full flex flex-col">
-      <h2 className="text-lg font-normal text-black/62  mb-4">
+    <div className="bg-blue-400/10 backdrop-blur-lg border border-white/10 rounded-sm shadow-lg p-6 h-[300px] flex flex-col">
+      <h2 className="text-lg font-normal text-white/62  mb-4">
         Weekly Task Progress
       </h2>
-      <div className="ml-[-40px] flex-1 flex items-center justify-start">
+      <div className="ml-[-40px] flex-1 flex items-center justify-start overflow-hidden">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData}>
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="rgba(0,0,0,0.2)"
-            />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.2)" />
             <XAxis dataKey="name" stroke="rgba(0,0,0,0.5)" />
             <YAxis stroke="rgba(0,0,0,0.5)" />
             <Tooltip

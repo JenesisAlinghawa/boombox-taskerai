@@ -49,7 +49,32 @@ export async function GET(req: NextRequest) {
     }
 
     // Extract team members (exclude the current user)
-    const teamMembers = team?.members?.map((m) => m.user).filter((u) => u.id !== userId) || []
+    let teamMembers = team?.members?.map((m) => m.user).filter((u) => u.id !== userId) || []
+
+    // If no team members, get all users who have sent unread messages to this user
+    if (teamMembers.length === 0) {
+      const sendersWithUnread = await prisma.directMessage.findMany({
+        where: {
+          recipientId: userId,
+          isRead: false,
+          senderId: { not: userId }, // Exclude the current user
+        },
+        distinct: ['senderId'],
+        select: {
+          senderId: true,
+        },
+      })
+
+      const senderIds = [...new Set(sendersWithUnread.map(m => m.senderId))]
+      
+      if (senderIds.length > 0) {
+        const senders = await prisma.user.findMany({
+          where: { id: { in: senderIds } },
+          select: { id: true, firstName: true, lastName: true, email: true },
+        })
+        teamMembers = senders
+      }
+    }
 
     // Get unread count for each user
     const usersWithUnread = await Promise.all(

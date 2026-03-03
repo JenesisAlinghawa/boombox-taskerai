@@ -33,9 +33,24 @@ const otherMenuItems = [
   { icon: Settings, label: "Settings", href: "/settings" },
 ];
 
+// Global unread messages store
+let globalUnreadCount = 0;
+let globalSetUnreadMessages: ((count: number) => void) | null = null;
+
+export function clearUnreadMessages() {
+  if (globalSetUnreadMessages) {
+    globalSetUnreadMessages(0);
+  }
+}
+
+export function getUnreadMessagesCount() {
+  return globalUnreadCount;
+}
+
 export function NavigationMenu({ collapsed }: NavigationMenuProps) {
   const pathname = usePathname() || "";
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
@@ -51,6 +66,13 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
   }, []);
 
   useEffect(() => {
+    globalSetUnreadMessages = setUnreadMessages;
+    return () => {
+      globalSetUnreadMessages = null;
+    };
+  }, []);
+
+  useEffect(() => {
     const fetchUnreadMessages = async () => {
       try {
         const user = await getCurrentUser();
@@ -58,13 +80,18 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
 
         const res = await fetch(`/api/direct-messages/users?userId=${user.id}`);
         const data = await res.json();
+        console.log("[UnreadMessages] API Response:", data);
         const users = Array.isArray(data?.users) ? data.users : [];
         const totalUnread = users.reduce(
           (sum: number, u: any) => sum + (u.unreadCount || 0),
           0,
         );
+        console.log("[UnreadMessages] Total unread:", totalUnread);
+        globalUnreadCount = totalUnread;
         setUnreadMessages(totalUnread);
-      } catch {}
+      } catch (error) {
+        console.error("[UnreadMessages] Fetch error:", error);
+      }
     };
 
     fetchUnreadMessages();
@@ -73,19 +100,59 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
   }, []);
 
   useEffect(() => {
+    const fetchUnreadNotifications = async () => {
+      try {
+        const user = await getCurrentUser();
+        if (!user?.id) return;
+        const res = await fetch(`/api/notifications?userId=${user.id}`);
+        const data = await res.json();
+        const items = Array.isArray(data?.notifications)
+          ? data.notifications
+          : [];
+        const unread = items.filter((n: any) => !n.isRead).length;
+        setUnreadNotifications(unread);
+      } catch (e) {
+        console.error("[Notifications] Fetch error:", e);
+      }
+    };
+    fetchUnreadNotifications();
+    const nid = setInterval(fetchUnreadNotifications, 5000);
+    return () => clearInterval(nid);
+  }, []);
+
+  useEffect(() => {
     if (!currentUser?.id) return;
+    console.log(
+      "[UnreadMessages] Setting up EventSource for userId:",
+      currentUser.id,
+    );
     const es = new EventSource(`/api/subscribe?userId=${currentUser.id}`);
 
     const onDirectMessage = (e: MessageEvent) => {
       try {
         const data = JSON.parse(e.data);
+        console.log("[UnreadMessages] New message event:", data);
         if (data?.message) {
+          globalUnreadCount += 1;
           setUnreadMessages((prev) => prev + 1);
         }
-      } catch {}
+      } catch (error) {
+        console.error("[UnreadMessages] Event parse error:", error);
+      }
+    };
+
+    const onNotification = (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data);
+        console.log("[Notifications] New notification event:", data);
+        setUnreadNotifications((prev) => prev + 1);
+      } catch (error) {
+        console.error("[Notifications] Event parse error:", error);
+      }
     };
 
     es.addEventListener("direct_message", onDirectMessage as EventListener);
+    es.addEventListener("notification", onNotification as EventListener);
     return () => es.close();
   }, [currentUser]);
 
@@ -94,124 +161,61 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
       ? pathname === href
       : pathname === href || pathname.startsWith(href + "/");
 
-  const buttonStyle = (active: boolean): React.CSSProperties => ({
-    width: "100%",
-    padding: "10px 16px 10px 16px",
-    borderColor: active ? "rgba(225,225,225,0.65)" : "transparent",
-    color: "#ffffff",
-    borderWidth: 1,
-    borderRadius: 32,
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-    fontSize: 12,
-    fontWeight: 200,
-    cursor: "pointer",
-    transition: "all 0.2s",
-    position: "relative",
-    overflow: "hidden",
-  });
+  const buttonStyle = (active: boolean): string =>
+    `w-full px-4 py-2.5 flex items-center gap-2.5 text-sm font-light cursor-pointer relative overflow-hidden rounded-full border border-transparent text-white transition-shadow duration-700 ease-out ${
+      active ? "shadow-[1px_1px_6px_rgba(250,250,250,0.30)]" : "shadow-none"
+    }`;
 
   return (
-    <div
-      style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        fontFamily: "Inter, system-ui, -apple-system, sans-serif",
-      }}
-    >
-      <nav
-        style={{
-          padding: "12px 0",
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-        }}
-      >
+    <div className="flex-1 flex flex-col font-inter">
+      {/* Main Menu */}
+      <nav className="p-3 flex flex-col gap-2">
         {mainMenuItems.map((item) => {
           const active = isActive(item.href);
           const Icon = item.icon;
           const isMessages = item.href === "/messages";
+          if (isMessages) {
+            console.log(
+              "[UnreadMessages] Rendering Messages item - unreadMessages:",
+              unreadMessages,
+              "shouldShowBadge:",
+              isMessages && unreadMessages > 0,
+            );
+          }
           return (
             <Link
               key={item.label}
               href={item.href}
-              style={{
-                textDecoration: "none",
-                width: "85%",
-                margin: "0 auto",
-                display: "block",
-              }}
+              className="no-underline w-[85%] mx-auto block"
             >
               <button
-                style={buttonStyle(active)}
+                className={buttonStyle(active)}
                 title={collapsed ? item.label : undefined}
               >
                 {active && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      right: 0,
-                      top: 0,
-                      bottom: 0,
-                      width: 3,
-                    }}
-                  />
+                  <div className="absolute right-0 top-0 bottom-0 w-0.5" />
                 )}
-                <div
-                  style={{
-                    width: 20,
-                    display: "flex",
-                    justifyContent: "flex-start",
-                  }}
-                >
+                <div className="w-5 flex justify-start relative">
                   <Icon size={20} strokeWidth={1.5} />
+                  {/* Unread message badge - positioned at bottom-right of icon */}
+                  {isMessages && unreadMessages > 0 && (
+                    <div className="absolute -bottom-1.5 -right-1.5 min-w-[14px] h-3.5 rounded-full bg-red-500 border-2 border-blue-500/25 text-white text-[9px] font-bold flex items-center justify-center">
+                      {unreadMessages > 99 ? "99+" : unreadMessages}
+                    </div>
+                  )}
                 </div>
                 {!collapsed && <span>{item.label}</span>}
-
-                {isMessages && unreadMessages > 0 && (
-                  <div
-                    style={{
-                      marginLeft: "auto",
-                      minWidth: 16,
-                      height: 16,
-                      borderRadius: "50%",
-                      background: "#ef4444",
-                      border: "2px solid rgba(0, 68, 255, 0.23)",
-                      color: "#fff",
-                      fontSize: 10,
-                      fontWeight: 600,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "0 4px",
-                    }}
-                  >
-                    {unreadMessages > 99 ? "99+" : unreadMessages}
-                  </div>
-                )}
               </button>
             </Link>
           );
         })}
       </nav>
 
-      <div
-        style={{
-          margin: "0 16px",
-          borderTop: "1px solid rgba(255,255,255,0.25)",
-        }}
-      />
+      {/* Separator */}
+      <div className="mx-4 border-t border-white/25" />
 
-      <nav
-        style={{
-          padding: "12px 0",
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-        }}
-      >
+      {/* Other Menu */}
+      <nav className="p-3 flex flex-col gap-2">
         {otherMenuItems.map((item) => {
           const active = isActive(item.href);
           const Icon = item.icon;
@@ -220,35 +224,16 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
             <Link
               key={item.label}
               href={item.href}
-              style={{
-                textDecoration: "none",
-                width: "80%",
-                margin: "0 auto",
-                display: "block",
-              }}
+              className="no-underline w-[80%] mx-auto block"
             >
               <button
-                style={buttonStyle(active)}
+                className={buttonStyle(active)}
                 title={collapsed ? item.label : undefined}
               >
                 {active && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      right: 0,
-                      top: 0,
-                      bottom: 0,
-                      width: 3,
-                    }}
-                  />
+                  <div className="absolute right-0 top-0 bottom-0 w-0.5" />
                 )}
-                <div
-                  style={{
-                    width: 20,
-                    display: "flex",
-                    justifyContent: "flex-start",
-                  }}
-                >
+                <div className="w-5 flex justify-start">
                   <Icon size={20} strokeWidth={1.5} />
                 </div>
                 {!collapsed && <span>{item.label}</span>}
@@ -258,7 +243,8 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
         })}
       </nav>
 
-      <div style={{ flex: 1 }} />
+      {/* Flex spacer */}
+      <div className="flex-1" />
     </div>
   );
 }

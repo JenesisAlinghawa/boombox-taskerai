@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { logTaskEvent, getIpAddress } from "@/lib/auditLog";
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -65,28 +66,120 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    if (task.createdById !== userId && task.assigneeId !== userId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    let body: any = {};
+    try {
+      body = await request.json();
+    } catch (e) {
+      // No body or invalid JSON — treat as empty update
+      console.warn('PATCH request had no JSON body or failed to parse:', e);
+      body = {};
     }
 
-    const body = await request.json();
-    const data: any = {};
-    if (body.title !== undefined) data.title = body.title;
-    if (body.description !== undefined) data.description = body.description;
-    if (body.priority !== undefined) data.priority = body.priority;
-    if (body.dueDate !== undefined) data.dueDate = body.dueDate ? new Date(body.dueDate) : null;
-    if (body.assigneeId !== undefined) data.assigneeId = body.assigneeId || null;
-    if (body.status !== undefined) data.status = body.status;
-
-    const updatedTask = await prisma.task.update({ 
-      where: { id: taskId }, 
-      data, 
-      include: { 
-        createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
-        assignee: { select: { id: true, firstName: true, lastName: true, email: true } } 
-      } 
+    // Fetch previous values for change tracking
+    const prev = await prisma.task.findUnique({
+      where: { id: taskId },
+      select: {
+        title: true,
+        description: true,
+        priority: true,
+        dueDate: true,
+        assigneeId: true,
+        status: true,
+      },
     });
-    return NextResponse.json({ task: updatedTask });
+
+    // If user is the creator, allow all updates
+    if (task.createdById === userId) {
+      const data: any = {};
+      const changes: any[] = [];
+      if (body.title !== undefined) {
+        data.title = body.title;
+        changes.push({ field: 'title', oldValue: prev?.title, newValue: body.title });
+      }
+      if (body.description !== undefined) {
+        data.description = body.description;
+        changes.push({ field: 'description', oldValue: prev?.description, newValue: body.description });
+      }
+      if (body.priority !== undefined) {
+        data.priority = body.priority;
+        changes.push({ field: 'priority', oldValue: prev?.priority, newValue: body.priority });
+      }
+      if (body.dueDate !== undefined) {
+        data.dueDate = body.dueDate ? new Date(body.dueDate) : null;
+        changes.push({ field: 'dueDate', oldValue: prev?.dueDate, newValue: body.dueDate || null });
+      }
+      if (body.assigneeId !== undefined) {
+        data.assigneeId = body.assigneeId || null;
+        changes.push({ field: 'assigneeId', oldValue: prev?.assigneeId, newValue: body.assigneeId || null });
+      }
+      if (body.status !== undefined) {
+        // Prevent invalid transition: In Progress -> To do
+        if (prev?.status === 'inprogress' && body.status === 'todo') {
+          return NextResponse.json({ error: 'Invalid status transition: cannot revert In Progress to To Do' }, { status: 400 });
+        }
+        changes.push({ field: 'status', oldValue: prev?.status, newValue: body.status });
+      }
+
+      const updatedTask = await prisma.task.update({ 
+        where: { id: taskId }, 
+        data, 
+        include: { 
+          createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+          assignee: { select: { id: true, firstName: true, lastName: true, email: true } } 
+        } 
+      });
+
+      // Audit log
+      if (changes.length > 0) {
+        await logTaskEvent({
+          userId: userId,
+          action: 'TASK_UPDATED',
+          taskId: taskId,
+          changes,
+          ipAddress: getIpAddress(request as any),
+        });
+      }
+
+      return NextResponse.json({ task: updatedTask });
+    }
+
+    // If user is the assignee, allow status changes only
+    if (task.assigneeId === userId) {
+      if (body.status === undefined) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      const oldStatus = prev?.status;
+
+      // Server-side guard: Prevent In Progress -> To Do transition by assignee
+      if (oldStatus === 'inprogress' && body.status === 'todo') {
+        return NextResponse.json({ error: 'Invalid status transition: cannot revert In Progress to To Do' }, { status: 400 });
+      }
+
+      const updatedTask = await prisma.task.update({ 
+        where: { id: taskId }, 
+        data: { status: body.status }, 
+        include: { 
+          createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+          assignee: { select: { id: true, firstName: true, lastName: true, email: true } } 
+        } 
+      });
+
+      // Audit log for status change
+      if (oldStatus !== body.status) {
+        await logTaskEvent({
+          userId: userId,
+          action: 'TASK_UPDATED',
+          taskId: taskId,
+          changes: [{ field: 'status', oldValue: oldStatus, newValue: body.status }],
+          ipAddress: getIpAddress(request as any),
+        });
+      }
+
+      return NextResponse.json({ task: updatedTask });
+    }
+
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   } catch (error) {
     console.error("Update task error:", error);
     return NextResponse.json({ error: "Failed to update task" }, { status: 500 });
@@ -135,6 +228,15 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     
     // Then delete the task
     const result = await prisma.task.delete({ where: { id: taskId } });
+
+    // Audit log
+    await logTaskEvent({
+      userId: userId,
+      action: 'TASK_DELETED',
+      taskId: taskId,
+      changes: [],
+      ipAddress: getIpAddress(request as any),
+    });
     
     return NextResponse.json({ success: true, task: result });
   } catch (error: any) {

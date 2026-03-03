@@ -2,8 +2,24 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Lock, Network } from "lucide-react";
+import {
+  AlertCircle,
+  Lock,
+  Network,
+  Sparkles,
+  TrendingUp,
+  Zap,
+  CheckCircle,
+  Clock,
+  Paperclip,
+  MessageSquare,
+  Plus,
+} from "lucide-react";
+import { ToastProvider, useToast } from "@/app/components/ToastProvider";
 import TaskStatusChart from "@/app/components/TaskStatusChart";
+import StatusCard from "@/app/components/dashboard/StatusCards";
+import WeeklyProgressChart from "@/app/components/dashboard/WeeklyProgressChart";
+import TaskSummary from "@/app/components/dashboard/TaskSummary";
 import { getCurrentUser } from "@/utils/sessionManager";
 import { useAuthProtection } from "@/app/hooks/useAuthProtection";
 import { PageContainer } from "@/app/components/PageContainer";
@@ -17,10 +33,10 @@ import {
 } from "@/utils/dijkstra";
 
 const COLORS = {
-  bg: "#ffffff",
-  cardBg: "#F9FAFD",
-  text: "#1f2937",
-  muted: "#6b7280",
+  bg: "bg-transparent",
+  cardBg: "bg-blue-400/10",
+  text: "text-white/62",
+  muted: "text-white/40",
   success: "#10b981",
   warning: "#f59e0b",
   error: "#ef4444",
@@ -30,6 +46,7 @@ const COLORS = {
   inProgress: "#3b82f6",
   done: "#10b981",
   stuck: "#ef4444",
+  pending: "#f59e0b",
 };
 
 interface Recommendation {
@@ -57,8 +74,17 @@ interface AnalyticsData {
 }
 
 export default function AnalyticsPage() {
+  return (
+    <ToastProvider>
+      <AnalyticsPageContent />
+    </ToastProvider>
+  );
+}
+
+function AnalyticsPageContent() {
   const router = useRouter();
   useAuthProtection(); // Protect this route
+  const toast = useToast();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,6 +100,27 @@ export default function AnalyticsPage() {
   const [hoveredSegment, setHoveredSegment] = useState<string | null>(null);
   const [criticalPath, setCriticalPath] = useState<string | null>(null);
   const [dijkstraError, setDijkstraError] = useState<string | null>(null);
+  const [weeklyData, setWeeklyData] = useState({
+    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    inProgress: [0, 0, 0, 0, 0, 0, 0],
+    completed: [0, 0, 0, 0, 0, 0, 0],
+    overdue: [0, 0, 0, 0, 0, 0, 0],
+  });
+  const [completedTasksHistory, setCompletedTasksHistory] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"completed" | "created" | "name">(
+    "completed",
+  );
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [visibleCount, setVisibleCount] = useState<number>(10);
+  const [deleteModalTaskId, setDeleteModalTaskId] = useState<number | null>(
+    null,
+  );
+  const [deleteModalTaskTitle, setDeleteModalTaskTitle] = useState("");
+  const [menuOpenTaskId, setMenuOpenTaskId] = useState<number | null>(null);
+
+  const isOwner = (task: any) =>
+    currentUser && task && task.createdById === currentUser.id;
 
   useEffect(() => {
     const loadUser = async () => {
@@ -249,6 +296,76 @@ export default function AnalyticsPage() {
             ? localAiTrends
             : generateTrends(completionRate, overdueTasks, tasks),
         );
+
+        // Calculate weekly data
+        const weekDataLabels = [
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu",
+          "Fri",
+          "Sat",
+          "Sun",
+        ];
+        const weekInProgress = [0, 0, 0, 0, 0, 0, 0];
+        const weekCompleted = [0, 0, 0, 0, 0, 0, 0];
+        const weekOverdue = [0, 0, 0, 0, 0, 0, 0];
+
+        tasks.forEach((task: any) => {
+          if (task.dueDate) {
+            const dayOfWeek = new Date(task.dueDate).getDay();
+            const dayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+            if (dayIndex >= 0 && dayIndex < 7) {
+              if (task.status === "completed" || task.status === "done") {
+                weekCompleted[dayIndex]++;
+              } else if (
+                task.status === "in-progress" ||
+                task.status === "inprogress"
+              ) {
+                weekInProgress[dayIndex]++;
+              } else if (
+                task.status !== "completed" &&
+                new Date(task.dueDate) < new Date()
+              ) {
+                weekOverdue[dayIndex]++;
+              }
+            }
+          }
+        });
+
+        setWeeklyData({
+          labels: weekDataLabels,
+          inProgress: weekInProgress,
+          completed: weekCompleted,
+          overdue: weekOverdue,
+        });
+
+        // Extract completed tasks history with metadata
+        const completedHistory = tasks
+          .filter((t: any) => t.status === "completed" || t.status === "done")
+          .map((t: any) => ({
+            id: t.id,
+            title: t.title,
+            completedDate: t.completedDate || t.updatedAt,
+            createdDate: t.createdDate || t.createdAt,
+            dueDate: t.dueDate,
+            assignedBy: t.assignedBy?.name || t.assignedBy || "Unknown",
+            status: t.status,
+            attachments: Array.isArray(t.attachments) ? t.attachments : [],
+            comments: Array.isArray(t.comments) ? t.comments : [],
+            attachmentsCount: Array.isArray(t.attachments)
+              ? t.attachments.length
+              : 0,
+            commentCount: Array.isArray(t.comments) ? t.comments.length : 0,
+            priority: t.priority || "medium",
+          }))
+          .sort(
+            (a: any, b: any) =>
+              new Date(b.completedDate).getTime() -
+              new Date(a.completedDate).getTime(),
+          );
+
+        setCompletedTasksHistory(completedHistory);
 
         setAnalytics({
           totalTasks,
@@ -449,19 +566,8 @@ export default function AnalyticsPage() {
 
   if (loading) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: COLORS.bg,
-          color: COLORS.text,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <div style={{ fontSize: 18, color: COLORS.muted }}>
-          Loading analytics...
-        </div>
+      <div className="min-h-screen bg-transparent flex items-center justify-center">
+        <div className="text-white/40 text-lg">Loading analytics...</div>
       </div>
     );
   }
@@ -474,60 +580,20 @@ export default function AnalyticsPage() {
     !authorizedRoles.includes(currentUser.role)
   ) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: COLORS.bg,
-          color: COLORS.text,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "20px",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: "400px",
-            textAlign: "center",
-            background: "#fef2f2",
-            border: "1px solid #fee2e2",
-            borderRadius: "12px",
-            padding: "40px 30px",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "16px",
-          }}
-        >
-          <Lock size={48} color="#ef4444" />
-          <h2 style={{ margin: "0", fontSize: "20px", fontWeight: "600" }}>
+      <div className="min-h-screen bg-transparent flex items-center justify-center p-5">
+        <div className="max-w-xs text-center bg-red-500/10 border border-red-500/30 rounded-lg p-10 flex flex-col items-center gap-4">
+          <Lock size={48} className="text-red-400" />
+          <h2 className="m-0 text-xl font-semibold text-white/62">
             Access Denied
           </h2>
-          <p
-            style={{
-              margin: "0",
-              fontSize: "14px",
-              color: COLORS.muted,
-              lineHeight: "1.6",
-            }}
-          >
+          <p className="m-0 text-sm text-white/40 leading-relaxed">
             Analytics is restricted to managers and above. Your current role (
             <strong>{currentUser.role}</strong>) does not have permission to
             access this page.
           </p>
           <button
             onClick={() => router.push("/dashboard")}
-            style={{
-              marginTop: "16px",
-              padding: "10px 20px",
-              background: COLORS.primary,
-              color: "white",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer",
-              fontSize: "14px",
-              fontWeight: "500",
-            }}
+            className="mt-4 px-5 py-2 bg-blue-600 text-white rounded-md cursor-pointer text-sm font-medium hover:bg-blue-700 transition-colors"
           >
             Return to Dashboard
           </button>
@@ -538,809 +604,506 @@ export default function AnalyticsPage() {
 
   if (!analytics) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: COLORS.bg,
-          color: COLORS.text,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <div style={{ fontSize: 18, color: COLORS.muted }}>
-          Failed to load analytics
-        </div>
+      <div className="min-h-screen bg-transparent flex items-center justify-center">
+        <div className="text-white/40 text-lg">Failed to load analytics</div>
       </div>
     );
   }
 
   return (
     <PageContainer title="ANALYTICS">
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          marginBottom: 24,
-        }}
-      >
-        <button
-          onClick={() => router.back()}
-          style={{
-            background: "none",
-            border: "none",
-            fontSize: 24,
-            cursor: "pointer",
-            color: COLORS.text,
-            padding: 0,
-          }}
-        >
-          ←
-        </button>
-        <h1
-          style={{
-            fontSize: 24,
-            fontWeight: 600,
-            margin: 0,
-            color: COLORS.text,
-          }}
-        >
-          Analytics Overview
-        </h1>
-      </div>
-
-      {/* Key Metrics Grid */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: 16,
-          marginBottom: 24,
-        }}
-      >
-        {[
-          {
-            label: "Campaign Tasks",
-            value: analytics.totalTasks,
-            color: COLORS.info,
-          },
-          {
-            label: "Delivered",
-            value: analytics.completedTasks,
-            color: COLORS.success,
-          },
-          {
-            label: "Success Rate",
-            value: `${analytics.completionRate}%`,
-            color: COLORS.warning,
-          },
-          {
-            label: "Timeline Risks",
-            value: analytics.overdueTasks,
-            color: COLORS.error,
-          },
-        ].map((metric, i) => (
-          <div
-            key={i}
-            style={{
-              background: COLORS.cardBg,
-              border: "1px solid rgba(0,0,0,0.1)",
-              filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
-              padding: 20,
-              borderRadius: 8,
-              display: "flex",
-              gap: 16,
-              alignItems: "flex-start",
-            }}
-          >
-            <div>
-              <p style={{ fontSize: 12, color: COLORS.muted, margin: 0 }}>
-                {metric.label}
-              </p>
-              <div
-                style={{
-                  fontSize: 28,
-                  fontWeight: 700,
-                  color: metric.color,
-                  marginTop: 4,
-                }}
+      {/* Key Metrics Grid - Using StatusCards for consistency */}
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <StatusCard
+          count={analytics.totalTasks}
+          label="Total Tasks"
+          icon="clock"
+          color="from-blue-500/20 to-blue-600/20"
+        />
+        <StatusCard
+          count={analytics.completedTasks}
+          label="Completed"
+          icon="check"
+          color="from-green-500/20 to-green-600/20"
+        />
+        <div className="bg-blue-400/10 backdrop-blur-lg border border-white/10 rounded-sm shadow-lg p-4 flex-1 flex-col justify-between h-full transition-all duration-300 w-auto min-w-[136px]">
+          <div className="flex w-full items-center justify-center gap-4">
+            <div className="text-purple-400">
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
               >
-                {metric.value}
-              </div>
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 6v6l4 2" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-xs text-white/40 m-0">Success Rate</p>
+              <p className="text-3xl font-normal text-white/62 mt-1 pl-0 m-0">
+                {analytics.completionRate}%
+              </p>
             </div>
           </div>
-        ))}
+        </div>
+        <StatusCard
+          count={analytics.overdueTasks}
+          label="Overdue"
+          icon="alert"
+          color="from-red-500/20 to-red-600/20"
+        />
       </div>
 
       {/* Critical Path - Task Optimization using Dijkstra */}
-      <div
-        style={{
-          background: COLORS.cardBg,
-          border: "1px solid rgba(0,0,0,0.1)",
-          filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
-          padding: 20,
-          borderRadius: 8,
-          marginBottom: 24,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            marginBottom: 16,
-          }}
-        >
-          <Network size={24} color={COLORS.info} />
-          <h2
-            style={{
-              fontSize: 16,
-              fontWeight: 600,
-              margin: 0,
-              color: COLORS.text,
-            }}
-          >
+      <div className="bg-blue-400/10 backdrop-blur-lg border border-white/10 rounded-sm shadow-xl p-5 mb-6">
+        <div className="flex items-center gap-3 mb-4">
+          <Network size={24} className="text-blue-400" />
+          <h2 className="text-base font-semibold m-0 text-white/62">
             Optimal Task Sequence (Dijkstra's Algorithm)
           </h2>
         </div>
 
         {dijkstraError ? (
-          <div
-            style={{
-              padding: 12,
-              background: "rgba(239, 68, 68, 0.1)",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              borderRadius: 6,
-              color: COLORS.error,
-              fontSize: 13,
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-            }}
-          >
+          <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-md text-red-400 text-xs flex gap-2 items-center">
             <AlertCircle size={18} />
             <span>{dijkstraError}</span>
           </div>
         ) : criticalPath ? (
-          <div
-            style={{
-              padding: 12,
-              background: "rgba(16, 185, 129, 0.1)",
-              border: "1px solid rgba(16, 185, 129, 0.3)",
-              borderRadius: 6,
-              fontSize: 13,
-            }}
-          >
-            <p style={{ margin: 0, color: COLORS.text, fontWeight: 500 }}>
+          <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-md text-sm">
+            <p className="m-0 text-white/62 font-semibold">
               🎯 <strong>Optimal Path:</strong> {criticalPath}
             </p>
-            <p
-              style={{
-                margin: "8px 0 0",
-                fontSize: 12,
-                color: COLORS.muted,
-              }}
-            >
+            <p className="m-0 mt-2 text-xs text-white/40">
               This represents the critical path - the longest sequence of
               dependent tasks that determines the minimum project completion
               time.
             </p>
           </div>
         ) : (
-          <p style={{ fontSize: 13, color: COLORS.muted, margin: 0 }}>
+          <p className="text-xs text-white/40 m-0">
             Loading optimal task sequence...
           </p>
         )}
       </div>
 
-      {/* Two Column Layout */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 20,
-          marginBottom: 24,
-        }}
-      >
-        {/* Recommendations */}
-        <div
-          style={{
-            background: COLORS.cardBg,
-            border: "1px solid rgba(0,0,0,0.1)",
-            filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
-            padding: 20,
-            borderRadius: 8,
-          }}
-        >
-          <h2
-            style={{
-              fontSize: 16,
-              fontWeight: 600,
-              marginBottom: 16,
-              margin: 0,
-              color: "#333",
-            }}
-          >
-            Smart Recommendations
-          </h2>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-              marginTop: 16,
-            }}
-          >
+      {/* Two Column Layout - Campaign Performance Summary & AI Recommendations */}
+      <div className="grid grid-cols-2 gap-5 mb-6">
+        {/* Campaign Performance Summary - Left */}
+        <div className="bg-green-500/10 border border-green-500/20 p-5 rounded-sm shadow-xl">
+          <h3 className="text-sm font-semibold m-0 mb-3 text-white/62 flex items-center gap-2">
+            <Sparkles size={16} className="text-green-400" /> Campaign
+            Performance Summary
+          </h3>
+          <div className="text-xs text-white/70 leading-relaxed">
+            <p>
+              {analytics.performanceSummary ||
+                `Your team is currently tracking at ${analytics.completionRate}% completion rate with ${analytics.totalTasks} total tasks. With ${analytics.completedTasks} completed and ${analytics.overdueTasks} overdue, the recommended focus is on maintaining momentum while addressing any blockers. Average task distribution per team member is ${analytics.avgTasksPerMember} tasks.`}
+            </p>
+          </div>
+
+          {/* Completion Metrics */}
+          {analytics.completedTasks > 0 && (
+            <div className="mt-4 pt-4 border-t border-green-500/20">
+              <div className="text-xs font-semibold text-green-300 mb-3 flex items-center gap-1">
+                <CheckCircle size={14} className="text-green-400" /> Completion
+                Metrics
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-white/5 rounded text-xs border border-white/10">
+                  <p className="text-white/40 m-0 mb-1">Total Completed</p>
+                  <p className="text-white/62 font-semibold m-0 text-lg">
+                    {analytics.completedTasks}
+                  </p>
+                </div>
+                <div className="p-3 bg-white/5 rounded text-xs border border-white/10">
+                  <p className="text-white/40 m-0 mb-1">Completion Rate</p>
+                  <p className="text-white/62 font-semibold m-0 text-lg">
+                    {analytics.completionRate}%
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* AI Recommendations - Right */}
+        <div className="bg-blue-400/10 backdrop-blur-lg border border-white/10 rounded-sm shadow-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles size={18} className="text-yellow-400" />
+            <h2 className="text-base font-semibold m-0 text-white/62">
+              AI Recommendations
+            </h2>
+          </div>
+          <div className="flex flex-col gap-3">
             {(analytics?.recommendations || []).length > 0 ? (
               analytics.recommendations.map((rec, i) => (
                 <div
                   key={i}
-                  style={{
-                    background: "rgba(0, 0, 0, 0.02)",
-                    border: "1px solid rgba(0, 0, 0, 0.1)",
-                    padding: 12,
-                    borderRadius: 6,
-                  }}
+                  className="bg-white/5 border border-white/10 p-3 rounded-md hover:bg-white/10 transition-colors"
                 >
-                  <h3
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      margin: "0 0 4px",
-                      color: COLORS.text,
-                    }}
-                  >
+                  <h3 className="text-xs font-semibold m-0 mb-1 text-white/62">
                     {rec.title}
                   </h3>
-                  <p
-                    style={{
-                      fontSize: 12,
-                      color: COLORS.muted,
-                      margin: 0,
-                      lineHeight: 1.5,
-                    }}
-                  >
+                  <p className="text-xs text-white/40 m-0 leading-relaxed">
                     {rec.description}
                   </p>
                 </div>
               ))
             ) : (
-              <p style={{ fontSize: 12, color: COLORS.muted }}>
+              <p className="text-xs text-white/40">
                 No recommendations available yet
               </p>
             )}
           </div>
         </div>
-
-        {/* Trends */}
-        <div
-          style={{
-            background: COLORS.cardBg,
-            border: "1px solid rgba(0,0,0,0.1)",
-            filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
-            padding: 20,
-            borderRadius: 8,
-          }}
-        >
-          <h2
-            style={{
-              fontSize: 16,
-              fontWeight: 600,
-              marginBottom: 16,
-              margin: 0,
-              color: "#333",
-            }}
-          >
-            Campaign Performance Trends
-          </h2>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-              marginTop: 16,
-            }}
-          >
-            {(analytics?.trends || []).length > 0 ? (
-              analytics.trends.map((trend, i) => {
-                const trendData =
-                  typeof trend === "string" ? { text: trend } : trend;
-                return (
-                  <div
-                    key={i}
-                    style={{
-                      padding: 12,
-                      background: "rgba(0, 0, 0, 0.02)",
-                      borderRadius: 6,
-                      border: "1px solid rgba(0, 0, 0, 0.1)",
-                    }}
-                  >
-                    <span style={{ fontSize: 13, color: COLORS.text }}>
-                      {trendData.text}
-                    </span>
-                  </div>
-                );
-              })
-            ) : (
-              <p style={{ fontSize: 12, color: COLORS.muted }}>
-                No trends available yet
-              </p>
-            )}
-          </div>
-        </div>
       </div>
 
-      {/* Charts Grid - Overall Task Overview and Team Progress */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(500px, 1fr))",
-          gap: 20,
-          marginBottom: 24,
-        }}
-      >
-        {/* Overall Task Overview - Detailed Pie Chart with AI Insights */}
-        <div
-          style={{
-            background: "#F9FAFD",
-            border: "1px solid rgba(0,0,0,0.1)",
-            filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
-            padding: 20,
-            borderRadius: 8,
-          }}
-        >
-          <h3
-            style={{
-              fontSize: 15,
-              fontWeight: 600,
-              margin: "0 0 16px 0",
-              color: "#333",
-            }}
-          >
-            Overall task overview
-          </h3>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 16,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 48,
-                justifyContent: "center",
-              }}
-            >
-              {/* Pie Chart SVG */}
-              {analytics.totalTasks > 0 ? (
-                <div style={{ position: "relative", flexShrink: 0 }}>
-                  <svg
-                    width="280"
-                    height="280"
-                    viewBox="0 0 200 200"
-                    style={{ flexShrink: 0 }}
-                  >
-                    <g transform="translate(100,100)">
-                      {(() => {
-                        const radius = 90;
-                        const gap = 0.04;
-                        let cumulative = -Math.PI / 2;
+      {/* Charts Grid - Weekly Progress and Task Summary (Reversed Layout) */}
+      <div className="grid grid-cols-2 gap-5 mb-6">
+        {/* Task Summary - Left */}
+        <TaskSummary
+          completed={analytics.completedTasks}
+          total={analytics.totalTasks}
+          inProgress={taskStatusCounts.inProgress}
+          pending={
+            analytics.totalTasks -
+            analytics.completedTasks -
+            taskStatusCounts.inProgress
+          }
+          overdue={analytics.overdueTasks}
+          aiInsight={
+            taskStatusCounts.done > taskStatusCounts.inProgress
+              ? "Strong completion rate! Your team is shipping tasks at a healthy pace. Keep maintaining this momentum."
+              : taskStatusCounts.inProgress > taskStatusCounts.stuck
+                ? "Good progress on active work. Focus on reducing bottlenecks to improve completion rate."
+                : "Many tasks are stuck. Prioritize unblocking these to accelerate delivery."
+          }
+        />
 
-                        const segments = [
-                          {
-                            value: taskStatusCounts.inProgress,
-                            color: COLORS.inProgress,
-                            label: "Working on it",
-                          },
-                          {
-                            value: taskStatusCounts.done,
-                            color: COLORS.done,
-                            label: "Done",
-                          },
-                          {
-                            value: taskStatusCounts.stuck,
-                            color: COLORS.stuck,
-                            label: "Stuck",
-                          },
-                        ].filter((s) => s.value > 0);
+        {/* Weekly Progress Chart - Right */}
+        <WeeklyProgressChart data={weeklyData} />
+      </div>
 
-                        return segments.map((segment, i) => {
-                          const portion = segment.value / analytics.totalTasks;
-                          const angle = portion * Math.PI * 2;
-                          const startAngle = cumulative + gap / 2;
-                          const endAngle = cumulative + angle - gap / 2;
-
-                          const x1 = radius * Math.cos(startAngle);
-                          const y1 = radius * Math.sin(startAngle);
-                          const x2 = radius * Math.cos(endAngle);
-                          const y2 = radius * Math.sin(endAngle);
-
-                          const largeArc = angle > Math.PI ? 1 : 0;
-
-                          // Calculate text position in the middle of the segment
-                          const textAngle = cumulative + angle / 2;
-                          const textRadius = radius * 0.65;
-                          const textX = textRadius * Math.cos(textAngle);
-                          const textY = textRadius * Math.sin(textAngle);
-
-                          if (
-                            segments.length === 1 &&
-                            angle > 2 * Math.PI - 0.1
-                          ) {
-                            return (
-                              <g key={i}>
-                                <circle
-                                  cx="0"
-                                  cy="0"
-                                  r={radius}
-                                  fill={segment.color}
-                                  stroke="#ffffff"
-                                  strokeWidth="1.5"
-                                  style={{
-                                    cursor: "pointer",
-                                    transition: "opacity 0.2s",
-                                    opacity:
-                                      hoveredSegment === null ||
-                                      hoveredSegment === segment.label
-                                        ? 1
-                                        : 0.6,
-                                  }}
-                                  onMouseEnter={() =>
-                                    setHoveredSegment(segment.label)
-                                  }
-                                  onMouseLeave={() => setHoveredSegment(null)}
-                                />
-                                {hoveredSegment === segment.label && (
-                                  <text
-                                    x={textX}
-                                    y={textY}
-                                    textAnchor="middle"
-                                    dominantBaseline="middle"
-                                    fill="white"
-                                    fontSize="16"
-                                    fontWeight="bold"
-                                    pointerEvents="none"
-                                  >
-                                    {segment.value}
-                                  </text>
-                                )}
-                              </g>
-                            );
-                          }
-
-                          const path = [
-                            `M ${x1} ${y1}`,
-                            `A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`,
-                            `L 0 0 Z`,
-                          ].join(" ");
-
-                          cumulative += angle;
-
-                          return (
-                            <g key={i}>
-                              <path
-                                d={path}
-                                fill={segment.color}
-                                stroke="#ffffff"
-                                strokeWidth="1.5"
-                                style={{
-                                  cursor: "pointer",
-                                  transition: "opacity 0.2s",
-                                  opacity:
-                                    hoveredSegment === null ||
-                                    hoveredSegment === segment.label
-                                      ? 1
-                                      : 0.6,
-                                }}
-                                onMouseEnter={() =>
-                                  setHoveredSegment(segment.label)
-                                }
-                                onMouseLeave={() => setHoveredSegment(null)}
-                              />
-                              {hoveredSegment === segment.label && (
-                                <text
-                                  x={textX}
-                                  y={textY}
-                                  textAnchor="middle"
-                                  dominantBaseline="middle"
-                                  fill="white"
-                                  fontSize="16"
-                                  fontWeight="bold"
-                                  pointerEvents="none"
-                                >
-                                  {segment.value}
-                                </text>
-                              )}
-                            </g>
-                          );
-                        });
-                      })()}
-                    </g>
-                  </svg>
-                </div>
-              ) : (
-                <div
-                  style={{
-                    width: 280,
-                    height: 280,
-                    borderRadius: "50%",
-                    background: "rgba(0,0,0,0.04)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: COLORS.muted,
-                    fontSize: 14,
-                    fontWeight: 500,
-                  }}
-                >
-                  No tasks yet
-                </div>
-              )}
-
-              {/* Legend */}
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 12,
-                  minWidth: 180,
-                }}
+      {/* Completed Tasks History (detailed with filters) */}
+      <div className="mt-6 bg-blue-400/10 backdrop-blur-lg border border-white/10 rounded-sm shadow-xl p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <CheckCircle size={18} className="text-green-400" />
+          <h2 className="text-base font-semibold m-0 text-white/62">
+            Completed Tasks
+          </h2>
+        </div>
+        {/* Toolbar with welcome message, search, and sort */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-sm text-white/62">
+            {currentUser
+              ? `Welcome back, ${currentUser.name || currentUser.email}! Here are your completed tasks for today.`
+              : "Completed Tasks"}
+          </div>
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              placeholder="Search task title or assignee..."
+              className="bg-white/10 border border-white/20 text-white/62 placeholder-white/40 p-2 rounded-md text-xs w-72"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-white/40">Sort by</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="bg-white/5 text-white/62 p-2 rounded-md text-xs"
               >
-                {[
-                  {
-                    label: "Working on it",
-                    value: taskStatusCounts.inProgress,
-                    color: COLORS.inProgress,
-                  },
-                  {
-                    label: "Done",
-                    value: taskStatusCounts.done,
-                    color: COLORS.done,
-                  },
-                  {
-                    label: "Stuck",
-                    value: taskStatusCounts.stuck,
-                    color: COLORS.stuck,
-                  },
-                ].map((item, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      fontSize: 13.5,
-                      fontWeight: 500,
-                      color: "#333",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 14,
-                        height: 14,
-                        borderRadius: 3,
-                        background: item.color,
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.12)",
-                      }}
-                    />
-                    <span>
-                      {item.label}{" "}
-                      <strong>
-                        {analytics.totalTasks > 0
-                          ? Math.round(
-                              (item.value / analytics.totalTasks) * 100,
-                            )
-                          : 0}
-                        %
-                      </strong>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* AI Insights */}
-            <div
-              style={{
-                background: "rgba(93, 139, 177, 0.05)",
-                border: "1px solid rgba(93, 139, 177, 0.2)",
-                padding: 12,
-                borderRadius: 6,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: COLORS.primary,
-                  marginBottom: 8,
-                }}
+                <option value="name">Name (A-Z)</option>
+                <option value="created">Task Created</option>
+                <option value="completed">Task Completed</option>
+              </select>
+              <button
+                onClick={() =>
+                  setSortDir((s) => (s === "asc" ? "desc" : "asc"))
+                }
+                className="bg-white/5 text-white/62 p-2 rounded-md text-xs"
+                title="Toggle sort direction"
               >
-                AI Insight
-              </div>
-              <div
-                style={{ fontSize: 12, color: COLORS.text, lineHeight: 1.6 }}
-              >
-                {taskStatusCounts.done > taskStatusCounts.inProgress
-                  ? "Strong completion rate! Your team is shipping tasks at a healthy pace. Keep maintaining this momentum."
-                  : taskStatusCounts.inProgress > taskStatusCounts.stuck
-                    ? "Good progress on active work. Focus on reducing bottlenecks to improve completion rate."
-                    : "Many tasks are stuck. Prioritize unblocking these to accelerate delivery."}
-              </div>
+                {sortDir === "asc" ? "Asc" : "Desc"}
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Overall Task Status Bar Chart - AI Enhanced */}
-        <div
-          style={{
-            background: "#F9FAFD",
-            border: "1px solid rgba(0,0,0,0.1)",
-            filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
-            padding: 20,
-            borderRadius: 8,
-          }}
-        >
-          <TaskStatusChart
-            title="Overall task status"
-            data={[
-              {
-                status: "Working on it",
-                count: taskStatusCounts.inProgress,
-                color: COLORS.inProgress,
-              },
-              {
-                status: "Stuck",
-                count: taskStatusCounts.stuck,
-                color: COLORS.stuck,
-              },
-              {
-                status: "Done",
-                count: taskStatusCounts.done,
-                color: COLORS.done,
-              },
-            ]}
-          />
+        <PageContentCon className="h-[300px] overflow-y-auto rounded-md">
+          <table className="w-full border-collapse text-sm">
+            <thead className="bg-blue-500/40 sticky top-0">
+              <tr className="border-b border-black/10">
+                <th className="px-3 py-2 text-left font-light text-white col-span-2">
+                  Task
+                </th>
+                <th className="px-3 py-2 text-left font-light text-white">
+                  Assignee
+                </th>
+                <th className="px-3 py-2 text-center font-light text-white">
+                  Attachment
+                </th>
+                <th className="px-3 py-2 text-center font-light text-white">
+                  Comment
+                </th>
+                <th className="px-3 py-2 text-center font-light text-white">
+                  Priority
+                </th>
+                <th className="px-3 py-2 text-right font-light text-white">
+                  Date Completed
+                </th>
+                <th className="px-3 py-2 text-center font-light text-white">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {(() => {
+                const q = searchQuery.trim().toLowerCase();
+                let items = completedTasksHistory.filter((task) => {
+                  if (!q) return true;
+                  return (
+                    task.title.toLowerCase().includes(q) ||
+                    (task.assignedBy || "").toLowerCase().includes(q)
+                  );
+                });
 
-          {/* AI Recommendations for Task Status */}
-          {aiRecommendations.length > 0 && (
-            <div
-              style={{
-                marginTop: 16,
-                paddingTop: 16,
-                borderTop: "1px solid rgba(0,0,0,0.1)",
-              }}
+                items = items.sort((a: any, b: any) => {
+                  if (sortBy === "name") {
+                    const an = a.title.toLowerCase();
+                    const bn = b.title.toLowerCase();
+                    return sortDir === "asc"
+                      ? an.localeCompare(bn)
+                      : bn.localeCompare(an);
+                  }
+                  if (sortBy === "created") {
+                    const ac = new Date(a.createdDate).getTime();
+                    const bc = new Date(b.createdDate).getTime();
+                    return sortDir === "asc" ? ac - bc : bc - ac;
+                  }
+                  // default: completed
+                  const ad = new Date(a.completedDate).getTime();
+                  const bd = new Date(b.completedDate).getTime();
+                  return sortDir === "asc" ? ad - bd : bd - ad;
+                });
+
+                const visible = items.slice(0, visibleCount);
+
+                return (
+                  <>
+                    {visible.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="py-10 text-center text-blue-200"
+                        >
+                          {completedTasksHistory.length === 0
+                            ? "No completed tasks"
+                            : "No matching tasks"}
+                        </td>
+                      </tr>
+                    ) : (
+                      visible.map((task: any, i: number) => {
+                        const completedDate = new Date(task.completedDate);
+                        return (
+                          <tr
+                            key={task.id || i}
+                            className="border-b border-white/6 hover:bg-white/2 transition-colors"
+                          >
+                            <td className="px-3 py-2 text-sm text-white/62 truncate">
+                              {task.title}
+                            </td>
+                            <td className="px-3 py-2 truncate">
+                              {task.assignedBy}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              {task.attachments &&
+                              task.attachments.length > 0 ? (
+                                <a
+                                  href={
+                                    task.attachments[0].url ||
+                                    task.attachments[0].filename ||
+                                    "#"
+                                  }
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 text-white/60"
+                                >
+                                  <Paperclip size={14} />{" "}
+                                  {task.attachments.length}
+                                </a>
+                              ) : (
+                                <span className="text-white/40">0</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              {task.comments && task.comments.length > 0 ? (
+                                <span className="inline-flex items-center gap-1 text-white/60">
+                                  <MessageSquare size={14} />{" "}
+                                  {task.comments.length}
+                                </span>
+                              ) : (
+                                <span className="text-white/40">0</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-center capitalize">
+                              {task.priority || "medium"}
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              {completedDate.toLocaleDateString()}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              {isOwner(task) && (
+                                <div className="relative">
+                                  <button
+                                    onClick={() =>
+                                      setMenuOpenTaskId(
+                                        menuOpenTaskId === task.id
+                                          ? null
+                                          : task.id,
+                                      )
+                                    }
+                                    className="p-1 text-white/60 hover:text-white transition-colors"
+                                    title="Actions"
+                                  >
+                                    ⋮
+                                  </button>
+                                  {menuOpenTaskId === task.id && (
+                                    <div className="absolute right-0 top-[calc(100%+4px)] bg-blue-950 border border-white/10 rounded-lg shadow-xl z-50 min-w-[120px]">
+                                      <button
+                                        onClick={() => {
+                                          setDeleteModalTaskId(task.id);
+                                          setDeleteModalTaskTitle(task.title);
+                                          setMenuOpenTaskId(null);
+                                        }}
+                                        className="w-full px-3 py-2 bg-none border-none text-white text-left cursor-pointer hover:bg-white/10 transition-colors text-sm"
+                                      >
+                                        Delete
+                                      </button>
+                                      <button
+                                        onClick={async () => {
+                                          try {
+                                            const res = await fetch(
+                                              `/api/tasks/${task.id}`,
+                                              {
+                                                method: "PATCH",
+                                                headers: {
+                                                  "Content-Type":
+                                                    "application/json",
+                                                },
+                                                body: JSON.stringify({
+                                                  status: "in-progress",
+                                                }),
+                                              },
+                                            );
+                                            if (res.ok) {
+                                              setCompletedTasksHistory(
+                                                completedTasksHistory.filter(
+                                                  (t) => t.id !== task.id,
+                                                ),
+                                              );
+                                              setMenuOpenTaskId(null);
+                                              toast.success(
+                                                "Task moved back to In Progress",
+                                              );
+                                            } else {
+                                              toast.error(
+                                                "Failed to undo task",
+                                              );
+                                            }
+                                          } catch (error) {
+                                            console.error(
+                                              "Failed to undo task:",
+                                              error,
+                                            );
+                                            toast.error("Failed to undo task");
+                                          }
+                                        }}
+                                        className="w-full px-3 py-2 bg-none border-none text-white text-left cursor-pointer hover:bg-white/10 transition-colors text-sm"
+                                      >
+                                        Undo
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </>
+                );
+              })()}
+            </tbody>
+          </table>
+        </PageContentCon>
+
+        <div className="flex justify-center mt-3">
+          {completedTasksHistory.length > visibleCount && (
+            <button
+              onClick={() => setVisibleCount((v) => v + 10)}
+              className="px-3 py-1 rounded-md bg-blue-500/30 text-white text-xs"
             >
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: COLORS.primary,
-                  marginBottom: 12,
-                }}
-              >
-                Recommended Actions
-              </div>
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: 10 }}
-              >
-                {aiRecommendations
-                  .slice(0, 3)
-                  .map((rec: Recommendation, i: number) => (
-                    <div
-                      key={i}
-                      style={{
-                        display: "flex",
-                        gap: 10,
-                        padding: 10,
-                        background: "rgba(0, 0, 0, 0.02)",
-                        borderLeft: "3px solid #000",
-                        borderRadius: 4,
-                      }}
-                    >
-                      <div
-                        style={{ fontSize: 12, minWidth: 16, color: "#000" }}
-                      >
-                        •
-                      </div>
-                      <div>
-                        <div
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 600,
-                            color: "#333",
-                          }}
-                        >
-                          {rec.title}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: COLORS.text,
-                            marginTop: 2,
-                          }}
-                        >
-                          {rec.description}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
+              Load more
+            </button>
           )}
         </div>
       </div>
 
-      {/* Performance Summary with AI Insights */}
-      <div
-        style={{
-          marginTop: 24,
-          background: "rgba(16, 185, 129, 0.1)",
-          border: "1px solid rgba(16, 185, 129, 0.2)",
-          padding: 20,
-          borderRadius: 8,
-        }}
-      >
-        <h3 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 12px" }}>
-          Campaign Performance Summary
-        </h3>
-        <div style={{ fontSize: 13, color: COLORS.text, lineHeight: 1.8 }}>
-          <p>
-            {analytics.performanceSummary ||
-              `Your team is currently tracking at ${analytics.completionRate}% completion rate with ${analytics.totalTasks} total tasks. With ${analytics.completedTasks} completed and ${analytics.overdueTasks} overdue, the recommended focus is on maintaining momentum while addressing any blockers. Average task distribution per team member is ${analytics.avgTasksPerMember} tasks.`}
-          </p>
-        </div>
-
-        {/* AI Trends */}
-        {aiTrends.length > 0 && (
-          <div
-            style={{
-              marginTop: 16,
-              paddingTop: 16,
-              borderTop: "1px solid rgba(16, 185, 129, 0.2)",
-            }}
-          >
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: "#059669",
-                marginBottom: 10,
-              }}
-            >
-              Current Trends
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                gap: 10,
-              }}
-            >
-              {aiTrends.map((trend: any, i: number) => (
-                <div
-                  key={i}
-                  style={{
-                    padding: 10,
-                    background: "rgba(0, 0, 0, 0.02)",
-                    borderRadius: 4,
-                    border: "1px solid rgba(0, 0, 0, 0.1)",
-                    fontSize: 12,
-                    color: COLORS.text,
-                  }}
-                >
-                  {typeof trend === "object" ? trend.text : trend}
-                </div>
-              ))}
+      {/* Delete Confirmation Modal */}
+      {deleteModalTaskId !== null && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center rounded-md z-50">
+          <div className="bg-gray-900 border border-white/20 rounded-md p-6 max-w-sm mx-4">
+            <h3 className="text-lg font-semibold text-white mb-2">
+              Delete Task
+            </h3>
+            <p className="text-sm text-white/60 mb-4">
+              Are you sure you want to permanently delete{" "}
+              <strong className="text-white">"{deleteModalTaskTitle}"</strong>?
+              This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDeleteModalTaskId(null)}
+                className="px-4 py-2 rounded-md bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await fetch(`/api/tasks/${deleteModalTaskId}`, {
+                      method: "DELETE",
+                    });
+                    if (res.ok) {
+                      setCompletedTasksHistory(
+                        completedTasksHistory.filter(
+                          (t) => t.id !== deleteModalTaskId,
+                        ),
+                      );
+                      setDeleteModalTaskId(null);
+                      toast.success("Task deleted permanently");
+                    } else {
+                      toast.error("Failed to delete task");
+                    }
+                  } catch (error) {
+                    console.error("Failed to delete task:", error);
+                    toast.error("Failed to delete task");
+                  }
+                }}
+                className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors"
+              >
+                Delete Permanently
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </PageContainer>
   );
 }

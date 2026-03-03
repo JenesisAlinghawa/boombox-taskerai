@@ -56,43 +56,46 @@ const TaskTimeline = ({
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
-    <div className="bg-white/10 backdrop-blur rounded-xl p-2 h-full flex flex-col">
+    <div className="bg-blue-400/10 backdrop-blur-lg border border-white/10 rounded-sm shadow-lg shadow-white/30 p-4 pl-8 pr-8 h-full flex flex-col">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-sm font-semibold text-black/62">Tasks Timeline</h2>
-        <div className="flex gap-1">
+        <h2 className="text-xl font-normal text-white/62">Tasks Timeline</h2>
+        <div className="flex gap-0">
+          <p className="text-m text-white/62 text-center">
+            {format(new Date(currentYear, currentMonth), "MMMM yyyy")}
+          </p>
+
           <button
             onClick={handlePrevMonth}
-            className="p-1 hover:bg-white/20 rounded"
+            className="p-1 hover:bg-white/20 rounded-xl"
           >
-            <ChevronLeft size={14} className="text-black/62" />
+            <ChevronLeft size={14} className="text-white/62" />
           </button>
           <button
             onClick={handleNextMonth}
-            className="p-1 hover:bg-white/20 rounded"
+            className="p-1 hover:bg-white/20 rounded-xl"
           >
-            <ChevronRight size={14} className="text-black/62" />
+            <ChevronRight size={14} className="text-white/62" />
           </button>
         </div>
       </div>
 
-      <p className="text-xs text-black/62 mb-2">
-        {format(new Date(currentYear, currentMonth), "MMMM yyyy")}
-      </p>
-
       {/* Weekday headers */}
-      <div className="grid grid-cols-7 gap-0.5 mb-1">
+      <div className="grid grid-cols-7 gap-0 mb-0">
         {weekDays.map((day) => (
-          <div key={day} className="text-xs text-black/62 text-center">
+          <div
+            key={day}
+            className="text-m font-semibold text-white/62 text-center"
+          >
             {day}
           </div>
         ))}
       </div>
 
       {/* Calendar grid */}
-      <div className="grid grid-cols-7 gap-0.5 flex-1 auto-rows-fr">
+      <div className="grid grid-cols-7 gap-0 flex-1 auto-rows-fr">
         {/* Empty cells for days before month starts */}
         {Array.from({ length: firstDay.getDay() }).map((_, i) => (
-          <div key={`empty-${i}`} className="bg-white/5 rounded" />
+          <div key={`empty-${i}`} className="border-white/10 pl-[-5] " />
         ))}
 
         {/* Days in month */}
@@ -104,10 +107,10 @@ const TaskTimeline = ({
             <div
               key={day.toISOString()}
               className={`
-                rounded flex items-center justify-center text-xs font-semibold
-                ${isToday ? "bg-blue-500 text-black/62" : ""}
-                ${hasTask && !isToday ? "bg-green-500/30 text-black/62" : ""}
-                ${!isToday && !hasTask ? "bg-white/5 text-black/62" : ""}
+                border-black/20 shadow-sm  flex items-center justify-center text-m font-semibold
+                ${isToday ? "bg-blue-500/30 text-white/62" : ""}
+                ${hasTask && !isToday ? "bg-green-500/30 text-white/62" : ""}
+                ${!isToday && !hasTask ? "bg-white/5 text-white/62" : ""}
               `}
             >
               {day.getDate()}

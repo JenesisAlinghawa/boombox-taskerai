@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { createNotification } from "@/lib/notificationService";
 
 function getUserIdFromRequest(request: NextRequest): number | null {
   const userHeader = request.headers.get("x-user-id");
@@ -164,14 +165,12 @@ export async function POST(request: NextRequest) {
     // Create notification for the added user
     const inviterData = (await prisma.user.findUnique({ where: { id: userId }, select: { firstName: true, lastName: true } }));
     const inviterName = `${inviterData?.firstName || ""} ${inviterData?.lastName || ""}`.trim() || "A user";
-    await prisma.notification.create({
+    await createNotification({
+      receiverId: userToAdd.id,
+      type: "team_added",
       data: {
-        receiverId: userToAdd.id,
-        type: "team_added",
-        data: {
-          title: "Added to Team",
-          message: `${inviterName} added you to their team`,
-        },
+        title: "Added to Team",
+        message: `${inviterName} added you to their team`,
       },
     });
 

@@ -2,12 +2,19 @@ import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 
 const Clock = () => {
-  const [time, setTime] = useState(new Date());
+  const [time, setTime] = useState<Date | null>(null);
 
   useEffect(() => {
+    setTime(new Date());
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  if (!time) {
+    return (
+      <div className="relative w-16 h-16 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-lg"></div>
+    );
+  }
 
   const hours = time.getHours() % 12;
   const minutes = time.getMinutes();
@@ -83,14 +90,14 @@ const DashboardHeader = () => {
   const dayName = format(today, "EEEE");
 
   return (
-    <div className="bg-white/10 backdrop-blur rounded-xl p-4 pl-10 h-medium flex flex-row justify-between items-start">
+    <div className="bg-blue-400/10 backdrop-blur-lg border border-white/10 rounded-sm shadow-lg  p-4 pl-10 h-medium flex flex-row justify-between items-start">
       <div>
-        <p className="text-3xl font-normal text-black/62">{formattedDate}</p>
-        <p className="text-black/62 font-normal text-md pl-4 mt-1">{dayName}</p>
+        <p className="text-3xl font-normal text-white/80">{formattedDate}</p>
+        <p className="text-white font-normal text-md pl-4 mt-1">{dayName}</p>
       </div>
-      <div className="flex items-center gap-4 text-black-300">
+      <div className="flex items-center gap-4 text-white/60">
         <Clock />
-        <span className="text-3xl text-black/62 font-normal pl-5 pr-10 tracking-widest">
+        <span className="text-3xl text-white/80 font-normal pl-5 pr-10 tracking-widest">
           {currentTime || "Loading..."}
         </span>
       </div>

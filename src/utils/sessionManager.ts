@@ -13,6 +13,8 @@ export interface User {
   profilePicture?: string;
   active?: boolean;
   lastActive?: Date;
+  emailNotifications?: boolean;
+  messageNotifications?: boolean;
 }
 
 /**

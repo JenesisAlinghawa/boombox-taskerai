@@ -42,7 +42,7 @@ export async function PUT(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const { firstName, lastName, profilePicture } = await request.json();
+    const { firstName, lastName, profilePicture, emailNotifications, messageNotifications } = await request.json();
 
     if (!firstName || !lastName) {
       return NextResponse.json(
@@ -61,6 +61,14 @@ export async function PUT(
       updateData.profilePicture = profilePicture;
     }
 
+    // update notification settings if provided
+    if (typeof emailNotifications === "boolean") {
+      updateData.emailNotifications = emailNotifications;
+    }
+    if (typeof messageNotifications === "boolean") {
+      updateData.messageNotifications = messageNotifications;
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: updateData,
@@ -74,6 +82,8 @@ export async function PUT(
         profilePicture: true,
         active: true,
         lastActive: true,
+        emailNotifications: true,
+        messageNotifications: true,
       },
     });
 

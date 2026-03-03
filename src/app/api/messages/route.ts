@@ -66,6 +66,26 @@ export async function GET(request: NextRequest) {
         isEdited: true,
         editedAt: true,
         parentMessageId: true,
+        parentMessage: {
+          select: {
+            id: true,
+            content: true,
+            createdAt: true,
+            sender: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                profilePicture: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            replies: true,
+          },
+        },
         createdAt: true,
         sender: {
           select: {
@@ -142,6 +162,26 @@ export async function POST(request: NextRequest) {
         reactions: true,
         isEdited: true,
         parentMessageId: true,
+        parentMessage: {
+          select: {
+            id: true,
+            content: true,
+            createdAt: true,
+            sender: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                profilePicture: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            replies: true,
+          },
+        },
         createdAt: true,
         sender: {
           select: {

@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { createNotification } from "@/lib/notificationService";
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,17 +75,14 @@ export async function POST(request: NextRequest) {
     });
 
     if (owner) {
-      await prisma.notification.create({
+      await createNotification({
+        receiverId: owner.id,
+        type: "NEW_USER_REQUEST",
         data: {
-          receiverId: owner.id,
-          type: "NEW_USER_REQUEST",
-          data: {
-            newUserId: newUser.id,
-            firstName,
-            lastName,
-            email: newUser.email,
-          },
-          read: false,
+          newUserId: newUser.id,
+          firstName,
+          lastName,
+          email: newUser.email,
         },
       });
     }

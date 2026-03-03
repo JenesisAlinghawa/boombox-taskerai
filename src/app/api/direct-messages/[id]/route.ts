@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { createNotification } from '@/lib/notificationService'
 
 export async function GET(
   req: NextRequest,
@@ -84,21 +85,42 @@ export async function POST(req: NextRequest) {
       select: { firstName: true, lastName: true },
     })
 
-    await prisma.notification.create({
+    await createNotification({
+      receiverId: recipientId,
+      type: 'direct_message',
       data: {
-        receiverId: recipientId,
-        type: 'direct_message',
-        data: {
-          title: `New message from ${sender?.firstName} ${sender?.lastName}`,
-          message: content,
-          senderId,
-        },
+        title: `New message from ${sender?.firstName} ${sender?.lastName}`,
+        message: content,
+        senderId,
       },
-    })
+    });
 
     return NextResponse.json({ success: true, message })
   } catch (error: any) {
     console.error('Send DM error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const messageId = parseInt(id)
+
+    if (!messageId) {
+      return NextResponse.json({ error: 'Message ID required' }, { status: 400 })
+    }
+
+    await prisma.directMessage.delete({
+      where: { id: messageId },
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
+    console.error('Delete DM error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
