@@ -1,49 +1,68 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentUser } from "@/utils/sessionManager";
 import { useAuthProtection } from "@/app/hooks/useAuthProtection";
-import { PageContainer } from "@/app/components/PageContainer";
-import { PageContentCon } from "@/app/components/PageContentCon";
+import { PageContainer } from "@/app/components/page-layouts/MainPageContainerLayoutComponent";
+import {
+  ChevronDown,
+  X,
+  Bell,
+  CheckSquare,
+  ListTodo,
+  AlertCircle,
+  Clock,
+  MessageCircle,
+  Users,
+  Gift,
+  UserPlus,
+} from "lucide-react";
 
 interface Notification {
   id: number;
   userId: number;
-  type: string; // 'task_assigned', 'channel_added', 'welcome', 'task_deadline', etc.
+  type: string;
   title: string;
   message: string;
-  relatedId?: number; // taskId, channelId, etc.
-  relatedType?: string; // 'task', 'channel', etc.
+  relatedId?: number;
+  relatedType?: string;
   isRead: boolean;
   createdAt: string;
 }
 
 export default function NotificationsPage() {
   const router = useRouter();
-  useAuthProtection(); // Protect this route
+  useAuthProtection();
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentEmployee, setCurrentEmployee] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [expandedGroups, setExpandedGroups] = useState<{
+    [key: string]: boolean;
+  }>({});
+  const [expandedMessages, setExpandedMessages] = useState<{
+    [key: number]: boolean;
+  }>({});
 
   useEffect(() => {
     const loadUser = async () => {
       const user = await getCurrentUser();
-      setCurrentUser(user);
+      setCurrentEmployee(user);
     };
     loadUser();
   }, []);
 
   const fetchNotifications = async () => {
-    if (currentUser?.messageNotifications === false) {
-      // nothing to fetch, API now returns [] anyway, but avoid network call
+    if (currentEmployee?.messageNotifications === false) {
       setNotifications([]);
       setLoading(false);
       return;
     }
 
     try {
-      const res = await fetch(`/api/notifications?userId=${currentUser?.id}`);
+      const res = await fetch(
+        `/api/notification-handlers?userId=${currentEmployee?.id}`,
+      );
       const data = await res.json();
       const items = Array.isArray(data?.notifications)
         ? data.notifications
@@ -57,17 +76,45 @@ export default function NotificationsPage() {
   };
 
   useEffect(() => {
-    if (!currentUser?.id) return;
+    if (!currentEmployee?.id) return;
     fetchNotifications();
 
-    // Poll for updates
     const interval = setInterval(() => fetchNotifications(), 3000);
     return () => clearInterval(interval);
-  }, [currentUser?.id]);
+  }, [currentEmployee?.id]);
+
+  // Group notifications: messages separate, others by type
+  const groupedNotifications = useMemo(() => {
+    const groups: { [key: string]: Notification[] } = {};
+
+    notifications.forEach((notif) => {
+      if (notif.relatedType === "message" || notif.type.includes("message")) {
+        const key = "messages";
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(notif);
+      } else {
+        const key = notif.type;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(notif);
+      }
+    });
+
+    // Sort messages by most recent and group others
+    Object.keys(groups).forEach((key) => {
+      groups[key].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+    });
+
+    return groups;
+  }, [notifications]);
 
   const handleDelete = async (notificationId: number) => {
     try {
-      await fetch(`/api/notifications/${notificationId}`, { method: "DELETE" });
+      await fetch(`/api/notification-handlers/${notificationId}`, {
+        method: "DELETE",
+      });
       setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
     } catch (err) {
       console.error("Failed to delete notification:", err);
@@ -76,9 +123,8 @@ export default function NotificationsPage() {
 
   const handleNotificationClick = async (notification: Notification) => {
     try {
-      // Mark as read
       if (!notification.isRead) {
-        await fetch(`/api/notifications/${notification.id}`, {
+        await fetch(`/api/notification-handlers/${notification.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ isRead: true }),
@@ -90,19 +136,18 @@ export default function NotificationsPage() {
         );
       }
 
-      // Navigate based on notification type
       if (notification.type === "new_user_registration") {
         router.push("/settings?tab=team");
       } else if (
         notification.relatedType === "task" &&
         notification.relatedId
       ) {
-        router.push(`/dashboard/tasks`);
+        router.push(`/tasks?focus=${notification.relatedId}`);
       } else if (
         notification.relatedType === "channel" &&
         notification.relatedId
       ) {
-        router.push(`/dashboard/messages`);
+        router.push(`/messages`);
       } else {
         router.push("/dashboard");
       }
@@ -112,242 +157,322 @@ export default function NotificationsPage() {
   };
 
   const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case "task_assigned":
-        return "📋";
-      case "channel_added":
-        return "👥";
-      case "welcome":
-        return "🎉";
-      case "task_deadline":
-        return "⏰";
-      case "new_user_registration":
-        return "👤";
-      default:
-        return "📢";
-    }
+    if (type === "task_assigned") return ListTodo;
+    if (type === "task_overdue") return AlertCircle;
+    if (type === "task_deadline_approaching") return Clock;
+    if (type.includes("task")) return CheckSquare;
+    if (type.includes("message") || type === "new_message")
+      return MessageCircle;
+    if (type === "channel_added") return Users;
+    if (type === "welcome") return Gift;
+    if (type === "new_user_registration") return UserPlus;
+    return Bell;
   };
 
   const getNotificationColor = (type: string) => {
-    switch (type) {
-      case "task_assigned":
-        return "#3b82f6"; // blue
-      case "channel_added":
-        return "#10b981"; // green
-      case "welcome":
-        return "#f59e0b"; // amber
-      case "task_deadline":
-        return "#ef4444"; // red
-      case "new_user_registration":
-        return "#8b5cf6"; // purple
-      default:
-        return "#6366f1"; // indigo
+    if (type.includes("task") || type === "task_assigned") {
+      return "#3b82f6";
+    } else if (
+      type === "task_overdue" ||
+      type === "task_deadline_approaching"
+    ) {
+      return "#ef4444";
+    } else if (type.includes("message") || type === "new_message") {
+      return "#06b6d4";
+    } else if (type === "channel_added") {
+      return "#10b981";
+    } else if (type === "welcome") {
+      return "#f59e0b";
+    } else if (type === "new_user_registration") {
+      return "#8b5cf6";
     }
+    return "#6366f1";
+  };
+
+  const getGroupTitle = (key: string) => {
+    if (key === "messages") return "Messages";
+    if (key === "task_assigned") return "Task Assignments";
+    if (key === "task_overdue") return "Overdue Tasks";
+    if (key === "task_deadline_approaching") return "Approaching Deadlines";
+    if (key === "channel_added") return "Channel Updates";
+    if (key === "new_user_registration") return "New Users";
+    return key
+      .split("_")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  };
+
+  const isLongText = (text: string, maxLength: number = 120) => {
+    return text.length > maxLength;
+  };
+
+  const getRelativeTime = (createdAt: string) => {
+    const date = new Date(createdAt);
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (seconds < 60) {
+      const unit = seconds === 1 ? "second" : "seconds";
+      return `${seconds} ${unit} ago`;
+    }
+
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) {
+      const unit = minutes === 1 ? "minute" : "minutes";
+      return `${minutes} ${unit} ago`;
+    }
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) {
+      const unit = hours === 1 ? "hour" : "hours";
+      return `${hours} ${unit} ago`;
+    }
+
+    const days = Math.floor(hours / 24);
+    if (days < 7) {
+      const unit = days === 1 ? "day" : "days";
+      return `${days} ${unit} ago`;
+    }
+
+    const weeks = Math.floor(days / 7);
+    if (weeks < 4) {
+      const unit = weeks === 1 ? "week" : "weeks";
+      return `${weeks} ${unit} ago`;
+    }
+
+    const months = Math.floor(days / 30);
+    if (months < 12) {
+      const unit = months === 1 ? "month" : "months";
+      return `${months} ${unit} ago`;
+    }
+
+    const years = Math.floor(days / 365);
+    const unit = years === 1 ? "year" : "years";
+    return `${years} ${unit} ago`;
   };
 
   return (
     <PageContainer title="NOTIFICATIONS">
-      {currentUser?.messageNotifications === false && (
-        <div className="p-4 mb-6 bg-yellow-100 text-yellow-800 rounded-lg text-center">
+      {currentEmployee?.messageNotifications === false && (
+        <div className="p-4 mb-6 bg-yellow-100/50 border border-yellow-400/30 rounded-sm text-yellow-800 text-center backdrop-blur-sm">
           You have <strong>disabled in‑app notifications</strong> in your
-          settings. This page will not show new alerts until you turn them back
-          on.
+          settings. Turn them back on to see alerts.
         </div>
       )}
+
       {loading ? (
-        <div style={{ color: "#333", textAlign: "center", padding: "40px" }}>
+        <div className="text-black/60 text-center py-10">
           Loading notifications...
         </div>
       ) : notifications.length === 0 ? (
-        <div
-          style={{
-            background: "#F9FAFD",
-            border: "1px solid rgba(0,0,0,0.1)",
-            filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
-            borderRadius: "12px",
-            padding: "40px",
-            textAlign: "center",
-            color: "#a0aec0",
-          }}
-        >
-          No notifications yet
+        <div className="bg-blue-100 backdrop-blur-lg border border-black/10 rounded-sm shadow-lg p-10 text-center text-black/60 transition-all duration-200 hover:border-black/50 hover:shadow-2xl">
+          <Bell size={32} className="mx-auto mb-3 text-black/40" />
+          <p>No notifications yet</p>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          {notifications.map((notification) => (
-            <div
-              key={notification.id}
-              style={{
-                background: "rgba(255, 255, 255, 0.12)",
-                backdropFilter: "blur(2px)",
-                WebkitBackdropFilter: "blur(5px)",
-                border: `1px solid ${
-                  notification.isRead
-                    ? "rgba(0,0,0,0.12)"
-                    : "rgba(239, 68, 68, 0.23)"
-                }`,
-                filter: "drop-shadow(2px 2px 5px rgba(211, 212, 214, 0.5))",
-                borderRadius: "12px",
-                padding: "6px 18px 6px 18px",
-                display: "flex",
-                alignItems: "center",
-                gap: "16px",
-                cursor: "pointer",
-                transition: "all 0.2s",
-                opacity: notification.isRead ? 0.8 : 1,
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.background =
-                  "rgba(249, 250, 253, 0.1)";
-                (e.currentTarget as HTMLElement).style.borderColor =
-                  "rgba(255, 255, 255, 0.22)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.background =
-                  "rgba(255, 255, 255, 0.22)";
-                (e.currentTarget as HTMLElement).style.borderColor =
-                  notification.isRead
-                    ? "rgba(255, 255, 255, 0.1)"
-                    : "rgba(255, 255, 255, 0.22)";
-              }}
-            >
-              {/* Icon */}
-              <div
-                style={{
-                  width: "38px",
-                  height: "38px",
-                  borderRadius: "42px",
-                  background: getNotificationColor(notification.type),
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "18px",
-                  flexShrink: 0,
-                }}
-              >
-                {getNotificationIcon(notification.type)}
-              </div>
+        <div className="flex flex-col gap-1">
+          {Object.entries(groupedNotifications).map(
+            ([groupKey, groupNotifs]) => {
+              // If only 1 notification in group, render without grouping
+              if (groupNotifs.length === 1) {
+                const notification = groupNotifs[0];
+                const isExpanded = expandedMessages[notification.id];
+                const isTooLong = isLongText(notification.message, 120);
+                const displayMessage = isExpanded
+                  ? notification.message
+                  : notification.message.slice(0, 120);
 
-              {/* Content */}
-              <div
-                style={{
-                  flex: 1,
-                  cursor: "pointer",
-                  minWidth: 0,
-                }}
-                onClick={() => handleNotificationClick(notification)}
-              >
-                <h3
-                  style={{
-                    color: "#ffffff",
-                    fontSize: "12px",
-                    fontWeight: 320,
-                    margin: "0 0 4px 0",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  {notification.title}
-                </h3>
-                <p
-                  style={{
-                    color: "#ffffff",
-                    fontSize: "10px",
-                    margin: "0",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  {notification.message}
-                </p>
-                <p
-                  style={{
-                    color: "#ffffff9f",
-                    fontSize: "10px",
-                    margin: 0,
-                  }}
-                >
-                  {new Date(notification.createdAt).toLocaleString()}
-                </p>
-              </div>
+                return (
+                  <div key={notification.id}>
+                    <div
+                      className={`flex items-start gap-1 p-2.5 rounded-sm border transition-all duration-150 bg-blue-100/80 backdrop-blur-md ${
+                        notification.isRead
+                          ? "border-black/10 opacity-75 hover:opacity-90"
+                          : "border-black/20 bg-blue-100 shadow-md"
+                      } hover:border-black/50 hover:shadow-lg cursor-pointer`}
+                      onClick={() => handleNotificationClick(notification)}
+                    >
+                      {/* Icon */}
+                      <div
+                        className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center"
+                        style={{
+                          background: getNotificationColor(notification.type),
+                        }}
+                      >
+                        {React.createElement(
+                          getNotificationIcon(notification.type),
+                          {
+                            size: 14,
+                            color: "white",
+                          },
+                        )}
+                      </div>
 
-              {/* Unread indicator */}
-              {!notification.isRead && (
-                <div
-                  style={{
-                    width: "8px",
-                    height: "8px",
-                    borderRadius: "50%",
-                    background: "#ef4444",
-                    flexShrink: 0,
-                  }}
-                />
-              )}
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-black/90 text-[10px] font-normal truncate">
+                          {notification.title}
+                        </h3>
+                        <p className="text-black/80 text-xs mt-0.5 break-words">
+                          {displayMessage}
+                          {isTooLong && !isExpanded && "..."}
+                        </p>
+                        {isTooLong && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedMessages((prev) => ({
+                                ...prev,
+                                [notification.id]: !prev[notification.id],
+                              }));
+                            }}
+                            className="mt-0.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                          >
+                            {isExpanded ? "Show less" : "Show more"}
+                          </button>
+                        )}
+                        <p className="text-black/65 text-[10px] mt-0.5">
+                          {getRelativeTime(notification.createdAt)}
+                        </p>
+                      </div>
 
-              {/* Action buttons */}
-              {notification.type === "new_user_registration" ? (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(notification.id);
-                  }}
-                  style={{
-                    background: "rgba(100, 116, 139, 0.2)",
-                    color: "#64748b",
-                    border: "1px solid rgba(100, 116, 139, 0.3)",
-                    borderRadius: "6px",
-                    padding: "6px 12px",
-                    fontSize: "12px",
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                    flexShrink: 0,
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.background =
-                      "rgba(255, 255, 255, 0.1)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.background =
-                      "rgba(255, 255, 255, 0.22)";
-                  }}
-                >
-                  Dismiss
-                </button>
-              ) : (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(notification.id);
-                  }}
-                  style={{
-                    background: "rgba(239, 68, 68, 0.2)",
-                    color: "#ffffff",
-                    border: "1px solid rgba(239, 68, 68, 0.3)",
-                    borderRadius: "6px",
-                    padding: "6px 12px",
-                    fontSize: "12px",
-                    fontWeight: 200,
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                    flexShrink: 0,
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.background =
-                      "rgba(239, 68, 68, 0.3)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.background =
-                      "rgba(239, 68, 68, 0.2)";
-                  }}
-                >
-                  Delete
-                </button>
-              )}
-            </div>
-          ))}
+                      {/* Unread Indicator */}
+                      {!notification.isRead && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0 mt-1" />
+                      )}
+
+                      {/* Delete Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(notification.id);
+                        }}
+                        className="ml-1 flex-shrink-0 p-0.5 text-black/60 hover:text-black hover:bg-black/10 rounded transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
+              // If multiple notifications, render with group header
+              return (
+                <div key={groupKey}>
+                  {/* Group Header */}
+                  <button
+                    onClick={() =>
+                      setExpandedGroups((prev) => ({
+                        ...prev,
+                        [groupKey]: !prev[groupKey],
+                      }))
+                    }
+                    className="w-full flex items-center gap-1 px-4 py-2 bg-blue-100 backdrop-blur-lg border border-black/10 rounded-sm shadow-lg text-black/80 text-sm font-semibold hover:border-black/50 hover:shadow-2xl transition-all duration-200 mb-2"
+                  >
+                    <ChevronDown
+                      size={16}
+                      className={`transition-transform duration-200 flex-shrink-0 ${
+                        expandedGroups[groupKey] ? "rotate-180" : ""
+                      }`}
+                    />
+                    <span>{getGroupTitle(groupKey)}</span>
+                    <span className="ml-auto bg-black/10 px-2 py-0.5 rounded text-xs">
+                      {groupNotifs.length}
+                    </span>
+                  </button>
+
+                  {/* Group Items */}
+                  {expandedGroups[groupKey] && (
+                    <div className="flex flex-col gap-1 ml-1">
+                      {groupNotifs.map((notification) => {
+                        const isExpanded = expandedMessages[notification.id];
+                        const isTooLong = isLongText(notification.message, 120);
+                        const displayMessage = isExpanded
+                          ? notification.message
+                          : notification.message.slice(0, 120);
+
+                        return (
+                          <div
+                            key={notification.id}
+                            className={`flex items-start gap-1 p-2.5 rounded-sm border transition-all duration-150 bg-blue-100/80 backdrop-blur-md ${
+                              notification.isRead
+                                ? "border-black/10 opacity-75 hover:opacity-90"
+                                : "border-black/20 bg-blue-100 shadow-md"
+                            } hover:border-black/50 hover:shadow-lg cursor-pointer`}
+                            onClick={() =>
+                              handleNotificationClick(notification)
+                            }
+                          >
+                            {/* Icon */}
+                            <div
+                              className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center"
+                              style={{
+                                background: getNotificationColor(
+                                  notification.type,
+                                ),
+                              }}
+                            >
+                              {React.createElement(
+                                getNotificationIcon(notification.type),
+                                {
+                                  size: 14,
+                                  color: "white",
+                                },
+                              )}
+                            </div>
+
+                            {/* Content */}
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-black/90 text-[10px] font-normal truncate">
+                                {notification.title}
+                              </h3>
+                              <p className="text-black/80 text-xs mt-0.5 break-words">
+                                {displayMessage}
+                                {isTooLong && !isExpanded && "..."}
+                              </p>
+                              {isTooLong && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedMessages((prev) => ({
+                                      ...prev,
+                                      [notification.id]: !prev[notification.id],
+                                    }));
+                                  }}
+                                  className="mt-0.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                                >
+                                  {isExpanded ? "Show less" : "Show more"}
+                                </button>
+                              )}
+                              <p className="text-black/65 text-[10px] mt-0.5">
+                                {getRelativeTime(notification.createdAt)}
+                              </p>
+                            </div>
+
+                            {/* Unread Indicator */}
+                            {!notification.isRead && (
+                              <div className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0 mt-1" />
+                            )}
+
+                            {/* Delete Button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(notification.id);
+                              }}
+                              className="ml-1 flex-shrink-0 p-0.5 text-black/60 hover:text-black hover:bg-black/10 rounded transition-colors"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            },
+          )}
         </div>
       )}
     </PageContainer>

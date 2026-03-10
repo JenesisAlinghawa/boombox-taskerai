@@ -11,11 +11,11 @@ datasource db {
 }
 
 // Role-based access control for TaskerAI
-// EMPLOYEE: Default role for new users. Cannot manage users or access team settings.
+// EMPLOYEE: Default role for new employees. Cannot manage employees or access team settings.
 // TEAM_LEAD: Can view team data. RESERVED for future expansion.
-// MANAGER: Can create, edit, delete users. Can manage team settings.
+// MANAGER: Can create, edit, delete employees. Can manage team settings.
 // CO_OWNER: Can do everything MANAGER can do. Can be promoted by OWNER for delegation.
-// OWNER: Full system access. Bootstrap account created via seed script. Only OWNER can promote users.
+// OWNER: Full system access. Bootstrap account created via seed script. Only OWNER can promote employees.
 enum Role {
   EMPLOYEE
   TEAM_LEAD
@@ -24,7 +24,7 @@ enum Role {
   OWNER
 }
 
-model User {
+model Employee {
   id                  Int       @id @default(autoincrement())
   email               String    @unique
   password            String
@@ -59,7 +59,7 @@ model User {
 }
 
 model Task {
-  id          Int      @id @default(autoincrement())
+  id          String   @id @default(cuid())
   title       String
   description String?
   status      String   @default("todo")
@@ -70,26 +70,26 @@ model Task {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  createdBy   User     @relation("CreatedTasks", fields: [createdById], references: [id], onDelete: Cascade)
-  assignee    User?    @relation("AssignedTasks", fields: [assigneeId], references: [id], onDelete: SetNull)
+  createdBy   Employee @relation("CreatedTasks", fields: [createdById], references: [id], onDelete: Cascade)
+  assignee    Employee? @relation("AssignedTasks", fields: [assigneeId], references: [id], onDelete: SetNull)
   comments    Comment[]
   attachments Attachment[]
 }
 
 model Comment {
   id        Int      @id @default(autoincrement())
-  taskId    Int
+  taskId    String
   userId    Int?
   content   String
   createdAt DateTime @default(now())
 
   task Task @relation(fields: [taskId], references: [id])
-  user User? @relation(fields: [userId], references: [id])
+  employee Employee? @relation(fields: [userId], references: [id])
 }
 
 model Attachment {
   id        Int      @id @default(autoincrement())
-  taskId    Int
+  taskId    String
   url       String
   filename  String?
   createdAt DateTime @default(now())
@@ -107,7 +107,7 @@ model Channel {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  creator         User      @relation("ChannelCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  creator         Employee @relation("ChannelCreator", fields: [creatorId], references: [id], onDelete: Cascade)
   members         ChannelMember[]
   editors         ChannelEditor[]
   messages        Message[]
@@ -119,7 +119,7 @@ model ChannelMember {
   channelId Int
   joinedAt  DateTime @default(now())
 
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [userId], references: [id], onDelete: Cascade)
   channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
   @@unique([userId, channelId])
@@ -131,7 +131,7 @@ model ChannelEditor {
   channelId Int
   grantedAt DateTime @default(now())
 
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [userId], references: [id], onDelete: Cascade)
   channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
   @@unique([userId, channelId])
@@ -152,7 +152,7 @@ model Message {
   updatedAt       DateTime  @updatedAt
 
   channel         Channel?  @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  sender          User      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  sender          Employee @relation(fields: [senderId], references: [id], onDelete: Cascade)
   parentMessage   Message?  @relation("MessageReplies", fields: [parentMessageId], references: [id], onDelete: Cascade)
   replies         Message[] @relation("MessageReplies")
 }
@@ -168,8 +168,8 @@ model DirectMessage {
   parentMessageId Int?
   createdAt DateTime @default(now())
 
-  sender    User @relation("SentDirectMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  recipient User @relation("ReceivedDirectMessages", fields: [recipientId], references: [id], onDelete: Cascade)
+  sender    Employee @relation("SentDirectMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient Employee @relation("ReceivedDirectMessages", fields: [recipientId], references: [id], onDelete: Cascade)
   parentMessage DirectMessage? @relation("DirectMessageReplies", fields: [parentMessageId], references: [id], onDelete: Cascade)
   replies DirectMessage[] @relation("DirectMessageReplies")
 }
@@ -182,7 +182,7 @@ model Notification {
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  receiver  User     @relation(fields: [receiverId], references: [id], onDelete: Cascade)
+  receiver  Employee @relation(fields: [receiverId], references: [id], onDelete: Cascade)
 }
 
 model Log {
@@ -193,7 +193,7 @@ model Log {
   data      Json?
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employee  Employee @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Team {
@@ -203,7 +203,7 @@ model Team {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  owner   User       @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  owner   Employee   @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   members TeamMember[]
 }
 
@@ -216,9 +216,9 @@ model TeamMember {
   joinedAt  DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  team   Team  @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  user   User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  inviter User? @relation("TeamMemberInviter", fields: [inviterId], references: [id], onDelete: SetNull)
+  team   Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inviter  Employee? @relation("TeamMemberInviter", fields: [inviterId], references: [id], onDelete: SetNull)
 
   @@unique([teamId, userId])
 }
@@ -234,7 +234,7 @@ model AuditLog {
   success    Boolean  @default(true)
   createdAt  DateTime @default(now())
 
-  user       User?    @relation("AuditLogs", fields: [userId], references: [id], onDelete: SetNull)
+  employee   Employee? @relation("AuditLogs", fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([action])

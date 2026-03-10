@@ -19,7 +19,8 @@ export function setupAuditMiddleware(prisma: any) {
         }
 
         if (params.action === "create") {
-          await logTaskEvent({
+          // Fire-and-forget to avoid blocking
+          logTaskEvent({
             userId,
             action: "TASK_CREATED",
             taskId: result.id,
@@ -40,6 +41,8 @@ export function setupAuditMiddleware(prisma: any) {
                 newValue: result.priority,
               },
             ],
+          }).catch(err => {
+            console.error("Audit logging error:", err);
           });
         }
 
@@ -86,20 +89,26 @@ export function setupAuditMiddleware(prisma: any) {
             });
 
           if (changes.length > 0) {
-            await logTaskEvent({
+            // Fire-and-forget to avoid blocking
+            logTaskEvent({
               userId,
               action: "TASK_UPDATED",
               taskId: result.id || params.args.where.id,
               changes,
+            }).catch(err => {
+              console.error("Audit logging error:", err);
             });
           }
         }
 
         if (params.action === "delete") {
-          await logTaskEvent({
+          // Fire-and-forget to avoid blocking
+          logTaskEvent({
             userId,
             action: "TASK_DELETED",
             taskId: params.args.where.id,
+          }).catch(err => {
+            console.error("Audit logging error:", err);
           });
         }
       } catch (error) {

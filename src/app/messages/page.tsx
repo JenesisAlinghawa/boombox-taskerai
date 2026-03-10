@@ -19,13 +19,15 @@ import {
   MapPin,
   X,
   Loader,
+  MoreVertical,
+  MessageCirclePlus,
 } from "lucide-react";
 import { getCurrentUser } from "@/utils/sessionManager";
 import { useAuthProtection } from "@/app/hooks/useAuthProtection";
-import CreateChannelModal from "@/app/components/messaging/CreateChannelModal";
-import { MessageBubble } from "@/app/components/MessageBubble";
-import { PageContainer } from "@/app/components/PageContainer";
-import { PageContentCon } from "@/app/components/PageContentCon";
+import CreateChannelModal from "@/app/components/messaging-components/CreateNewChannelModalComponent";
+import { MessageBubble } from "@/app/components/messaging-components/ChatMessageBubbleDisplayComponent";
+import { PageContainer } from "@/app/components/page-layouts/MainPageContainerLayoutComponent";
+import { PageContentCon } from "@/app/components/page-layouts/PageContentWrapperContainerComponent";
 import { io, Socket } from "socket.io-client";
 import {
   buildTaskGraph,
@@ -36,7 +38,7 @@ import {
   type TaskNode as DijkstraTaskNode,
 } from "@/utils/dijkstra";
 
-interface User {
+interface Employee {
   id: number;
   firstName: string;
   lastName: string;
@@ -52,7 +54,7 @@ interface Channel {
   name: string;
   description?: string;
   profilePicture?: string;
-  members: Array<{ user: User }>;
+  members: Array<{ user: Employee }>;
   creatorId: number;
 }
 
@@ -79,7 +81,7 @@ interface Message {
     replies: number;
   };
   createdAt: string;
-  sender: User;
+  sender: Employee;
 }
 
 type ViewType = "channels" | "dms";
@@ -89,26 +91,26 @@ const ChannelListItem = React.memo(function ChannelListItem({
   channel,
   onSelect,
   unreadCount,
+  isActive = false,
 }: {
   channel: Channel;
   onSelect: (channel: Channel) => void;
   unreadCount?: number;
+  isActive?: boolean;
 }) {
-  const [showTooltip, setShowTooltip] = React.useState(false);
-
   return (
     <div
       onClick={() => onSelect(channel)}
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
-      className="relative flex items-center justify-center p-1 rounded-md cursor-pointer w-fit"
+      className={`flex items-center p-1 rounded-sm cursor-pointer w-full transition-colors border-l-4 ${
+        isActive ? "border-blue-400 bg-blue-200" : "border-transparent"
+      } hover:border-black/50 hover:bg-blue-50`}
     >
-      <div className="relative w-8 h-8 rounded-full bg-white flex items-center justify-center text-[16px] text-[#798CC3] font-semibold overflow-hidden">
+      <div className="relative w-8 h-8 rounded-full bg-white flex items-center justify-center text-[16px] text-gray-400 font-semibold overflow-hidden border border-black/10">
         {channel.profilePicture ? (
           <img
             src={channel.profilePicture}
             alt={channel.name}
-            className="w-full h-full rounded-full object-cover"
+            className="w-full h-full rounded-full object-cover object-center"
           />
         ) : (
           channel.name[0].toUpperCase()
@@ -123,81 +125,67 @@ const ChannelListItem = React.memo(function ChannelListItem({
           </div>
         )}
       </div>
-
-      {showTooltip && (
-        <div
-          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black/90 text-white text-xs rounded-md px-2 py-1 z-50 whitespace-nowrap pointer-events-none"
-          style={{ fontFamily: "var(--font-inria-sans)" }}
-        >
-          {channel.name}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-black/90" />
-        </div>
-      )}
+      <span className="ml-2 text-black/80 text-sm truncate whitespace-nowrap hidden sm:block">
+        {channel.name}
+      </span>
     </div>
   );
 });
 
 // User List Item Component
 const UserListItem = React.memo(function UserListItem({
-  user,
+  employee,
   isOnline,
   onSelect,
+  isActive = false,
 }: {
-  user: User;
+  employee: Employee;
   isOnline: boolean;
-  onSelect: (user: User) => void;
+  onSelect: (employee: Employee) => void;
+  isActive?: boolean;
 }) {
-  const [showTooltip, setShowTooltip] = React.useState(false);
-
   return (
     <div
-      onClick={() => onSelect(user)}
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
-      className="relative flex items-center justify-center p-1 rounded-md cursor-pointer w-fit"
+      onClick={() => onSelect(employee)}
+      className={`flex items-center p-1 rounded-sm cursor-pointer w-full transition-colors border-l-4 ${
+        isActive ? "border-blue-400 bg-blue-200" : "border-transparent"
+      } hover:border-black/50 hover:bg-blue-50`}
     >
       <div className="relative w-8 h-8 flex-shrink-0">
-        <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-[16px] text-[#798CC3] font-semibold overflow-hidden">
-          {user.profilePicture ? (
+        <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-[16px] text-gray-400 font-semibold overflow-hidden border border-black/10">
+          {employee.profilePicture ? (
             <img
-              src={user.profilePicture}
-              alt={user.firstName}
-              className="w-full h-full rounded-full object-cover"
+              src={employee.profilePicture}
+              alt={employee.firstName}
+              className="w-full h-full rounded-full object-cover object-center"
             />
           ) : (
-            `${user.firstName[0]}${user.lastName[0]}`
+            `${employee.firstName[0]}${employee.lastName[0]}`
           )}
         </div>
         <div
-          className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 ${isOnline ? "bg-emerald-500" : "bg-gray-500"} border-[rgba(13,27,42,1)]`}
+          className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 ${isOnline ? "bg-emerald-500" : "bg-gray-500"} border-blue-100`}
         />
       </div>
-
-      {showTooltip && (
-        <div
-          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black/90 text-white text-xs rounded-md px-2 py-1 z-50 whitespace-nowrap pointer-events-none"
-          style={{ fontFamily: "var(--font-inria-sans)" }}
-        >
-          {user.firstName} {user.lastName}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-black/90" />
-        </div>
-      )}
+      <span className="ml-2 text-black/80 text-sm truncate whitespace-nowrap hidden sm:block">
+        {employee.firstName} {employee.lastName}
+      </span>
     </div>
   );
 });
 
 export default function MessagesPage() {
   useAuthProtection(); // Protect this route
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
   const [activeView, setActiveView] = useState<ViewType>("channels");
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
-  const [selectedDMUser, setSelectedDMUser] = useState<User | null>(null);
+  const [selectedDMUser, setSelectedDMUser] = useState<Employee | null>(null);
 
   const [channels, setChannels] = useState<Channel[]>([]);
   const [channelUnreadCounts, setChannelUnreadCounts] = useState<
     Record<number, number>
   >({});
-  const [dmConversations, setDmConversations] = useState<User[]>([]);
+  const [dmConversations, setDmConversations] = useState<Employee[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [filteredMessages, setFilteredMessages] = useState<Message[]>([]);
 
@@ -230,10 +218,12 @@ export default function MessagesPage() {
   const [editingChannelName, setEditingChannelName] = useState("");
   const [editingChannelDesc, setEditingChannelDesc] = useState("");
   const [activeUserIds, setActiveUserIds] = useState<string[]>([]);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  const canViewUserTaskProgress = (currentUserRole: string): boolean => {
+  const canViewUserTaskProgress = (currentEmployeeRole: string): boolean => {
     const highRoles = ["ADMIN", "MANAGER", "LEAD"];
-    return highRoles.includes(currentUserRole);
+    return highRoles.includes(currentEmployeeRole);
   };
 
   // Debug: Log activeUserIds changes
@@ -245,15 +235,30 @@ export default function MessagesPage() {
     loadInitialData();
   }, []);
 
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+
+    if (menuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [menuOpen]);
+
   // Fetch channel unread counts periodically
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentEmployee) return;
 
     const fetchChannelUnreadCounts = async () => {
       try {
-        const res = await fetch("/api/channels/unread", {
+        const res = await fetch("/api/channel-management/unread", {
           headers: {
-            "x-user-id": String(currentUser.id),
+            "x-user-id": String(currentEmployee.id),
           },
         });
 
@@ -270,10 +275,10 @@ export default function MessagesPage() {
     const interval = setInterval(fetchChannelUnreadCounts, 3000);
 
     return () => clearInterval(interval);
-  }, [currentUser]);
+  }, [currentEmployee]);
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentEmployee) return;
 
     console.log("Initializing socket connection...");
     socketRef.current = io(undefined, {
@@ -290,8 +295,8 @@ export default function MessagesPage() {
     socket.on("connect", () => {
       console.log("Socket.io connected");
       socket.emit("user:join", {
-        userId: String(currentUser.id),
-        userName: `${currentUser.firstName} ${currentUser.lastName}`,
+        userId: String(currentEmployee.id),
+        userName: `${currentEmployee.firstName} ${currentEmployee.lastName}`,
       });
     });
 
@@ -301,10 +306,10 @@ export default function MessagesPage() {
 
     socket.on("users:active", (userIds: string[]) => {
       console.log("Active users received:", userIds);
-      console.log("Current user ID:", String(currentUser.id));
+      console.log("Current user ID:", String(currentEmployee.id));
       console.log(
         "Is current user online?",
-        userIds.includes(String(currentUser.id)),
+        userIds.includes(String(currentEmployee.id)),
       );
       setActiveUserIds(userIds);
     });
@@ -316,13 +321,13 @@ export default function MessagesPage() {
       if (
         selectedDMUser &&
         newMessage.sender.id === selectedDMUser.id &&
-        currentUser
+        currentEmployee
       ) {
-        fetch("/api/direct-messages/mark-as-read", {
+        fetch("/api/direct-messaging-endpoints/mark-as-read", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-user-id": String(currentUser.id),
+            "x-user-id": String(currentEmployee.id),
           },
           body: JSON.stringify({ senderId: selectedDMUser.id }),
         }).catch((err) => console.error("Failed to mark as read:", err));
@@ -369,7 +374,7 @@ export default function MessagesPage() {
     return () => {
       socket.disconnect();
     };
-  }, [currentUser]);
+  }, [currentEmployee]);
 
   useEffect(() => {
     if (selectedChannel) {
@@ -384,9 +389,9 @@ export default function MessagesPage() {
       });
 
       // Subscribe to this specific channel room for real-time messages
-      if (currentUser && socketRef.current) {
+      if (currentEmployee && socketRef.current) {
         socketRef.current.emit("channel:join", {
-          userId: currentUser.id,
+          userId: currentEmployee.id,
           channelId: selectedChannel.id,
         });
       }
@@ -399,9 +404,9 @@ export default function MessagesPage() {
       fetchDMMessages();
 
       // Subscribe to this specific DM room for real-time messages
-      if (currentUser && socketRef.current) {
+      if (currentEmployee && socketRef.current) {
         socketRef.current.emit("dm:join", {
-          userId: currentUser.id,
+          userId: currentEmployee.id,
           otherUserId: selectedDMUser.id,
         });
       }
@@ -409,7 +414,7 @@ export default function MessagesPage() {
       // Poll for new messages every 2 seconds when viewing DMs
       const pollInterval = setInterval(fetchDMMessages, 2000);
 
-      if (currentUser && canViewUserTaskProgress(currentUser.role)) {
+      if (currentEmployee && selectedDMUser) {
         fetchUserTaskProgress(selectedDMUser);
       } else {
         setSelectedUserTasks([]);
@@ -426,7 +431,7 @@ export default function MessagesPage() {
     } else {
       setMessages([]);
     }
-  }, [selectedChannel, selectedDMUser, currentUser]);
+  }, [selectedChannel, selectedDMUser, currentEmployee]);
 
   useEffect(() => {
     scrollToBottom();
@@ -451,7 +456,7 @@ export default function MessagesPage() {
     memberIds: number[];
     profilePictureFile?: File;
   }) => {
-    if (!currentUser) return;
+    if (!currentEmployee) return;
 
     try {
       const formData = new FormData();
@@ -462,10 +467,10 @@ export default function MessagesPage() {
         formData.append("profilePicture", data.profilePictureFile);
       }
 
-      const res = await fetch("/api/channels", {
+      const res = await fetch("/api/channel-management", {
         method: "POST",
         headers: {
-          "x-user-id": String(currentUser.id),
+          "x-user-id": String(currentEmployee.id),
         },
         body: formData,
       });
@@ -491,7 +496,7 @@ export default function MessagesPage() {
         return;
       }
 
-      setCurrentUser(user as User);
+      setCurrentEmployee(user as Employee);
 
       // Set loading to false immediately so UI shows
       setLoading(false);
@@ -502,13 +507,13 @@ export default function MessagesPage() {
 
       try {
         const [channelsRes, dmsRes] = await Promise.all([
-          fetch(`/api/channels?userId=${(user as any).id}`, {
+          fetch(`/api/channel-management?userId=${(user as any).id}`, {
             headers: {
               "x-user-id": String((user as any).id),
             },
             signal: controller.signal,
           }),
-          fetch("/api/direct-messages", {
+          fetch("/api/direct-messaging-endpoints", {
             headers: {
               "x-user-id": String((user as any).id),
             },
@@ -520,15 +525,39 @@ export default function MessagesPage() {
 
         if (channelsRes.ok) {
           const data = await channelsRes.json();
+          console.log("[Messages] Channels API response:", data);
+          console.log(
+            "[Messages] Channels loaded:",
+            data.channels?.length || 0,
+          );
           setChannels(data.channels || []);
+        } else {
+          const errText = await channelsRes.text();
+          console.error(
+            "[Messages] Failed to load channels:",
+            channelsRes.status,
+            errText,
+          );
         }
 
         if (dmsRes.ok) {
           const data = await dmsRes.json();
+          console.log("[Messages] DM API response:", data);
           const conversations = (data.conversations || []).filter(
             (u: any) => u && u.firstName && u.lastName,
           );
+          console.log(
+            "[Messages] DM conversations loaded:",
+            conversations.length,
+          );
           setDmConversations(conversations);
+        } else {
+          const errText = await dmsRes.text();
+          console.error(
+            "[Messages] Failed to load DMs:",
+            dmsRes.status,
+            errText,
+          );
         }
       } catch (fetchErr: any) {
         clearTimeout(timeoutId);
@@ -543,155 +572,239 @@ export default function MessagesPage() {
   };
 
   const fetchChannelMessages = async () => {
-    if (!selectedChannel || !currentUser) return;
+    if (!selectedChannel || !currentEmployee) return;
     try {
+      console.log(
+        `[Messages] Fetching messages for channel ${selectedChannel.id}...`,
+      );
       const res = await fetch(
-        `/api/messages?channelId=${selectedChannel.id}&limit=50`,
+        `/api/message-endpoints?channelId=${selectedChannel.id}&limit=50`,
         {
           headers: {
-            "x-user-id": String(currentUser.id),
+            "x-user-id": String(currentEmployee.id),
           },
         },
       );
-      if (res.ok) {
-        const data = await res.json();
-        const newMessages = data.messages || [];
 
-        // Only update if messages actually changed (avoid re-renders)
-        setMessages((prev) => {
-          const prevIds = new Set(prev.map((m: Message) => m.id));
-          const newIds = new Set(newMessages.map((m: Message) => m.id));
+      if (!res.ok) {
+        console.error(`[Messages] API error: ${res.status} ${res.statusText}`);
+        const error = await res.json().catch(() => ({}));
+        console.error("[Messages] Error details:", error);
+        setError(`Failed to fetch messages: ${error?.error || res.statusText}`);
+        return;
+      }
 
-          // If message count changed or IDs changed, update
-          if (
-            prev.length !== newMessages.length ||
-            ![...prevIds].every((id) => newIds.has(id))
-          ) {
-            return newMessages;
-          }
-          return prev;
-        });
+      const data = await res.json();
+      const newMessages = data.messages || [];
+      console.log(`[Messages] Received ${newMessages.length} messages`);
 
-        // Mark messages in this channel as read in the database
-        try {
-          await fetch(`/api/channels/${selectedChannel.id}/mark-as-read`, {
+      // Only update if messages actually changed (avoid re-renders)
+      setMessages((prev) => {
+        const prevIds = new Set(prev.map((m: Message) => m.id));
+        const newIds = new Set(newMessages.map((m: Message) => m.id));
+
+        // If message count changed or IDs changed, update
+        if (
+          prev.length !== newMessages.length ||
+          ![...prevIds].every((id) => newIds.has(id))
+        ) {
+          return newMessages;
+        }
+        return prev;
+      });
+
+      // Mark messages in this channel as read in the database
+      try {
+        await fetch(
+          `/api/channel-management/${selectedChannel.id}/mark-as-read`,
+          {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "x-user-id": String(currentUser.id),
+              "x-user-id": String(currentEmployee.id),
             },
-          });
-          // Clear the unread count for this channel
-          setChannelUnreadCounts((prev) => ({
-            ...prev,
-            [selectedChannel.id]: 0,
-          }));
-          console.log(
-            "[Messages] Marked messages as read in channel:",
-            selectedChannel.id,
-          );
-        } catch (markErr) {
-          console.error(
-            "[Messages] Failed to mark channel messages as read:",
-            markErr,
-          );
-        }
+          },
+        );
+        // Clear the unread count for this channel
+        setChannelUnreadCounts((prev) => ({
+          ...prev,
+          [selectedChannel.id]: 0,
+        }));
+        console.log(
+          "[Messages] Marked messages as read in channel:",
+          selectedChannel.id,
+        );
+      } catch (markErr) {
+        console.error(
+          "[Messages] Failed to mark channel messages as read:",
+          markErr,
+        );
       }
     } catch (err) {
-      setError("Failed to fetch messages");
+      console.error("[Messages] Error fetching channel messages:", err);
+      setError(
+        `Failed to fetch messages: ${err instanceof Error ? err.message : "Unknown error"}`,
+      );
     }
   };
 
   const fetchDMMessages = async () => {
-    if (!selectedDMUser || !currentUser) return;
+    if (!selectedDMUser || !currentEmployee) return;
     try {
+      console.log(
+        `[Messages] Fetching DM messages with user ${selectedDMUser.id}...`,
+      );
       const res = await fetch(
-        `/api/direct-messages?userId=${selectedDMUser.id}`,
+        `/api/direct-messaging-endpoints/${selectedDMUser.id}?userId=${currentEmployee.id}`,
         {
           headers: {
-            "x-user-id": String(currentUser.id),
+            "x-user-id": String(currentEmployee.id),
           },
         },
       );
-      if (res.ok) {
-        const data = await res.json();
-        const newMessages = data.messages || [];
 
-        // Only update if messages actually changed (avoid re-renders)
-        setMessages((prev) => {
-          const prevIds = new Set(prev.map((m: Message) => m.id));
-          const newIds = new Set(newMessages.map((m: Message) => m.id));
+      if (!res.ok) {
+        console.error(`[Messages] API error: ${res.status} ${res.statusText}`);
+        const error = await res.json().catch(() => ({}));
+        console.error("[Messages] Error details:", error);
+        setError(`Failed to fetch messages: ${error?.error || res.statusText}`);
+        return;
+      }
 
-          // If message count changed or IDs changed, update
-          if (
-            prev.length !== newMessages.length ||
-            ![...prevIds].every((id) => newIds.has(id))
-          ) {
-            return newMessages;
-          }
-          return prev;
-        });
+      const data = await res.json();
+      const newMessages = data.messages || [];
+      console.log(`[Messages] Received ${newMessages.length} DM messages`);
 
-        // Mark messages from this sender as read in the database
-        try {
-          await fetch("/api/direct-messages/mark-as-read", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-user-id": String(currentUser.id),
-            },
-            body: JSON.stringify({ senderId: selectedDMUser.id }),
-          });
-          console.log(
-            "[Messages] Marked messages as read from user:",
-            selectedDMUser.id,
-          );
-        } catch (markErr) {
-          console.error("[Messages] Failed to mark messages as read:", markErr);
+      // Only update if messages actually changed (avoid re-renders)
+      setMessages((prev) => {
+        const prevIds = new Set(prev.map((m: Message) => m.id));
+        const newIds = new Set(newMessages.map((m: Message) => m.id));
+
+        // If message count changed or IDs changed, update
+        if (
+          prev.length !== newMessages.length ||
+          ![...prevIds].every((id) => newIds.has(id))
+        ) {
+          return newMessages;
         }
+        return prev;
+      });
+
+      // Mark messages from this sender as read in the database
+      try {
+        await fetch("/api/direct-messaging-endpoints/mark-as-read", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-id": String(currentEmployee.id),
+          },
+          body: JSON.stringify({ senderId: selectedDMUser.id }),
+        });
+        console.log(
+          "[Messages] Marked messages as read from user:",
+          selectedDMUser.id,
+        );
+      } catch (markErr) {
+        console.error("[Messages] Failed to mark messages as read:", markErr);
       }
     } catch (err) {
-      setError("Failed to fetch messages");
+      console.error("[Messages] Error fetching DM messages:", err);
+      setError(
+        `Failed to fetch messages: ${err instanceof Error ? err.message : "Unknown error"}`,
+      );
     }
   };
 
-  const fetchUserTaskProgress = async (user: User) => {
-    if (!currentUser || !canViewUserTaskProgress(currentUser.role)) {
+  const fetchUserTaskProgress = async (employee: Employee) => {
+    if (!currentEmployee) {
       return;
     }
 
     setLoadingUserTasks(true);
     try {
-      const res = await fetch(`/api/tasks?userId=${user.id}`, {
+      console.log("[Messages] Fetching task progress for user:", employee.id);
+      const res = await fetch(`/api/task-management?userId=${employee.id}`, {
         headers: {
-          "x-user-id": String(currentUser.id),
+          "x-user-id": String(currentEmployee.id),
         },
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        const taskList = Array.isArray(data?.tasks) ? data.tasks : [];
-
-        const userTasks = taskList.filter(
-          (t: any) => t.assigneeId === user.id || t.createdById === user.id,
-        );
-
-        const stats = {
-          todo: userTasks.filter((t: any) => t.status === "todo").length,
-          inProgress: userTasks.filter((t: any) => t.status === "inprogress")
-            .length,
-          stuck: userTasks.filter((t: any) => t.status === "stuck").length,
-          done: userTasks.filter((t: any) => t.status === "completed").length,
-          total: userTasks.length,
-        };
-
-        setSelectedUserTasks(userTasks);
-        setSelectedUserTaskStats(stats);
+      if (!res.ok) {
+        console.error("[Messages] Task API error:", res.status);
+        return;
       }
+
+      const data = await res.json();
+      const taskList = Array.isArray(data?.tasks) ? data.tasks : [];
+      console.log("[Messages] Tasks received:", taskList.length);
+
+      const userTasks = taskList.filter(
+        (t: any) =>
+          t.assigneeId === employee.id || t.createdById === employee.id,
+      );
+
+      const stats = {
+        todo: userTasks.filter((t: any) => t.status === "todo").length,
+        inProgress: userTasks.filter((t: any) => t.status === "inprogress")
+          .length,
+        stuck: userTasks.filter((t: any) => t.status === "stuck").length,
+        done: userTasks.filter((t: any) => t.status === "completed").length,
+        total: userTasks.length,
+      };
+
+      setSelectedUserTasks(userTasks);
+      setSelectedUserTaskStats(stats);
+      console.log("[Messages] Task stats updated:", stats);
     } catch (err) {
       console.error("Failed to fetch user task progress:", err);
     } finally {
       setLoadingUserTasks(false);
+    }
+  };
+
+  const handleChannelPicChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedChannel || !currentEmployee) return;
+
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const uploadRes = await fetch("/api/file-upload-handlers", {
+        method: "POST",
+        body: form,
+      });
+      if (!uploadRes.ok) throw new Error("Upload failed");
+      const { url } = await uploadRes.json();
+
+      const updateRes = await fetch(
+        `/api/channel-management/${selectedChannel.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-id": String(currentEmployee.id),
+          },
+          body: JSON.stringify({ profilePicture: url }),
+        },
+      );
+      if (!updateRes.ok) throw new Error("Channel update failed");
+
+      // update local state
+      const updated = await updateRes.json();
+      setSelectedChannel((prev) =>
+        prev ? { ...prev, profilePicture: updated.profilePicture } : prev,
+      );
+      setChannels((prev) =>
+        prev.map((c) =>
+          c.id === selectedChannel.id
+            ? { ...c, profilePicture: updated.profilePicture }
+            : c,
+        ),
+      );
+    } catch (err) {
+      console.error("Failed to change channel picture:", err);
     }
   };
 
@@ -713,15 +826,15 @@ export default function MessagesPage() {
       lowerQuery.includes(keyword),
     );
 
-    if (!isOptimizationQuery || !currentUser) {
+    if (!isOptimizationQuery || !currentEmployee) {
       return null;
     }
 
     try {
       // Fetch current user's tasks
-      const tasksRes = await fetch("/api/tasks", {
+      const tasksRes = await fetch("/api/task-management", {
         headers: {
-          "x-user-id": String(currentUser.id),
+          "x-user-id": String(currentEmployee.id),
         },
       });
 
@@ -799,7 +912,7 @@ export default function MessagesPage() {
       const formData = new FormData();
       formData.append("file", attachmentFile);
 
-      const res = await fetch("/api/upload", {
+      const res = await fetch("/api/file-upload-handlers", {
         method: "POST",
         body: formData,
       });
@@ -831,16 +944,16 @@ export default function MessagesPage() {
       // Check if this is an optimization query and get AI response
       const optimizationResponse = await handleOptimizationQuery(messageInput);
 
-      if (selectedChannel && currentUser) {
+      if (selectedChannel && currentEmployee) {
         const res = await fetch(
-          `/api/channels/${selectedChannel.id}/messages`,
+          `/api/channel-management/${selectedChannel.id}/messages`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               channelId: selectedChannel.id,
               content: messageInput,
-              userId: currentUser.id,
+              userId: currentEmployee.id,
               attachments: attachmentUrl ? [attachmentUrl] : [],
               parentMessageId: replyingTo || undefined,
             }),
@@ -860,7 +973,7 @@ export default function MessagesPage() {
         const data = await res.json();
         const newMessage = data.message;
         // Ensure the message has the current user's full profile including picture
-        newMessage.sender = currentUser;
+        newMessage.sender = currentEmployee;
         setMessages([...messages, newMessage]);
 
         // If this was an optimization query, add bot response
@@ -896,12 +1009,12 @@ export default function MessagesPage() {
         setReplyingTo(null);
         setError("");
         setSendingMessage(false);
-      } else if (selectedDMUser && currentUser) {
-        const res = await fetch("/api/direct-messages/send", {
+      } else if (selectedDMUser && currentEmployee) {
+        const res = await fetch("/api/direct-messaging-endpoints/send", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-user-id": String(currentUser.id),
+            "x-user-id": String(currentEmployee.id),
           },
           body: JSON.stringify({
             recipientId: selectedDMUser.id,
@@ -924,7 +1037,7 @@ export default function MessagesPage() {
         const data = await res.json();
         const newMessage = data.message;
         // Ensure the message has the current user's full profile including picture
-        newMessage.sender = currentUser;
+        newMessage.sender = currentEmployee;
         setMessages([...messages, newMessage]);
 
         // If this was an optimization query, add bot response
@@ -979,12 +1092,12 @@ export default function MessagesPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const getStatusDisplay = (user: User) => {
-    const isOnline = activeUserIds.includes(String(user.id));
+  const getStatusDisplay = (employee: Employee) => {
+    const isOnline = activeUserIds.includes(String(employee.id));
     if (isOnline) return "Online";
-    if (user.lastActive) {
+    if (employee.lastActive) {
       const minutes = Math.floor(
-        (Date.now() - new Date(user.lastActive).getTime()) / (1000 * 60),
+        (Date.now() - new Date(employee.lastActive).getTime()) / (1000 * 60),
       );
       if (minutes < 1) return "Just now";
       if (minutes < 60) return `${minutes}m ago`;
@@ -1045,7 +1158,7 @@ export default function MessagesPage() {
   const [reactingIds, setReactingIds] = useState<Set<number>>(new Set());
 
   const addReaction = async (messageId: number, emoji: string) => {
-    if (!currentUser || (!selectedChannel && !selectedDMUser)) return;
+    if (!currentEmployee || (!selectedChannel && !selectedDMUser)) return;
 
     // do not fire another request while one is in progress for this message
     if (reactingIds.has(messageId)) return;
@@ -1054,7 +1167,7 @@ export default function MessagesPage() {
     const existing = messages
       .find((m) => m.id === messageId)
       ?.reactions?.some(
-        (r) => r.emoji === emoji && r.userId === currentUser.id,
+        (r) => r.emoji === emoji && r.userId === currentEmployee.id,
       );
     if (existing) {
       // already reacted; nothing to do (we no longer toggle off)
@@ -1065,13 +1178,13 @@ export default function MessagesPage() {
 
     try {
       const endpoint = selectedChannel
-        ? `/api/channels/${selectedChannel.id}/messages/${messageId}/reactions`
-        : `/api/direct-messages/${messageId}/reactions`;
+        ? `/api/channel-management/${selectedChannel.id}/messages/${messageId}/reactions`
+        : `/api/direct-messaging-endpoints/${messageId}/reactions`;
 
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emoji, userId: currentUser.id }),
+        body: JSON.stringify({ emoji, userId: currentEmployee.id }),
       });
 
       if (!res.ok) throw new Error("Failed to add reaction");
@@ -1093,12 +1206,12 @@ export default function MessagesPage() {
 
   const deleteMessage = async (messageId: number) => {
     if (!confirm("Delete this message?")) return;
-    if (!currentUser || (!selectedChannel && !selectedDMUser)) return;
+    if (!currentEmployee || (!selectedChannel && !selectedDMUser)) return;
 
     try {
       const endpoint = selectedChannel
-        ? `/api/channels/${selectedChannel.id}/messages/${messageId}`
-        : `/api/direct-messages/${messageId}`;
+        ? `/api/channel-management/${selectedChannel.id}/messages/${messageId}`
+        : `/api/direct-messaging-endpoints/${messageId}`;
 
       const res = await fetch(endpoint, {
         method: "DELETE",
@@ -1121,15 +1234,15 @@ export default function MessagesPage() {
   const editMessage = async (messageId: number, newContent: string) => {
     if (
       !newContent.trim() ||
-      !currentUser ||
+      !currentEmployee ||
       (!selectedChannel && !selectedDMUser)
     )
       return;
 
     try {
       const endpoint = selectedChannel
-        ? `/api/channels/${selectedChannel.id}/messages/${messageId}`
-        : `/api/direct-messages/${messageId}`;
+        ? `/api/channel-management/${selectedChannel.id}/messages/${messageId}`
+        : `/api/direct-messaging-endpoints/${messageId}`;
 
       const res = await fetch(endpoint, {
         method: "PATCH",
@@ -1156,11 +1269,11 @@ export default function MessagesPage() {
   ) => {
     if (!newName.trim()) return;
     try {
-      const res = await fetch(`/api/channels/${channelId}`, {
+      const res = await fetch(`/api/channel-management/${channelId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          "x-user-id": String(currentUser?.id),
+          "x-user-id": String(currentEmployee?.id),
         },
         body: JSON.stringify({ name: newName, description: newDesc }),
       });
@@ -1191,10 +1304,10 @@ export default function MessagesPage() {
     if (!confirm("Are you sure you want to delete this channel?")) return;
 
     try {
-      const res = await fetch(`/api/channels/${channelId}`, {
+      const res = await fetch(`/api/channel-management/${channelId}`, {
         method: "DELETE",
         headers: {
-          "x-user-id": String(currentUser?.id),
+          "x-user-id": String(currentEmployee?.id),
         },
       });
       if (res.ok) {
@@ -1207,15 +1320,28 @@ export default function MessagesPage() {
     }
   };
 
-  const filteredChannels = channels.filter((ch) =>
-    ch.name.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const filteredChannels =
+    channels && Array.isArray(channels)
+      ? channels.filter(
+          (ch) =>
+            ch &&
+            ch.name &&
+            ch.name.toLowerCase().includes(searchQuery.toLowerCase()),
+        )
+      : [];
 
-  const filteredDMs = dmConversations.filter((user) =>
-    `${user.firstName} ${user.lastName}`
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase()),
-  );
+  const filteredDMs =
+    dmConversations && Array.isArray(dmConversations)
+      ? dmConversations.filter(
+          (user) =>
+            user &&
+            user.firstName &&
+            user.lastName &&
+            `${user.firstName} ${user.lastName}`
+              .toLowerCase()
+              .includes(searchQuery.toLowerCase()),
+        )
+      : [];
 
   if (loading) {
     return (
@@ -1242,11 +1368,11 @@ export default function MessagesPage() {
           background: transparent;
         }
         ::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.2);
+          background: rgba(0, 0, 0, 0.2);
           border-radius: 2px;
         }
         ::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 255, 255, 0.3);
+          background: rgba(0, 0, 0, 0.3);
         }
         @media (max-width: 1200px) {
           #right-sidebar {
@@ -1254,24 +1380,24 @@ export default function MessagesPage() {
           }
         }
       `}</style>
-      <div className="flex h-full gap-3">
+      <div className="flex h-full gap-1">
         {/* Left Sidebar */}
-        <div className="w-14 flex-shrink-0 flex flex-col gap-4">
+        <div className="w-52 flex-shrink-0 flex flex-col gap-1 transition-all">
           {/* Channels Container */}
-          <div className="h-[40%] min-h-[200px] max-h-[320px] overflow-visible flex flex-col pt-4 px-0 pl-0 pr-0 pb-4 bg-white/6 border border-white/12 rounded-xl backdrop-blur-sm">
+          <div className="h-[40%] min-h-[200px] max-h-[320px] overflow-visible flex flex-col pt-4 px-0 pl-0 pr-0 pb-4 bg-white border border-black/10 rounded-lg">
             {/* Channels Section */}
             <div
               style={{
-                   paddingLeft: "0px",
-                paddingRight: "0px",
+                paddingLeft: "6px",
+                paddingRight: "6px",
                 display: "flex",
                 flexDirection: "column",
                 height: "100%",
               }}
             >
-              <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
+              <div className="flex items-center justify-between gap-2 mb-3 pb-3 border-b border-black/10">
                 <h2
-                  className="text-[11px] font-normal m-0 text-white"
+                  className="text-[11px] font-normal m-0 text-black/80 flex-1 text-center"
                   style={{
                     fontFamily: "var(--font-inria-sans)",
                     letterSpacing: "0.3px",
@@ -1282,63 +1408,105 @@ export default function MessagesPage() {
                 <button
                   onClick={() => setIsChannelModalOpen(true)}
                   aria-label="Create channel"
-                  className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-500"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-sm bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors border border-blue-400/30 flex-shrink-0"
                 >
-                  <Plus size={14} />
+                  <MessageCirclePlus size={14} />
+                  New
                 </button>
               </div>
-              <div className="flex flex-col items-center gap-3 overflow-y-auto overflow-x-hidden flex-1">
-                {filteredChannels.map((channel) => (
-                  <ChannelListItem
-                    key={channel.id}
-                    channel={channel}
-                    unreadCount={channelUnreadCounts[channel.id] || 0}
-                    onSelect={(ch) => {
-                      setSelectedChannel(ch);
-                      setSelectedDMUser(null);
-                    }}
+              <div className="mb-2">
+                <div className="relative flex items-center bg-white border border-black/10 rounded px-2 py-1.5">
+                  <Search size={14} className="text-black/40 flex-shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Search channels..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="flex-1 px-2 py-0 bg-transparent text-black text-xs outline-none placeholder-black/40"
                   />
-                ))}
+                </div>
+              </div>
+              <div className="flex flex-col items-center gap-1 overflow-y-auto overflow-x-hidden flex-1">
+                {filteredChannels && filteredChannels.length > 0 ? (
+                  filteredChannels.map((channel) => (
+                    <ChannelListItem
+                      key={channel.id}
+                      channel={channel}
+                      unreadCount={channelUnreadCounts[channel.id] || 0}
+                      isActive={selectedChannel?.id === channel.id}
+                      onSelect={(ch) => {
+                        setSelectedChannel(ch);
+                        setSelectedDMUser(null);
+                      }}
+                    />
+                  ))
+                ) : (
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      color: "rgba(0,0,0,0.4)",
+                      textAlign: "center",
+                      padding: "16px",
+                    }}
+                  >
+                    No channels
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
           {/* Conversations Container */}
-          <div className="flex-1 min-h-[200px] max-h-[420px] overflow-visible flex flex-col pt-4 px-0 pl-0 pr-0 pb-4 bg-white/6 border border-white/12 rounded-xl backdrop-blur-sm">
+          <div className="flex-1 min-h-[200px] max-h-[420px] overflow-visible flex flex-col pt-4 px-0 pl-0 pr-0 pb-4 bg-white border border-black/10 rounded-lg">
             {/* Conversation Section */}
             <div
               style={{
-                paddingLeft: "0px",
-                paddingRight: "0px",
+                paddingLeft: "6px",
+                paddingRight: "6px",
                 display: "flex",
                 flexDirection: "column",
                 height: "100%",
               }}
             >
-              <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
+              <div className="flex items-center justify-center mb-3 pb-3 border-b border-black/10">
                 <h2
-                  className="text-[11px] font-normal m-0 text-white"
+                  className="text-[11px] font-normal m-0 text-black/80"
                   style={{
                     fontFamily: "var(--font-inria-sans)",
                     letterSpacing: "0.3px",
                   }}
                 >
-                  TEAM
+                  Direct Messages
                 </h2>
               </div>
-              <div className="flex flex-col items-center gap-3 overflow-y-auto overflow-x-hidden flex-1">
+              <div className="mb-2">
+                <div className="relative flex items-center bg-white border border-black/10 rounded px-2 py-1.5">
+                  <Search size={14} className="text-black/40 flex-shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Search conversations..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="flex-1 px-2 py-0 bg-transparent text-black text-xs outline-none placeholder-black/40"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col items-center gap-1 overflow-y-auto overflow-x-hidden flex-1">
                 {filteredDMs
                   .filter((u) => u && u.firstName && u.lastName)
-                  .map((user) => {
-                    const isOnline = activeUserIds.includes(String(user.id));
+                  .map((employee) => {
+                    const isOnline = activeUserIds.includes(
+                      String(employee.id),
+                    );
                     console.log(
-                      `User ${user.firstName} (ID: ${user.id}) - Online: ${isOnline}`,
+                      `User ${employee.firstName} (ID: ${employee.id}) - Online: ${isOnline}`,
                     );
                     return (
                       <UserListItem
-                        key={user.id}
-                        user={user}
+                        key={employee.id}
+                        employee={employee}
                         isOnline={isOnline}
+                        isActive={selectedDMUser?.id === employee.id}
                         onSelect={(u) => {
                           setSelectedDMUser(u);
                           setSelectedChannel(null);
@@ -1352,358 +1520,369 @@ export default function MessagesPage() {
         </div>
 
         {/* Main Chat Area */}
-        <PageContentCon className="flex-1 flex flex-col overflow-hidden">
-          {selectedChannel || selectedDMUser ? (
-            <>
-              {/* Header */}
-              <div className="pb-4 border-b border-white/10 flex items-center gap-3 justify-between">
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div className="w-11 h-11 rounded-full bg-[#798CC3] flex items-center justify-center text-white font-semibold overflow-hidden">
-                    {selectedDMUser ? (
-                      selectedDMUser.profilePicture ? (
-                        <img
-                          src={selectedDMUser.profilePicture}
-                          alt={selectedDMUser.firstName}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
-                        />
+        <div className="flex-1 border border-black/10 rounded-lg overflow-hidden bg-white">
+          <PageContentCon className="flex flex-col overflow-hidden h-full w-full">
+            {selectedChannel || selectedDMUser ? (
+              <>
+                {/* Header */}
+                <div className="pb-4 border-b border-black/10 flex items-center gap-3 justify-between">
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 12 }}
+                  >
+                    <div className="w-11 h-11 rounded-full bg-[#798CC3] flex items-center justify-center text-white font-semibold overflow-hidden">
+                      {selectedDMUser ? (
+                        selectedDMUser.profilePicture ? (
+                          <img
+                            src={selectedDMUser.profilePicture}
+                            alt={selectedDMUser.firstName}
+                            className="w-full h-full object-cover object-center"
+                          />
+                        ) : (
+                          `${selectedDMUser.firstName[0]}${selectedDMUser.lastName[0]}`
+                        )
+                      ) : selectedChannel ? (
+                        selectedChannel.profilePicture ? (
+                          <img
+                            src={selectedChannel.profilePicture}
+                            alt={selectedChannel.name}
+                            className="w-full h-full object-cover object-center"
+                          />
+                        ) : (
+                          selectedChannel.name[0].toUpperCase()
+                        )
                       ) : (
-                        `${selectedDMUser.firstName[0]}${selectedDMUser.lastName[0]}`
-                      )
-                    ) : selectedChannel ? (
-                      selectedChannel.profilePicture ? (
-                        <img
-                          src={selectedChannel.profilePicture}
-                          alt={selectedChannel.name}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
-                        />
-                      ) : (
-                        selectedChannel.name[0].toUpperCase()
-                      )
-                    ) : (
-                      ""
-                    )}
-                  </div>
-                  <div>
-                    <div
-                      style={{
-                        fontSize: "16px",
-                        fontWeight: "400",
-                        color: "#fff",
-                        fontFamily: "var(--font-inria-sans)",
-                      }}
-                    >
-                      {selectedDMUser
-                        ? `${selectedDMUser.firstName} ${selectedDMUser.lastName}`
-                        : selectedChannel
-                          ? selectedChannel.name
-                          : ""}
+                        ""
+                      )}
                     </div>
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        color: "rgba(255,255,255,0.6)",
-                        fontFamily: "var(--font-inria-sans)",
-                      }}
-                    >
-                      {selectedDMUser
-                        ? getStatusDisplay(selectedDMUser)
-                        : selectedChannel
-                          ? selectedChannel.description || "No description"
-                          : ""}
+                    <div>
+                      <div
+                        style={{
+                          fontSize: "16px",
+                          fontWeight: "400",
+                          color: "#000",
+                          fontFamily: "var(--font-inria-sans)",
+                        }}
+                      >
+                        {selectedDMUser
+                          ? `${selectedDMUser.firstName} ${selectedDMUser.lastName}`
+                          : selectedChannel
+                            ? selectedChannel.name
+                            : ""}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "rgba(0,0,0,0.6)",
+                          fontFamily: "var(--font-inria-sans)",
+                        }}
+                      >
+                        {selectedDMUser
+                          ? getStatusDisplay(selectedDMUser)
+                          : selectedChannel
+                            ? selectedChannel.description || "No description"
+                            : ""}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto px-5 pt-4 mt-4 flex flex-col gap-3">
-                {filteredMessages.map((msg, index) => {
-                  const showTimestamp = shouldShowTimestamp(
-                    msg,
-                    index,
-                    filteredMessages,
-                  );
-                  return (
-                    <div
-                      key={msg.id}
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: msg.parentMessageId ? "4px" : "0",
-                      }}
-                    >
-                      {/* Render parent message if this is a reply */}
-                      {msg.parentMessage && (
-                        <div
-                          id={`message-${msg.parentMessage.id}`}
-                          style={{
-                            opacity: 0.65,
-                          }}
-                        >
-                          <MessageBubble
-                            message={
-                              {
-                                id: msg.parentMessage.id,
-                                content: msg.parentMessage.content,
-                                createdAt: msg.parentMessage.createdAt,
-                                isEdited: false,
-                                isDeleted: false,
-                                sender: msg.parentMessage.sender as any,
-                                attachments: [],
-                                reactions: [],
-                                _count: { replies: 0 },
-                              } as any
-                            }
-                            isCurrentUser={
-                              msg.parentMessage.sender.id === currentUser?.id
-                            }
-                            onAddReaction={() => {}}
-                            onDelete={() => {}}
-                            onEdit={() => {}}
-                            onReply={() => setReplyingTo(msg.parentMessage!.id)}
-                            currentUserId={currentUser?.id || 0}
-                          />
-                        </div>
-                      )}
-
-                      {/* Render actual message with optional reply styling */}
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto px-5 pt-4 mt-1 flex flex-col gap-3">
+                  {filteredMessages.map((msg, index) => {
+                    const showTimestamp = shouldShowTimestamp(
+                      msg,
+                      index,
+                      filteredMessages,
+                    );
+                    return (
                       <div
-                        id={`message-${msg.id}`}
-                        data-parent-id={msg.parentMessageId || undefined}
+                        key={msg.id}
                         style={{
-                          marginLeft: msg.parentMessageId ? "24px" : "0",
-                          paddingLeft: msg.parentMessageId ? "12px" : "0",
-                          borderLeft: msg.parentMessageId
-                            ? "3px solid rgba(96, 165, 250, 0.4)"
-                            : "none",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: msg.parentMessageId ? "4px" : "0",
                         }}
                       >
-                        {showTimestamp && (
+                        {/* Render parent message if this is a reply */}
+                        {msg.parentMessage && (
                           <div
+                            id={`message-${msg.parentMessage.id}`}
                             style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              margin: "16px 0",
-                              gap: "12px",
+                              opacity: 0.65,
                             }}
                           >
-                            <div
-                              style={{
-                                flex: 1,
-                                height: "1px",
-                                background: "rgba(255,255,255,0.1)",
-                              }}
-                            />
-                            <p
-                              style={{
-                                fontSize: "11px",
-                                color: "rgba(255,255,255,0.5)",
-                                margin: 0,
-                                fontFamily: "var(--font-inria-sans)",
-                              }}
-                            >
-                              {formatMessageTime(msg.createdAt)}
-                            </p>
-                            <div
-                              style={{
-                                flex: 1,
-                                height: "1px",
-                                background: "rgba(255,255,255,0.1)",
-                              }}
+                            <MessageBubble
+                              message={
+                                {
+                                  id: msg.parentMessage.id,
+                                  content: msg.parentMessage.content,
+                                  createdAt: msg.parentMessage.createdAt,
+                                  isEdited: false,
+                                  isDeleted: false,
+                                  sender: msg.parentMessage.sender as any,
+                                  attachments: [],
+                                  reactions: [],
+                                  _count: { replies: 0 },
+                                } as any
+                              }
+                              isCurrentUser={
+                                msg.parentMessage.sender.id ===
+                                currentEmployee?.id
+                              }
+                              onAddReaction={() => {}}
+                              onDelete={() => {}}
+                              onEdit={() => {}}
+                              onReply={() =>
+                                setReplyingTo(msg.parentMessage!.id)
+                              }
+                              currentUserId={currentEmployee?.id || 0}
                             />
                           </div>
                         )}
-                        <MessageBubble
-                          message={msg}
-                          isCurrentUser={msg.sender.id === currentUser?.id}
-                          onAddReaction={(messageId, emoji) =>
-                            addReaction(messageId, emoji)
-                          }
-                          onDelete={(messageId) => deleteMessage(messageId)}
-                          onEdit={(messageId, newContent) =>
-                            editMessage(messageId, newContent)
-                          }
-                          onReply={(messageId) => setReplyingTo(messageId)}
-                          currentUserId={currentUser?.id || 0}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-                <div ref={messagesEndRef} />
-              </div>
 
-              {/* Input Area */}
-              <div className="pt-4 border-t border-white/10">
-                {replyingTo && (
-                  <div
-                    style={{
-                      padding: "12px",
-                      background: "rgba(255,255,255,0.05)",
-                      borderRadius: "8px",
-                      marginBottom: "12px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}
-                  >
-                    <Reply size={16} />
-                    <div style={{ flex: 1, overflow: "hidden" }}>
-                      {(() => {
-                        const parent = messages.find(
-                          (m) => m.id === replyingTo,
-                        );
-                        if (!parent)
+                        {/* Render actual message with optional reply styling */}
+                        <div
+                          id={`message-${msg.id}`}
+                          data-parent-id={msg.parentMessageId || undefined}
+                          style={{
+                            marginLeft: msg.parentMessageId ? "24px" : "0",
+                            paddingLeft: msg.parentMessageId ? "12px" : "0",
+                            borderLeft: msg.parentMessageId
+                              ? "3px solid rgba(96, 165, 250, 0.4)"
+                              : "none",
+                          }}
+                        >
+                          {showTimestamp && (
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                margin: "16px 0",
+                                gap: "12px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  flex: 1,
+                                  height: "1px",
+                                  background: "rgba(0,0,0,0.1)",
+                                }}
+                              />
+                              <p
+                                style={{
+                                  fontSize: "11px",
+                                  color: "rgba(0,0,0,0.5)",
+                                  margin: 0,
+                                  fontFamily: "var(--font-inria-sans)",
+                                }}
+                              >
+                                {formatMessageTime(msg.createdAt)}
+                              </p>
+                              <div
+                                style={{
+                                  flex: 1,
+                                  height: "1px",
+                                  background: "rgba(0,0,0,0.1)",
+                                }}
+                              />
+                            </div>
+                          )}
+                          <MessageBubble
+                            message={msg}
+                            isCurrentUser={
+                              msg.sender.id === currentEmployee?.id
+                            }
+                            onAddReaction={(messageId, emoji) =>
+                              addReaction(messageId, emoji)
+                            }
+                            onDelete={(messageId) => deleteMessage(messageId)}
+                            onEdit={(messageId, newContent) =>
+                              editMessage(messageId, newContent)
+                            }
+                            onReply={(messageId) => setReplyingTo(messageId)}
+                            currentUserId={currentEmployee?.id || 0}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Input Area */}
+                <div className="pt-4 border-t border-black/10">
+                  {replyingTo && (
+                    <div
+                      style={{
+                        padding: "12px",
+                        background: "rgba(0,0,0,0.05)",
+                        borderRadius: "6px",
+                        marginBottom: "12px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      <Reply size={16} />
+                      <div style={{ flex: 1, overflow: "hidden" }}>
+                        {(() => {
+                          const parent = messages.find(
+                            (m) => m.id === replyingTo,
+                          );
+                          if (!parent)
+                            return (
+                              <span
+                                style={{
+                                  fontSize: "12px",
+                                  opacity: 0.7,
+                                  color: "#000",
+                                  fontFamily: "var(--font-inria-sans)",
+                                }}
+                              >
+                                Replying to message
+                              </span>
+                            );
                           return (
                             <span
                               style={{
                                 fontSize: "12px",
                                 opacity: 0.7,
+                                color: "#000",
                                 fontFamily: "var(--font-inria-sans)",
+                                whiteSpace: "nowrap",
+                                textOverflow: "ellipsis",
+                                overflow: "hidden",
                               }}
                             >
-                              Replying to message
+                              {parent.sender && parent.sender.firstName
+                                ? `${parent.sender.firstName}: `
+                                : ""}
+                              {parent.content.slice(0, 50)}
                             </span>
                           );
-                        return (
-                          <span
-                            style={{
-                              fontSize: "12px",
-                              opacity: 0.7,
-                              fontFamily: "var(--font-inria-sans)",
-                              whiteSpace: "nowrap",
-                              textOverflow: "ellipsis",
-                              overflow: "hidden",
-                            }}
-                          >
-                            {parent.sender.firstName}: {parent.content}
-                          </span>
-                        );
-                      })()}
+                        })()}
+                      </div>
+                      <button
+                        onClick={() => setReplyingTo(null)}
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          cursor: "pointer",
+                          color: "#fff",
+                          marginLeft: "auto",
+                        }}
+                      >
+                        <X size={16} />
+                      </button>
                     </div>
+                  )}
+
+                  {/* Attachment Preview */}
+                  {attachmentFile && (
+                    <div
+                      style={{
+                        padding: "12px 12px 12px 12px",
+                        background: "rgba(0,0,0,0.05)",
+                        borderRadius: "6px",
+                        marginBottom: "12px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                      }}
+                    >
+                      <Paperclip size={16} />
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          color: "#000",
+                          fontFamily: "var(--font-inria-sans)",
+                          flex: 1,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {attachmentFile.name}
+                      </span>
+                      <button
+                        onClick={() => setAttachmentFile(null)}
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          cursor: "pointer",
+                          color: "#000",
+                        }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="relative flex items-center bg-white border border-black/10 rounded-full px-3 py-2">
                     <button
-                      onClick={() => setReplyingTo(null)}
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingAttachment}
+                      className="bg-transparent border-none cursor-pointer text-black/70 disabled:cursor-not-allowed disabled:opacity-50 transition-colors hover:text-black/90 flex-shrink-0"
+                    >
+                      <Paperclip size={18} />
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      onChange={handleAttachmentSelect}
+                      style={{ display: "none" }}
+                      disabled={uploadingAttachment}
+                    />
+                    <input
+                      value={messageInput}
+                      onChange={(e) => setMessageInput(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Type a message..."
+                      className="flex-1 px-2 py-0 bg-transparent text-black text-xs outline-none disabled:cursor-not-allowed disabled:opacity-50 placeholder-black/40"
+                    />
+                    <button
+                      onClick={sendMessage}
+                      disabled={sendingMessage}
                       style={{
                         background: "transparent",
                         border: "none",
-                        cursor: "pointer",
-                        color: "#fff",
-                        marginLeft: "auto",
+                        cursor: sendingMessage ? "not-allowed" : "pointer",
+                        color: "#000",
+                        opacity: sendingMessage ? 0.5 : 1,
+                        flexShrink: 0,
                       }}
+                      className="transition-colors hover:text-black/70"
                     >
-                      <X size={16} />
+                      <Send size={18} />
                     </button>
                   </div>
-                )}
-
-                {/* Attachment Preview */}
-                {attachmentFile && (
-                  <div
-                    style={{
-                      padding: "12px 12px 12px 12px",
-                      background: "rgba(255,255,255,0.05)",
-                      borderRadius: "8px",
-                      marginBottom: "12px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                    }}
-                  >
-                    <Paperclip size={16} />
-                    <span
-                      style={{
-                        fontSize: "12px",
-                        color: "#fff",
-                        fontFamily: "var(--font-inria-sans)",
-                        flex: 1,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {attachmentFile.name}
-                    </span>
-                    <button
-                      onClick={() => setAttachmentFile(null)}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        cursor: "pointer",
-                        color: "#fff",
-                      }}
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                )}
-
-                <div className="flex gap-3 items-center">
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingAttachment}
-                    className="bg-transparent border-none cursor-pointer text-white/70 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <Paperclip size={20} />
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    onChange={handleAttachmentSelect}
-                    style={{ display: "none" }}
-                    disabled={uploadingAttachment}
-                  />
-                  <input
-                    value={messageInput}
-                    onChange={(e) => setMessageInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Type a message..."
-                    className="flex-1 px-4 py-3 rounded-full bg-white/8 border border-white/15 text-white text-sm outline-none"
-                  />
-                  <button
-                    onClick={sendMessage}
-                    disabled={sendingMessage}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      cursor: sendingMessage ? "not-allowed" : "pointer",
-                      color: "#fff",
-                      opacity: sendingMessage ? 0.5 : 1,
-                    }}
-                  >
-                    <Send size={20} />
-                  </button>
                 </div>
+              </>
+            ) : (
+              <div
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "rgba(0,0,0,0.5)",
+                }}
+              >
+                Select a channel or conversation
               </div>
-            </>
-          ) : (
-            <div
-              style={{
-                flex: 1,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "rgba(255,255,255,0.5)",
-              }}
-            >
-              Select a channel or conversation
-            </div>
-          )}
-        </PageContentCon>
+            )}
+          </PageContentCon>
+        </div>
 
         {/* Right Sidebar */}
-        <div id="right-sidebar">
+        <div
+          id="right-sidebar"
+          className="border border-black/10 rounded-lg overflow-hidden bg-white"
+        >
           <PageContentCon
             style={{
-              width: "240px",
+              width: "320px",
               flexShrink: 0,
               overflow: "auto",
               height: "100%",
@@ -1711,43 +1890,74 @@ export default function MessagesPage() {
           >
             {selectedChannel || selectedDMUser ? (
               <div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    marginBottom: 20,
-                    padding: "16px 16px 16px 16px",
-                    borderRadius: "12px",
-                    background: "rgba(255,255,255,0.05)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: "50%",
-                      background: "#798CC3",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 18,
-                      color: "#fff",
-                      fontWeight: "600",
-                      overflow: "hidden",
-                    }}
-                  >
+                {/* header vertical with avatar centered and menu*/}
+                <div className="relative flex flex-col items-center mb-4 p-4 rounded-lg bg-blue-50 border border-black/10">
+                  {/* 3-dots menu button */}
+                  <div className="absolute top-2 right-2" ref={menuRef}>
+                    <button
+                      onClick={() => setMenuOpen(!menuOpen)}
+                      className="p-1 hover:bg-white/50 rounded transition-colors"
+                    >
+                      <MoreVertical size={18} className="text-black/60" />
+                    </button>
+
+                    {/* Dropdown menu */}
+                    {menuOpen && (
+                      <div className="absolute right-0 mt-1 bg-white border border-black/10 rounded shadow-lg z-50 min-w-[150px]">
+                        {selectedChannel ? (
+                          <>
+                            <button
+                              onClick={() => {
+                                setEditingChannelId(selectedChannel.id);
+                                setEditingChannelName(selectedChannel.name);
+                                setEditingChannelDesc(
+                                  selectedChannel.description ?? "",
+                                );
+                                setMenuOpen(false);
+                              }}
+                              className="w-full px-4 py-2 text-left hover:bg-blue-50 text-sm text-black/80 flex items-center gap-2 border-b border-black/5"
+                            >
+                              <Edit2 size={14} /> Edit Channel
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleDeleteChannel(selectedChannel.id);
+                                setMenuOpen(false);
+                              }}
+                              className="w-full px-4 py-2 text-left hover:bg-red-50 text-sm text-red-600 flex items-center gap-2"
+                            >
+                              <Trash2 size={14} /> Delete Channel
+                            </button>
+                          </>
+                        ) : selectedDMUser ? (
+                          <button
+                            onClick={() => {
+                              if (
+                                confirm(
+                                  `Delete conversation with ${selectedDMUser.firstName}?`,
+                                )
+                              ) {
+                                setSelectedDMUser(null);
+                                setMessages([]);
+                                setMenuOpen(false);
+                              }
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-red-50 text-sm text-red-600 flex items-center gap-2"
+                          >
+                            <Trash2 size={14} /> Delete Conversation
+                          </button>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="relative w-14 h-14 rounded-full bg-[#798CC3] flex items-center justify-center overflow-hidden">
                     {selectedDMUser ? (
                       selectedDMUser.profilePicture ? (
                         <img
                           src={selectedDMUser.profilePicture}
                           alt={selectedDMUser.firstName}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
+                          className="w-full h-full object-cover object-center"
                         />
                       ) : (
                         `${selectedDMUser.firstName[0]}${selectedDMUser.lastName[0]}`
@@ -1757,47 +1967,61 @@ export default function MessagesPage() {
                         <img
                           src={selectedChannel.profilePicture}
                           alt={selectedChannel.name}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
+                          className="w-full h-full object-cover object-center"
                         />
                       ) : (
                         selectedChannel.name[0].toUpperCase()
                       )
-                    ) : (
-                      ""
+                    ) : null}
+
+                    {/* online indicator when DM */}
+                    {selectedDMUser && (
+                      <span
+                        className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 ${
+                          activeUserIds.includes(String(selectedDMUser.id))
+                            ? "bg-emerald-500"
+                            : "bg-gray-500"
+                        } border-[rgba(13,27,42,1)]`}
+                      />
                     )}
+
+                    {/* edit icon for channel avatar */}
+                    {selectedChannel &&
+                      currentEmployee?.id === selectedChannel.creatorId && (
+                        <>
+                          <button
+                            onClick={() =>
+                              document
+                                .getElementById("right-sidebar-pic-input")
+                                ?.click()
+                            }
+                            className="absolute bottom-0 right-0 bg-black/30 hover:bg-black/50 p-1 rounded-full"
+                          >
+                            <Edit2 size={16} className="text-white" />
+                          </button>
+                          <input
+                            id="right-sidebar-pic-input"
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleChannelPicChange}
+                          />
+                        </>
+                      )}
                   </div>
-                  <div>
-                    <div
-                      style={{
-                        fontSize: "16px",
-                        fontWeight: "400",
-                        color: "#fff",
-                        fontFamily: "var(--font-inria-sans)",
-                      }}
-                    >
-                      {selectedDMUser
-                        ? `${selectedDMUser.firstName} ${selectedDMUser.lastName}`
-                        : selectedChannel
-                          ? selectedChannel.name
-                          : ""}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        color: "rgba(255,255,255,0.6)",
-                        fontFamily: "var(--font-inria-sans)",
-                      }}
-                    >
-                      {selectedDMUser
-                        ? getStatusDisplay(selectedDMUser)
-                        : selectedChannel
-                          ? selectedChannel.description || "No description"
-                          : ""}
-                    </div>
+                  <div className="mt-1 text-white text-lg font-medium text-center">
+                    {selectedDMUser
+                      ? `${selectedDMUser.firstName} ${selectedDMUser.lastName}`
+                      : selectedChannel
+                        ? selectedChannel.name
+                        : ""}
+                  </div>
+                  <div className="text-sm text-white/60 text-center">
+                    {selectedDMUser
+                      ? getStatusDisplay(selectedDMUser)
+                      : selectedChannel
+                        ? selectedChannel.description || "No description"
+                        : ""}
                   </div>
                 </div>
 
@@ -1810,10 +2034,10 @@ export default function MessagesPage() {
                     style={{
                       width: "100%",
                       padding: "8px 12px 8px 12px",
-                      borderRadius: 8,
-                      background: "rgba(255,255,255,0.05)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      color: "#fff",
+                      borderRadius: 6,
+                      background: "#fff",
+                      border: "1px solid rgba(0,0,0,0.1)",
+                      color: "#000",
                       fontSize: "var(--font-size-subdescription)",
                       outline: "none",
                       fontFamily: "var(--font-inria-sans)",
@@ -1827,7 +2051,7 @@ export default function MessagesPage() {
                       fontSize: "var(--font-size-description)",
                       fontWeight: "400",
                       margin: "0 0 16px 0",
-                      color: "#fff",
+                      color: "#000",
                       fontFamily: "var(--font-inria-sans)",
                     }}
                   >
@@ -1838,7 +2062,7 @@ export default function MessagesPage() {
                       <div
                         style={{
                           textAlign: "center",
-                          color: "rgba(255,255,255,0.5)",
+                          color: "rgba(0,0,0,0.5)",
                           fontSize: "var(--font-size-subdescription)",
                           fontFamily: "var(--font-inria-sans)",
                         }}
@@ -1857,22 +2081,22 @@ export default function MessagesPage() {
                           {
                             label: "To do",
                             value: selectedUserTaskStats.todo,
-                            color: "#FF6B6B",
+                            color: "#a855f7", // purple
                           },
                           {
                             label: "In Progress",
                             value: selectedUserTaskStats.inProgress,
-                            color: "#4ECDC4",
+                            color: "#3b82f6", // blue
                           },
                           {
-                            label: "Stuck",
+                            label: "Due",
                             value: selectedUserTaskStats.stuck,
-                            color: "#FFE66D",
+                            color: "#ef4444", // red
                           },
                           {
-                            label: "Done",
+                            label: "Completed",
                             value: selectedUserTaskStats.done,
-                            color: "#95E1D3",
+                            color: "#10b981", // green
                           },
                         ].map((stat, i) => (
                           <div
@@ -1880,9 +2104,9 @@ export default function MessagesPage() {
                             style={{
                               textAlign: "center",
                               padding: "12px 12px 12px 12px",
-                              borderRadius: "8px",
-                              background: "rgba(255,255,255,0.05)",
-                              border: "1px solid rgba(255,255,255,0.1)",
+                              borderRadius: "6px",
+                              background: "#fff",
+                              border: "1px solid rgba(0,0,0,0.1)",
                             }}
                           >
                             <div
@@ -1898,7 +2122,7 @@ export default function MessagesPage() {
                             <p
                               style={{
                                 fontSize: "12px",
-                                color: "rgba(255,255,255,0.7)",
+                                color: "rgba(0,0,0,0.7)",
                                 margin: "8px 0 0 0",
                                 fontFamily: "var(--font-inria-sans)",
                               }}
@@ -1974,7 +2198,7 @@ export default function MessagesPage() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "rgba(255,255,255,0.5)",
+                  color: "rgba(0,0,0,0.5)",
                 }}
               >
                 Select a channel or conversation
@@ -1988,7 +2212,7 @@ export default function MessagesPage() {
         isOpen={isChannelModalOpen}
         onClose={() => setIsChannelModalOpen(false)}
         onSubmit={createChannel}
-        currentUserId={currentUser?.id || 0}
+        currentUserId={currentEmployee?.id || 0}
       />
     </PageContainer>
   );

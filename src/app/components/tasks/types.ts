@@ -1,13 +1,14 @@
-export type User = {
+export type Employee = {
   id: number;
   name?: string | null;
   email: string;
   active?: boolean;
+  role?: "EMPLOYEE" | "TEAM_LEAD" | "MANAGER" | "CO_OWNER" | "OWNER";
 };
 
 export type Comment = {
   id: number;
-  taskId: number;
+  taskId: string;
   userId?: number | null;
   content: string;
   createdAt?: string;
@@ -16,14 +17,14 @@ export type Comment = {
 
 export type Attachment = {
   id: number;
-  taskId: number;
+  taskId: string;
   url: string;
   filename?: string | null;
   createdAt?: string;
 };
 
 export type Task = {
-  id: number;
+  id: string;
   title: string;
   description?: string | null;
   status?: string;

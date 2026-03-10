@@ -4,8 +4,8 @@ import { setupAuditMiddleware } from './auditMiddleware.js'
 const prismaClientSingleton = () => {
   const client = new PrismaClient()
   
-  // Initialize audit middleware for automatic Task operation logging
-  setupAuditMiddleware(client)
+  // Audit middleware disabled - causing 500 errors on task operations
+  // setupAuditMiddleware(client)
   
   return client
 }

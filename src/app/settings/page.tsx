@@ -1,27 +1,16 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import {
-  Upload,
-  Users,
-  Trash2,
-  ChevronDown,
-  LogOut,
-  AlertCircle,
-  Check,
-  Plus,
-  Mail,
-  Clock,
-} from "lucide-react";
-import {
-  getCurrentUser,
-  clearUserSession,
-  saveUserSession,
-} from "@/utils/sessionManager";
+import React, { useState, useEffect } from "react";
+import { LogOut, AlertCircle } from "lucide-react";
+import { getCurrentUser, clearUserSession } from "@/utils/sessionManager";
 import { useAuthProtection } from "@/app/hooks/useAuthProtection";
-import { PageContainer } from "@/app/components/PageContainer";
-import { PageContentCon } from "@/app/components/PageContentCon";
+import { PageContainer } from "@/app/components/page-layouts/MainPageContainerLayoutComponent";
+import { PageContentCon } from "@/app/components/page-layouts/PageContentWrapperContainerComponent";
 import { useRouter } from "next/navigation";
+import { ProfileManagementComponent } from "@/app/components/settings-components/ProfileManagementComponent";
+import { NotificationsComponent } from "@/app/components/settings-components/NotificationsComponent";
+import { TeamManagementComponent } from "@/app/components/settings-components/TeamManagementComponent";
+import { ConfirmProvider } from "@/app/components/providers-popups/ConfirmationDialogProviderComponent";
 
 interface User {
   id: number;
@@ -35,19 +24,7 @@ interface User {
   messageNotifications?: boolean;
 }
 
-interface ListUser {
-  id: number;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-  isVerified: boolean;
-  active: boolean;
-}
-
 type TabType = "profile" | "notifications" | "team";
-
-const ROLES = ["EMPLOYEE", "TEAM_LEAD", "MANAGER", "CO_OWNER"];
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -56,41 +33,11 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>("profile");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Profile state
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [profilePicture, setProfilePicture] = useState("");
-  const [profileSaving, setProfileSaving] = useState(false);
-  const [profileMessage, setProfileMessage] = useState("");
-
-  // Notification state
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [messageNotifications, setMessageNotifications] = useState(true);
-  const [notificationSaving, setNotificationSaving] = useState(false);
-
-  // Team management state
-  const [users, setUsers] = useState<ListUser[]>([]);
-  const [teamLoading, setTeamLoading] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviting, setInviting] = useState(false);
-  const [editingUserId, setEditingUserId] = useState<number | null>(null);
-  const [editingRole, setEditingRole] = useState("");
-  const [showRoleDropdown, setShowRoleDropdown] = useState<number | null>(null);
-  const [approvingUserId, setApprovingUserId] = useState<number | null>(null);
-  const [rejectingUserId, setRejectingUserId] = useState<number | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     loadCurrentUser();
   }, []);
-
-  useEffect(() => {
-    if (activeTab === "team" && canManageUsers) {
-      fetchUsers();
-    }
-  }, [activeTab]);
 
   const loadCurrentUser = async () => {
     try {
@@ -100,251 +47,11 @@ export default function SettingsPage() {
         return;
       }
       setCurrentUser(user as User);
-      setFirstName(user.firstName || "");
-      setLastName(user.lastName || "");
-      setProfilePicture(user.profilePicture || "");
-      setEmailNotifications(user.emailNotifications ?? true);
-      setMessageNotifications(user.messageNotifications ?? true);
       setError(null);
     } catch (err) {
       setError("Failed to load user data");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleProfilePictureChange = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setProfilePicture(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const saveProfile = async () => {
-    if (!currentUser) return;
-    setProfileSaving(true);
-    setProfileMessage("");
-
-    try {
-      const response = await fetch(`/api/users/${currentUser.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": String(currentUser.id),
-        },
-        body: JSON.stringify({
-          firstName,
-          lastName,
-          profilePicture,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to save profile");
-      }
-
-      setProfileMessage("Profile updated successfully");
-      const updatedUser = {
-        ...currentUser,
-        firstName,
-        lastName,
-        profilePicture,
-      } as User;
-      setCurrentUser(updatedUser);
-
-      // Save updated profile to localStorage with proper type cast
-      saveUserSession(updatedUser as any);
-
-      // Dispatch custom event to notify sidebar of profile update
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("profileUpdated"));
-      }
-
-      setTimeout(() => setProfileMessage(""), 3000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save profile");
-    } finally {
-      setProfileSaving(false);
-    }
-  };
-
-  const fetchUsers = async () => {
-    setTeamLoading(true);
-    try {
-      const userId =
-        typeof window !== "undefined" ? localStorage.getItem("userId") : null;
-      const response = await fetch("/api/users", {
-        headers: userId ? { "x-user-id": userId } : {},
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to fetch users");
-      }
-      const data = await response.json();
-      setUsers(data.users || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch users");
-    } finally {
-      setTeamLoading(false);
-    }
-  };
-
-  const inviteUser = async () => {
-    if (!inviteEmail) return;
-    setInviting(true);
-
-    try {
-      const response = await fetch("/api/invite/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: inviteEmail }),
-      });
-
-      if (!response.ok) throw new Error("Failed to send invite");
-
-      setInviteEmail("");
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send invite");
-    } finally {
-      setInviting(false);
-    }
-  };
-
-  const promoteUser = async (userId: number, newRole: string) => {
-    try {
-      const sessionUserId =
-        typeof window !== "undefined" ? localStorage.getItem("userId") : null;
-      const response = await fetch("/api/users/promote", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(sessionUserId && { "x-user-id": sessionUserId }),
-        },
-        body: JSON.stringify({ userId, newRole }),
-      });
-
-      if (!response.ok) throw new Error("Failed to promote user");
-
-      fetchUsers();
-      setEditingUserId(null);
-      setShowRoleDropdown(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to promote user");
-    }
-  };
-
-  const deleteUser = async (userId: number) => {
-    if (!confirm("Are you sure you want to delete this user?")) return;
-
-    try {
-      const sessionUserId =
-        typeof window !== "undefined" ? localStorage.getItem("userId") : null;
-      const response = await fetch(`/api/users/${userId}`, {
-        method: "DELETE",
-        headers: sessionUserId ? { "x-user-id": sessionUserId } : {},
-      });
-
-      if (!response.ok) throw new Error("Failed to delete user");
-
-      fetchUsers();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete user");
-    }
-  };
-
-  const approveUser = async (userId: number) => {
-    setApprovingUserId(userId);
-    try {
-      const sessionUserId =
-        typeof window !== "undefined" ? localStorage.getItem("userId") : null;
-      const response = await fetch(`/api/users/${userId}/approve`, {
-        method: "POST",
-        headers: sessionUserId ? { "x-user-id": sessionUserId } : {},
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to approve user");
-      }
-
-      fetchUsers();
-      alert("User approved successfully!");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to approve user");
-      alert(err instanceof Error ? err.message : "Failed to approve user");
-    } finally {
-      setApprovingUserId(null);
-    }
-  };
-
-  const rejectUser = async (userId: number) => {
-    if (
-      !confirm(
-        "Are you sure you want to reject this user? Their account will be deleted.",
-      )
-    )
-      return;
-
-    setRejectingUserId(userId);
-    try {
-      const sessionUserId =
-        typeof window !== "undefined" ? localStorage.getItem("userId") : null;
-      const response = await fetch(`/api/users/${userId}/deny`, {
-        method: "POST",
-        headers: sessionUserId ? { "x-user-id": sessionUserId } : {},
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to reject user");
-      }
-
-      fetchUsers();
-      alert("User rejected and account deleted");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reject user");
-      alert(err instanceof Error ? err.message : "Failed to reject user");
-    } finally {
-      setRejectingUserId(null);
-    }
-  };
-
-  // helper to update notification preferences
-  const handleToggle = async (
-    field: "emailNotifications" | "messageNotifications",
-    value: boolean,
-  ) => {
-    if (!currentUser) return;
-    setNotificationSaving(true);
-    try {
-      const res = await fetch(`/api/users/${currentUser.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": String(currentUser.id),
-        },
-        body: JSON.stringify({ [field]: value }),
-      });
-      if (!res.ok) throw new Error("Failed to update preferences");
-      const data = await res.json();
-      if (data.user) {
-        const u = data.user as any;
-        setCurrentUser((prev) => (prev ? { ...prev, ...u } : prev));
-        setEmailNotifications(u.emailNotifications ?? value);
-        setMessageNotifications(u.messageNotifications ?? value);
-      }
-    } catch (err: any) {
-      setError(err.message || "Failed to update preferences");
-    } finally {
-      setNotificationSaving(false);
     }
   };
 
@@ -358,7 +65,7 @@ export default function SettingsPage() {
       }
 
       // Call logout API to clear server-side cookies
-      await fetch("/api/auth/logout", { method: "POST" });
+      await fetch("/api/authentication-endpoints/logout", { method: "POST" });
     } catch (err) {
       console.error("Logout API error:", err);
     } finally {
@@ -387,448 +94,136 @@ export default function SettingsPage() {
   );
 
   return (
-    <PageContainer title="SETTINGS">
-      <PageContentCon className="space-y-6 mt-6 text-white">
-        <button
-          onClick={() => setShowLogoutConfirm(true)}
-          className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-        >
-          <LogOut size={18} />
-          Logout
-        </button>
-
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-white/20">
-          <button
-            onClick={() => {
-              setActiveTab("profile");
-              setError(null);
-            }}
-            className={`px-4 py-3 font-normal transition-colors ${
-              activeTab === "profile"
-                ? "text-blue-600 border-b-2 border-blue-600"
-                : "text-white/60 hover:text-white/80"
-            }`}
-          >
-            Profile
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab("notifications");
-              setError(null);
-            }}
-            className={`px-4 py-3 font-normal transition-colors ${
-              activeTab === "notifications"
-                ? "text-blue-600 border-b-2 border-blue-600"
-                : "text-white/60 hover:text-white/80"
-            }`}
-          >
-            Notifications
-          </button>
-          {canManageUsers && (
-            <button
-              onClick={() => {
-                setActiveTab("team");
-                setError(null);
-                fetchUsers();
-              }}
-              className={`px-4 py-3 font-normal transition-colors ${
-                activeTab === "team"
-                  ? "text-blue-600 border-b-2 border-blue-600"
-                  : "text-white/60 hover:text-white/80"
-              }`}
-            >
-              Team Management
-            </button>
-          )}
-        </div>
-
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
-            <AlertCircle size={20} className="text-red-600" />
-            <p className="text-red-800 text-sm">{error}</p>
-          </div>
-        )}
-
-        {/* Profile Tab */}
-        {activeTab === "profile" && currentUser && (
-          <div className="max-w-2xl space-y-6">
-            <div>
-              <h2 className="text-xl font-normal text-white/80 mb-4">
-                Update Profile Details
-              </h2>
-
-              <div className="space-y-4">
-                {/* Profile Picture */}
-                <div>
-                  <label className="block text-sm font-normal text-white/60 mb-2">
-                    Profile Picture
-                  </label>
-                  <div className="flex items-center gap-4">
-                    <div className="w-20 h-20 rounded-lg bg-white/10 flex items-center justify-center overflow-hidden">
-                      {profilePicture ? (
-                        <img
-                          src={profilePicture}
-                          alt="Profile"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Users size={32} className="text-white/60" />
-                      )}
-                    </div>
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      <Upload size={16} />
-                      Upload
-                    </button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleProfilePictureChange}
-                      className="hidden"
-                    />
-                  </div>
-                </div>
-
-                {/* First Name */}
-                <div>
-                  <label className="block text-sm font-normal text-white/60 mb-2">
-                    First Name
-                  </label>
-                  <input
-                    type="text"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="w-full px-4 py-2 border border-white/20 rounded-lg bg-white/10 text-white focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                    placeholder="Your first name"
-                  />
-                </div>
-
-                {/* Last Name */}
-                <div>
-                  <label className="block text-sm font-normal text-white/60 mb-1">
-                    Last Name
-                  </label>
-                  <input
-                    type="text"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="w-full px-4 py-2 border border-white/20 rounded-lg bg-white/10 text-white focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                    placeholder="Your last name"
-                  />
-                </div>
-
-                {/* Email */}
-                <div>
-                  <label className="block text-sm font-normal text-white/60 mb-1">
-                    Email (Read-only)
-                  </label>
-                  <input
-                    type="email"
-                    value={currentUser.email}
-                    disabled
-                    className="w-full px-4 py-2 border border-white/20 rounded-lg bg-white/10 text-white"
-                  />
-                </div>
-
-                {/* Role */}
-                <div>
-                  <label className="block text-sm font-normal text-white/60 mb-1">
-                    Role (Read-only)
-                  </label>
-                  <input
-                    type="text"
-                    value={currentUser.role}
-                    disabled
-                    className="w-full px-4 py-2 border border-white/20 rounded-lg bg-white/10 text-white"
-                  />
-                </div>
-
-                {profileMessage && (
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm flex items-center gap-2">
-                    <Check size={16} />
-                    {profileMessage}
-                  </div>
+    <ConfirmProvider>
+      <PageContainer title="SETTINGS">
+        <PageContentCon className="mt-0">
+          <div className="flex gap-1">
+            {/* Left Sidebar Navigation */}
+            <div className="w-48 h-screen flex-shrink-0">
+              <div className="bg-blue-100 backdrop-blur-md border border-black/10 mr-1 rounded-sm p-2 space-y-2 sticky top-1">
+                <button
+                  onClick={() => {
+                    setActiveTab("profile");
+                    setError(null);
+                  }}
+                  className={`w-full px-4 py-3 font-medium transition-colors rounded-sm text-left ${
+                    activeTab === "profile"
+                      ? "bg-blue-600 text-white"
+                      : "text-black/70 hover:bg-white/50"
+                  }`}
+                >
+                  Profile
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveTab("notifications");
+                    setError(null);
+                  }}
+                  className={`w-full px-4 py-3 font-medium transition-colors rounded-sm text-left ${
+                    activeTab === "notifications"
+                      ? "bg-blue-600 text-white"
+                      : "text-black/70 hover:bg-white/50"
+                  }`}
+                >
+                  Notifications
+                </button>
+                {canManageUsers && (
+                  <button
+                    onClick={() => {
+                      setActiveTab("team");
+                      setError(null);
+                    }}
+                    className={`w-full px-4 py-3 font-medium transition-colors rounded-sm text-left ${
+                      activeTab === "team"
+                        ? "bg-blue-600 text-white"
+                        : "text-black/70 hover:bg-white/50"
+                    }`}
+                  >
+                    Team Management
+                  </button>
                 )}
-
-                <button
-                  onClick={saveProfile}
-                  disabled={profileSaving}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                >
-                  {profileSaving ? "Saving..." : "Save Profile"}
-                </button>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* Notifications Tab */}
-        {activeTab === "notifications" && (
-          <div className="max-w-2xl space-y-6">
-            <h2 className="text-xl font-normal text-white/80">
-              Notification Preferences
-            </h2>
-            <div className="space-y-4">
-              <div className="flex flex-col space-y-1 p-4 border border-white/20 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <label className="font-normal text-white/60">
-                    Email Notifications
-                  </label>
-                  <button
-                    onClick={() =>
-                      handleToggle("emailNotifications", !emailNotifications)
-                    }
-                    disabled={notificationSaving}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      emailNotifications ? "bg-blue-600" : "bg-white/20"
-                    } ${notificationSaving ? "opacity-50 cursor-not-allowed" : ""}`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        emailNotifications ? "translate-x-6" : "translate-x-1"
-                      }`}
-                    />
-                  </button>
+            {/* Right Content Area */}
+            <div className="flex-1 space-y-6">
+              {error && (
+                <div className="p-4 bg-red-100 border border-red-300 rounded-sm flex items-center gap-1">
+                  <AlertCircle size={20} className="text-red-700" />
+                  <p className="text-red-800 text-sm">{error}</p>
                 </div>
-                <p className="text-sm text-white/60">
-                  When enabled, important updates will be sent to the email
-                  address associated with your account. Turning this off stops
-                  outgoing emails but does&nbsp;not affect in‑app notifications
-                  on the Notifications page.
-                </p>
-              </div>
+              )}
 
-              <div className="flex flex-col space-y-1 p-4 border border-white/20 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <label className="font-normal text-white/60">
-                    Message Notifications
-                  </label>
-                  <button
-                    onClick={() =>
-                      handleToggle(
-                        "messageNotifications",
-                        !messageNotifications,
-                      )
-                    }
-                    disabled={notificationSaving}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      messageNotifications ? "bg-blue-600" : "bg-white/20"
-                    } ${notificationSaving ? "opacity-50 cursor-not-allowed" : ""}`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        messageNotifications ? "translate-x-6" : "translate-x-1"
-                      }`}
-                    />
-                  </button>
-                </div>
-                <p className="text-sm text-white/60">
-                  Controls whether you receive notifications inside TaskerAI –
-                  these appear on the Notifications page and are pushed via
-                  real‑time mechanisms. If disabled, no new in‑app notifications
-                  will be shown.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Team Management Tab */}
-        {activeTab === "team" && canManageUsers && (
-          <div className="max-w-4xl space-y-6">
-            <h2 className="text-xl font-normal text-white/80">
-              Team Management
-            </h2>
-
-            {/* Invite Section */}
-            <div className="p-4 border border-white/20 rounded-lg">
-              <h3 className="font-normal text-white/60 mb-3 flex items-center gap-2">
-                <Plus size={18} />
-                Add New Team Member
-              </h3>
-              <div className="flex gap-2">
-                <input
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="Enter email address"
-                  className="flex-1 px-4 py-2 border border-white/20 rounded-lg bg-white/10 text-white placeholder-white/60 focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+              {/* Profile Tab */}
+              {activeTab === "profile" && currentUser && (
+                <ProfileManagementComponent
+                  currentUser={currentUser}
+                  onError={setError}
                 />
-                <button
-                  onClick={inviteUser}
-                  disabled={inviting || !inviteEmail}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                >
-                  {inviting ? "Sending..." : "Send Invite"}
-                </button>
-              </div>
-              <p className="text-xs text-white/60 mt-2">
-                An invitation link will be sent to their email
-              </p>
-            </div>
+              )}
 
-            {/* Users List */}
-            <div>
-              <h3 className="font-normal text-white/60 mb-3 flex items-center gap-2">
-                <Users size={18} />
-                Team Members ({users.length})
-              </h3>
+              {/* Notifications Tab */}
+              {activeTab === "notifications" && (
+                <NotificationsComponent
+                  currentUser={currentUser}
+                  onError={setError}
+                />
+              )}
 
-              {teamLoading ? (
-                <p className="text-white/60">Loading team members...</p>
-              ) : users.length === 0 ? (
-                <p className="text-white/60">No team members yet</p>
-              ) : (
-                <div className="space-y-2">
-                  {users.map((user) => (
-                    <div
-                      key={user.id}
-                      className="p-4 border border-white/20 rounded-lg flex items-center justify-between hover:bg-white/10 transition-colors"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-normal text-white/60">
-                            {user.firstName} {user.lastName}
-                          </h4>
-                          <span className="text-xs font-normal px-2 py-1 bg-blue-100 text-blue-700 rounded">
-                            {user.role}
-                          </span>
-                        </div>
-                        <p className="text-sm text-white/60 truncate">
-                          {user.email}
-                        </p>
-                        <p className="text-xs text-white/60 mt-1">
-                          {!user.active && (
-                            <span className="inline-block px-2 py-0.5 bg-amber-50 text-amber-700 rounded">
-                              Pending Approval
-                            </span>
-                          )}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2 ml-2 flex-wrap justify-end">
-                        {currentUser?.role === "OWNER" &&
-                          user.id !== currentUser.id && (
-                            <>
-                              {!user.active && (
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => approveUser(user.id)}
-                                    disabled={approvingUserId === user.id}
-                                    className="text-sm px-3 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors disabled:opacity-50 whitespace-nowrap flex items-center gap-1"
-                                  >
-                                    <Check size={14} />
-                                    {approvingUserId === user.id
-                                      ? "Approving..."
-                                      : "Approve"}
-                                  </button>
-                                  <button
-                                    onClick={() => rejectUser(user.id)}
-                                    disabled={rejectingUserId === user.id}
-                                    className="text-sm px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors disabled:opacity-50 whitespace-nowrap"
-                                  >
-                                    {rejectingUserId === user.id
-                                      ? "Rejecting..."
-                                      : "Reject"}
-                                  </button>
-                                </div>
-                              )}
-
-                              {user.active && (
-                                <div className="relative">
-                                  <button
-                                    onClick={() =>
-                                      setShowRoleDropdown(
-                                        showRoleDropdown === user.id
-                                          ? null
-                                          : user.id,
-                                      )
-                                    }
-                                    className="text-sm px-3 py-1 bg-white/10 text-white/60 rounded hover:bg-white/20 transition-colors whitespace-nowrap"
-                                  >
-                                    Change Role
-                                  </button>
-
-                                  {showRoleDropdown === user.id && (
-                                    <div className="absolute right-0 mt-1 bg-white/90 border border-white/20 rounded-lg shadow-lg z-10 w-40">
-                                      {ROLES.map((role) => (
-                                        <button
-                                          key={role}
-                                          onClick={() =>
-                                            promoteUser(user.id, role)
-                                          }
-                                          className="w-full text-left px-4 py-2 hover:bg-white/20 transition-colors text-sm"
-                                        >
-                                          {role}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              <button
-                                onClick={() => deleteUser(user.id)}
-                                className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                title="Delete user"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </>
-                          )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              {/* Team Management Tab */}
+              {activeTab === "team" && canManageUsers && (
+                <TeamManagementComponent
+                  currentUser={currentUser}
+                  canManageUsers={canManageUsers}
+                  onError={setError}
+                />
               )}
             </div>
           </div>
-        )}
-      </PageContentCon>
+        </PageContentCon>
 
-      {/* Logout Confirmation Modal */}
-      {showLogoutConfirm && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-          onClick={() => setShowLogoutConfirm(false)}
-        >
+        {/* Logout Confirmation Modal */}
+        {showLogoutConfirm && (
           <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-[90%] max-w-sm bg-transparent border border-white/10 rounded-lg shadow-xl p-6"
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            onClick={() => setShowLogoutConfirm(false)}
           >
-            <PageContentCon className="flex items-center gap-3 mb-4 pb-4 border-b border-white/10">
-              <div className="w-12 h-12 bg-red-100/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                <AlertCircle size={24} className="text-red-400" />
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-[90%] max-w-sm bg-blue-100 border border-black/10 rounded-sm shadow-xl p-6"
+            >
+              <div className="flex items-center gap-1 mb-1 pb-4 border-b border-black/10">
+                <div className="w-12 h-12 bg-red-200/60 rounded-sm flex items-center justify-center">
+                  <AlertCircle size={24} className="text-red-700" />
+                </div>
+                <h2 className="text-lg font-semibold text-black/80">
+                  Confirm Logout
+                </h2>
               </div>
-              <h2 className="text-lg font-normal text-white">Confirm Logout</h2>
-            </PageContentCon>
 
-            <p className="text-white/70 text-sm mb-6 leading-relaxed">
-              Are you sure you want to logout? You'll need to sign in again to
-              access your account.
-            </p>
+              <p className="text-black/70 text-sm mb-1 leading-relaxed">
+                Are you sure you want to logout? You'll need to sign in again to
+                access your account.
+              </p>
 
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors font-normal border border-white/10"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmLogout}
-                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-normal"
-              >
-                Logout
-              </button>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className="flex-1 px-4 py-2 bg-white/60 hover:bg-white/80 text-black/80 rounded-sm transition-colors font-medium border border-black/10"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmLogout}
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-sm transition-colors font-medium"
+                >
+                  Logout
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </PageContainer>
+        )}
+      </PageContainer>
+    </ConfirmProvider>
   );
 }

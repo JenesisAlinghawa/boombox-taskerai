@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { LoadingSpinner } from "@/app/components/ui";
+import { LoadingSpinner } from "@/app/components/shared-headers/FullPageLoadingSpinnerComponent";
 import { saveUserSession } from "@/utils/sessionManager";
 
 export default function VerifyClient() {
@@ -24,7 +24,7 @@ export default function VerifyClient() {
       }
 
       try {
-        const response = await fetch("/api/auth/verify", {
+        const response = await fetch("/api/authentication-endpoints/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token }),

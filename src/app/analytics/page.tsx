@@ -15,15 +15,18 @@ import {
   MessageSquare,
   Plus,
 } from "lucide-react";
-import { ToastProvider, useToast } from "@/app/components/ToastProvider";
-import TaskStatusChart from "@/app/components/TaskStatusChart";
-import StatusCard from "@/app/components/dashboard/StatusCards";
-import WeeklyProgressChart from "@/app/components/dashboard/WeeklyProgressChart";
-import TaskSummary from "@/app/components/dashboard/TaskSummary";
+import {
+  ToastProvider,
+  useToast,
+} from "@/app/components/providers-popups/ToastNotificationProviderComponent";
+import TaskStatusChart from "@/app/components/analytics-charts/TaskStatusDistributionChartComponent";
+import StatusCard from "@/app/components/dashboard/TaskStatusSummaryCardsComponent";
+import WeeklyProgressChart from "@/app/components/dashboard/WeeklyTaskTrendLineChartComponent";
+import TaskSummary from "@/app/components/dashboard/TaskSummaryOverviewComponent";
 import { getCurrentUser } from "@/utils/sessionManager";
 import { useAuthProtection } from "@/app/hooks/useAuthProtection";
-import { PageContainer } from "@/app/components/PageContainer";
-import { PageContentCon } from "@/app/components/PageContentCon";
+import { PageContainer } from "@/app/components/page-layouts/MainPageContainerLayoutComponent";
+import { PageContentCon } from "@/app/components/page-layouts/PageContentWrapperContainerComponent";
 import {
   buildTaskGraph,
   findCriticalPath,
@@ -143,14 +146,14 @@ function AnalyticsPageContent() {
     const fetchAnalytics = async () => {
       try {
         // Fetch all tasks
-        const tasksRes = await fetch("/api/tasks", {
+        const tasksRes = await fetch("/api/task-management", {
           headers: { "x-user-id": String(currentUser.id) },
         });
         const tasksData = await tasksRes.json();
         const tasks = Array.isArray(tasksData?.tasks) ? tasksData.tasks : [];
 
         // Fetch team for member count
-        const teamRes = await fetch("/api/teams", {
+        const teamRes = await fetch("/api/team-management", {
           headers: { "x-user-id": String(currentUser.id) },
         });
         const teamData = await teamRes.json();
@@ -239,7 +242,7 @@ function AnalyticsPageContent() {
         let performanceSummary = "";
 
         try {
-          const aiRes = await fetch("/api/analytics/ai", {
+          const aiRes = await fetch("/api/analytics-reports/ai", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -613,7 +616,7 @@ function AnalyticsPageContent() {
   return (
     <PageContainer title="ANALYTICS">
       {/* Key Metrics Grid - Using StatusCards for consistency */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-4 gap-2 mb-2">
         <StatusCard
           count={analytics.totalTasks}
           label="Total Tasks"
@@ -658,7 +661,7 @@ function AnalyticsPageContent() {
       </div>
 
       {/* Critical Path - Task Optimization using Dijkstra */}
-      <div className="bg-blue-400/10 backdrop-blur-lg border border-white/10 rounded-sm shadow-xl p-5 mb-6">
+      <div className="bg-blue-400/10 backdrop-blur-lg border border-white/10 rounded-sm shadow-xl p-5 mb-2 transition-all duration-200 hover:border-white/50 hover:shadow-2xl">
         <div className="flex items-center gap-3 mb-4">
           <Network size={24} className="text-blue-400" />
           <h2 className="text-base font-semibold m-0 text-white/62">
@@ -690,13 +693,15 @@ function AnalyticsPageContent() {
       </div>
 
       {/* Two Column Layout - Campaign Performance Summary & AI Recommendations */}
-      <div className="grid grid-cols-2 gap-5 mb-6">
+      <div className="grid grid-cols-2 gap-2 mb-2">
         {/* Campaign Performance Summary - Left */}
-        <div className="bg-green-500/10 border border-green-500/20 p-5 rounded-sm shadow-xl">
-          <h3 className="text-sm font-semibold m-0 mb-3 text-white/62 flex items-center gap-2">
-            <Sparkles size={16} className="text-green-400" /> Campaign
-            Performance Summary
-          </h3>
+        <div className="bg-green-500/10 border border-white/10 p-5 rounded-sm shadow-xl transition-all duration-200 hover:border-white/50 hover:shadow-2xl backdrop-blur-lg">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles size={18} className="text-green-400" />
+            <h2 className="text-base font-semibold m-0 text-white/62">
+              Campaign Performance Summary
+            </h2>
+          </div>
           <div className="text-xs text-white/70 leading-relaxed">
             <p>
               {analytics.performanceSummary ||
@@ -706,20 +711,20 @@ function AnalyticsPageContent() {
 
           {/* Completion Metrics */}
           {analytics.completedTasks > 0 && (
-            <div className="mt-4 pt-4 border-t border-green-500/20">
-              <div className="text-xs font-semibold text-green-300 mb-3 flex items-center gap-1">
+            <div className="mt-4 pt-4 border-t border-green-500/20 flex flex-col gap-2">
+              <div className="text-xs font-semibold text-green-300 flex items-center gap-1">
                 <CheckCircle size={14} className="text-green-400" /> Completion
                 Metrics
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-white/5 rounded text-xs border border-white/10">
-                  <p className="text-white/40 m-0 mb-1">Total Completed</p>
+              <div className="flex gap-2">
+                <div className="flex-1 p-3 bg-white/5 rounded text-xs border border-white/10">
+                  <p className="text-white/40 m-0 mb-1">Completed</p>
                   <p className="text-white/62 font-semibold m-0 text-lg">
                     {analytics.completedTasks}
                   </p>
                 </div>
-                <div className="p-3 bg-white/5 rounded text-xs border border-white/10">
-                  <p className="text-white/40 m-0 mb-1">Completion Rate</p>
+                <div className="flex-1 p-3 bg-white/5 rounded text-xs border border-white/10">
+                  <p className="text-white/40 m-0 mb-1">Rate</p>
                   <p className="text-white/62 font-semibold m-0 text-lg">
                     {analytics.completionRate}%
                   </p>
@@ -730,7 +735,7 @@ function AnalyticsPageContent() {
         </div>
 
         {/* AI Recommendations - Right */}
-        <div className="bg-blue-400/10 backdrop-blur-lg border border-white/10 rounded-sm shadow-xl p-5">
+        <div className="bg-blue-400/10 backdrop-blur-lg border border-white/10 rounded-sm shadow-xl p-5 transition-all duration-200 hover:border-white/50 hover:shadow-2xl">
           <div className="flex items-center gap-2 mb-4">
             <Sparkles size={18} className="text-yellow-400" />
             <h2 className="text-base font-semibold m-0 text-white/62">
@@ -762,33 +767,37 @@ function AnalyticsPageContent() {
       </div>
 
       {/* Charts Grid - Weekly Progress and Task Summary (Reversed Layout) */}
-      <div className="grid grid-cols-2 gap-5 mb-6">
+      <div className="grid grid-cols-2 gap-2 mb-2">
         {/* Task Summary - Left */}
-        <TaskSummary
-          completed={analytics.completedTasks}
-          total={analytics.totalTasks}
-          inProgress={taskStatusCounts.inProgress}
-          pending={
-            analytics.totalTasks -
-            analytics.completedTasks -
-            taskStatusCounts.inProgress
-          }
-          overdue={analytics.overdueTasks}
-          aiInsight={
-            taskStatusCounts.done > taskStatusCounts.inProgress
-              ? "Strong completion rate! Your team is shipping tasks at a healthy pace. Keep maintaining this momentum."
-              : taskStatusCounts.inProgress > taskStatusCounts.stuck
-                ? "Good progress on active work. Focus on reducing bottlenecks to improve completion rate."
-                : "Many tasks are stuck. Prioritize unblocking these to accelerate delivery."
-          }
-        />
+        <div className="min-h-0">
+          <TaskSummary
+            completed={analytics.completedTasks}
+            total={analytics.totalTasks}
+            inProgress={taskStatusCounts.inProgress}
+            pending={
+              analytics.totalTasks -
+              analytics.completedTasks -
+              taskStatusCounts.inProgress
+            }
+            overdue={analytics.overdueTasks}
+            aiInsight={
+              taskStatusCounts.done > taskStatusCounts.inProgress
+                ? "Strong completion rate! Your team is shipping tasks at a healthy pace. Keep maintaining this momentum."
+                : taskStatusCounts.inProgress > taskStatusCounts.stuck
+                  ? "Good progress on active work. Focus on reducing bottlenecks to improve completion rate."
+                  : "Many tasks are stuck. Prioritize unblocking these to accelerate delivery."
+            }
+          />
+        </div>
 
         {/* Weekly Progress Chart - Right */}
-        <WeeklyProgressChart data={weeklyData} />
+        <div className="min-h-0">
+          <WeeklyProgressChart data={weeklyData} />
+        </div>
       </div>
 
       {/* Completed Tasks History (detailed with filters) */}
-      <div className="mt-6 bg-blue-400/10 backdrop-blur-lg border border-white/10 rounded-sm shadow-xl p-5">
+      <div className="bg-blue-400/10 backdrop-blur-lg border border-white/10 rounded-sm shadow-xl p-5 mb-2 transition-all duration-200 hover:border-white/50 hover:shadow-2xl">
         <div className="flex items-center gap-2 mb-4">
           <CheckCircle size={18} className="text-green-400" />
           <h2 className="text-base font-semibold m-0 text-white/62">
@@ -988,7 +997,7 @@ function AnalyticsPageContent() {
                                         onClick={async () => {
                                           try {
                                             const res = await fetch(
-                                              `/api/tasks/${task.id}`,
+                                              `/api/task-management/${task.id}`,
                                               {
                                                 method: "PATCH",
                                                 headers: {
@@ -1077,9 +1086,12 @@ function AnalyticsPageContent() {
               <button
                 onClick={async () => {
                   try {
-                    const res = await fetch(`/api/tasks/${deleteModalTaskId}`, {
-                      method: "DELETE",
-                    });
+                    const res = await fetch(
+                      `/api/task-management/${deleteModalTaskId}`,
+                      {
+                        method: "DELETE",
+                      },
+                    );
                     if (res.ok) {
                       setCompletedTasksHistory(
                         completedTasksHistory.filter(

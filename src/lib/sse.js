@@ -1,1 +1,1 @@
-export { sendEvent } from "./sse.ts";
+export { addClient, removeClient, sendEvent } from "./sse.ts";

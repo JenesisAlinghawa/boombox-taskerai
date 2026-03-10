@@ -15,7 +15,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // For all other routes, we'll rely on client-side authentication checks
+  // For all other routes rely on client-side authentication checks
   // The client pages will redirect to login if no session is found
   // This is because middleware runs server-side and doesn't have access to localStorage
 

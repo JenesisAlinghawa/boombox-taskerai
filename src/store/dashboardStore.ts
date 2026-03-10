@@ -54,7 +54,7 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
   setCurrentYear: (year: number) => set({ currentYear: year }),
   fetchData: async (userId: string) => {
     try {
-      const response = await fetch(`/api/dashboard`, {
+      const response = await fetch(`/api/dashboard-data`, {
         headers: {
           "x-user-id": userId,
         },

@@ -4,8 +4,8 @@ import React, { useState, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { getCurrentUser } from "@/utils/sessionManager";
 import { useAuthProtection } from "@/app/hooks/useAuthProtection";
-import { PageContainer } from "@/app/components/PageContainer";
-import { PageContentCon } from "@/app/components/PageContentCon";
+import { PageContainer } from "@/app/components/page-layouts/MainPageContainerLayoutComponent";
+import { PageContentCon } from "@/app/components/page-layouts/PageContentWrapperContainerComponent";
 import { AlertCircle } from "lucide-react";
 
 interface Log {
@@ -53,7 +53,7 @@ export default function LogsPage() {
 
   const fetchLogs = async (userId: number) => {
     try {
-      const response = await fetch("/api/logs", {
+      const response = await fetch("/api/activity-logging", {
         method: "GET",
         headers: {
           "Content-Type": "application/json",

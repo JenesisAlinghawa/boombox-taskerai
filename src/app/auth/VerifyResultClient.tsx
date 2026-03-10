@@ -2,7 +2,8 @@
 
 import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import LoginForm from "@/app/components/auth/loginForm";
+import LoginForm from "@/app/components/auth/UserLoginFormComponent";
+import Image from "next/image";
 
 type Props = {
   status: "success" | "error";
@@ -21,67 +22,51 @@ export default function VerifyResultClient({ status, message }: Props) {
   }, [status, router]);
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        width: "100vw",
-        display: "flex",
-        background: "linear-gradient(to right, #a0d8ef 0%, #D2DBEC 70%)",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          right: 0,
-          top: 0,
-          width: "60%",
-          height: "100%",
-          background: "linear-gradient(to left, #5d8bb1 0%, transparent 100%)",
-          borderRadius: "20% 0 0 50%",
-          transform: "translateX(30%)",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          right: 0,
-          top: 0,
-          width: "70%",
-          height: "100%",
-          background: "linear-gradient(to left, #4a7ba0 30%, transparent 100%)",
-          borderRadius: "20% 0 0 50%",
-          transform: "translateX(20%)",
-        }}
-      />
+    <div className="min-h-screen w-screen flex flex-col bg-transparent relative overflow-hidden">
+      {/* TaskerAI Logo - Top Left */}
+      <div className="absolute top-6 left-6 z-10">
+        <Image
+          src="/assets/images/taskeraiLogo.png"
+          alt="TaskerAI"
+          width={48}
+          height={48}
+          priority
+          style={{ cursor: "pointer" }}
+        />
+      </div>
 
-      <div
-        style={{
-          flex: "0 0 50%",
-          maxWidth: "600px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "40px",
-          zIndex: 1,
-        }}
-      >
-        <div style={{ width: "100%", maxWidth: 420 }}>
-          <div style={{ textAlign: "center", marginBottom: 18 }}>
-            <h1 style={{ fontSize: 20, margin: 0 }}>
-              {status === "success" ? "Email Verified" : "Verification Error"}
-            </h1>
-            <p style={{ color: status === "success" ? "#2ecc71" : "#e74c3c" }}>
-              {message}
-            </p>
-          </div>
+      {/* Main Content - Two Column Layout */}
+      <div className="flex-1 flex items-center justify-start pl-[180px] pr-5 relative z-20">
+        {/* Left Column - Verification Message */}
+        <div className="w-[530px] h-[620px] bg-blue-100 backdrop-blur-sm border border-black/10 rounded-sm shadow-lg p-32 flex flex-col items-center justify-center gap-5 transition-all duration-200 hover:border-black/50 hover:shadow-[0_20px_25px_-5px_rgba(0,0,0,0.15)]">
+          <h1 className="text-4xl font-normal m-0 text-black text-center">
+            {status === "success" ? "Email Verified" : "Verification Error"}
+          </h1>
+          <p
+            className={`text-lg m-0 text-center ${
+              status === "success" ? "text-green-600" : "text-red-600"
+            }`}
+          >
+            {message}
+          </p>
 
           {status === "error" && <LoginForm />}
         </div>
       </div>
 
-      <div style={{ flex: 1, minHeight: "100vh" }} />
+      {/* Right Column - Boombox Image */}
+      <div className="absolute right-0 top-0 w-[45%] h-full flex items-center justify-center z-0">
+        <Image
+          src="/assets/images/BBX-Logo.png"
+          alt="Boombox"
+          width={400}
+          height={400}
+          style={{
+            objectFit: "contain",
+            opacity: 0.9,
+          }}
+        />
+      </div>
     </div>
   );
 }

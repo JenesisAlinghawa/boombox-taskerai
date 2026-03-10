@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import type { Attachment, Comment, Task, User } from "@/app/components/tasks/types";
-import { useToast } from "@/app/components/ToastProvider";
-import { useConfirm } from "@/app/components/ConfirmProvider";
+import { useToast } from "@/app/components/providers-popups/ToastNotificationProviderComponent";
+import { useConfirm } from "@/app/components/providers-popups/ConfirmationDialogProviderComponent";
 
-export function useTasks(currentUser: User | null) {
+export function useTasks(currentEmployee: User | null) {
   const toast = useToast();
   // Hook-based confirm; ensure `ConfirmProvider` wraps the page
   const confirm = useConfirm();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [taskDetails, setTaskDetails] = useState<Task | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
@@ -24,25 +24,25 @@ export function useTasks(currentUser: User | null) {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   useEffect(() => {
-    if (!currentUser) return;
-    fetch("/api/tasks", {
-      headers: { "x-user-id": String(currentUser.id) },
+    if (!currentEmployee) return;
+    fetch("/api/task-management", {
+      headers: { "x-user-id": String(currentEmployee.id) },
     })
       .then((r) => r.json())
       .then((d) => setTasks(Array.isArray(d?.tasks) ? d.tasks : []))
       .catch(console.error);
 
-    fetch("/api/users/assignable", {
-      headers: { "x-user-id": String(currentUser.id) },
+    fetch("/api/user-management/assignable", {
+      headers: { "x-user-id": String(currentEmployee.id) },
     })
       .then((r) => r.json())
       .then((d) => setUsers(d?.users || []))
       .catch(console.error);
-  }, [currentUser]);
+  }, [currentEmployee]);
 
   const getHeaders = (additional?: Record<string, string>) => ({
     "Content-Type": "application/json",
-    ...(currentUser && { "x-user-id": String(currentUser.id) }),
+    ...(currentEmployee && { "x-user-id": String(currentEmployee.id) }),
     ...(additional || {}),
   });
 
@@ -50,11 +50,11 @@ export function useTasks(currentUser: User | null) {
     setTasks((prev) => [createdTask, ...prev]);
   };
 
-  const handleSaveField = async (taskId: number, field: string, value: any) => {
+  const handleSaveField = async (taskId: string, field: string, value: any) => {
     try {
       const updateData: any = {};
       updateData[field] = value;
-      const res = await fetch(`/api/tasks/${taskId}`, {
+      const res = await fetch(`/api/task-management/${taskId}`, {
         method: "PATCH",
         headers: getHeaders(),
         body: JSON.stringify(updateData),
@@ -75,7 +75,7 @@ export function useTasks(currentUser: User | null) {
       // If details panel is open for this task, refresh it from server to ensure consistency
       if (selectedTaskId === taskId) {
         try {
-          const detailsRes = await fetch(`/api/tasks/${taskId}`, { headers: getHeaders() });
+          const detailsRes = await fetch(`/api/task-management/${taskId}`, { headers: getHeaders() });
           if (detailsRes.ok) {
             const detailsData = await detailsRes.json();
             setTaskDetails(detailsData.task);
@@ -93,7 +93,7 @@ export function useTasks(currentUser: User | null) {
 
       // Refresh entire tasks list to ensure server-side derived values (counts, etc.) are up to date
       try {
-        const listRes = await fetch('/api/tasks', { headers: getHeaders() });
+        const listRes = await fetch('/api/task-management', { headers: getHeaders() });
         if (listRes.ok) {
           const listData = await listRes.json();
           if (Array.isArray(listData?.tasks)) {
@@ -111,11 +111,11 @@ export function useTasks(currentUser: User | null) {
     }
   };
 
-  const handleDeleteTask = async (id: number) => {
+  const handleDeleteTask = async (id: string) => {
     const confirmed = await confirm({ message: "Delete this task?" });
     if (!confirmed) return;
     try {
-      const res = await fetch(`/api/tasks/${id}`, {
+      const res = await fetch(`/api/task-management/${id}`, {
         method: "DELETE",
         headers: getHeaders(),
       });
@@ -137,9 +137,9 @@ export function useTasks(currentUser: User | null) {
     }
   };
 
-  const loadTaskDetails = async (taskId: number) => {
+  const loadTaskDetails = async (taskId: string) => {
     try {
-      const res = await fetch(`/api/tasks/${taskId}`, {
+      const res = await fetch(`/api/task-management/${taskId}`, {
         headers: getHeaders(),
       });
       if (!res.ok) {
@@ -156,10 +156,10 @@ export function useTasks(currentUser: User | null) {
     }
   };
 
-  const handleAddComment = async (taskId: number) => {
+  const handleAddComment = async (taskId: string) => {
     if (!newComment.trim()) return;
     try {
-      const res = await fetch(`/api/tasks/${taskId}/comments`, {
+      const res = await fetch(`/api/task-management/${taskId}/comments`, {
         method: "POST",
         headers: getHeaders(),
         body: JSON.stringify({ content: newComment }),
@@ -175,11 +175,11 @@ export function useTasks(currentUser: User | null) {
     }
   };
 
-  const handleDeleteComment = async (commentId: number, taskId: number) => {
+  const handleDeleteComment = async (commentId: number, taskId: string) => {
     const confirmed = await confirm({ message: "Delete this comment?" });
     if (!confirmed) return;
     try {
-      const res = await fetch(`/api/tasks/${taskId}/comments/${commentId}`, {
+      const res = await fetch(`/api/task-management/${taskId}/comments/${commentId}`, {
         method: "DELETE",
         headers: getHeaders(),
       });
@@ -199,7 +199,7 @@ export function useTasks(currentUser: User | null) {
   ) => {
     if (!newContent.trim()) return;
     try {
-      const res = await fetch(`/api/tasks/${taskId}/comments/${commentId}`, {
+      const res = await fetch(`/api/task-management/${taskId}/comments/${commentId}`, {
         method: "PATCH",
         headers: getHeaders(),
         body: JSON.stringify({ content: newContent }),
@@ -214,7 +214,7 @@ export function useTasks(currentUser: User | null) {
     }
   };
 
-  const handleAddAttachment = async (taskId: number) => {
+  const handleAddAttachment = async (taskId: string) => {
     if (!attachmentFile) return;
     setUploadingAttachment(true);
     try {
@@ -222,7 +222,7 @@ export function useTasks(currentUser: User | null) {
       formData.append("file", attachmentFile);
       formData.append("filename", attachmentFile.name);
 
-      const res = await fetch(`/api/tasks/${taskId}/attachments`, {
+      const res = await fetch(`/api/task-management/${taskId}/attachments`, {
         method: "POST",
         headers: {
           ...(currentUser && { "x-user-id": String(currentUser.id) }),
@@ -244,12 +244,12 @@ export function useTasks(currentUser: User | null) {
 
   const handleDeleteAttachment = async (
     attachmentId: number,
-    taskId: number,
+    taskId: string,
   ) => {
     const confirmed = await confirm({ message: "Delete this attachment?" });
     if (!confirmed) return;
     try {
-      const res = await fetch(`/api/tasks/${taskId}/attachments/${attachmentId}`, {
+      const res = await fetch(`/api/task-management/${taskId}/attachments/${attachmentId}`, {
         method: "DELETE",
         headers: getHeaders(),
       });
@@ -328,3 +328,4 @@ export function useTasks(currentUser: User | null) {
     getFilteredAndSortedTasks,
   };
 }
+

@@ -35,7 +35,7 @@ export default function PendingRequestsPage() {
       }
 
       if (user.role !== "OWNER") {
-        setError("Only OWNER can access this page");
+        setError("Only the Owner can access this page");
         setLoading(false);
         return;
       }
@@ -49,7 +49,7 @@ export default function PendingRequestsPage() {
 
   const fetchPendingUsers = async () => {
     try {
-      const response = await fetch("/api/users/pending", {
+      const response = await fetch("/api/user-management/pending", {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -80,7 +80,7 @@ export default function PendingRequestsPage() {
   ) => {
     setApproving(userId);
     try {
-      const response = await fetch(`/api/users/${userId}/approve`, {
+      const response = await fetch(`/api/user-management/${userId}/approve`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -110,7 +110,7 @@ export default function PendingRequestsPage() {
   ) => {
     setDenying(userId);
     try {
-      const response = await fetch(`/api/users/${userId}/deny`, {
+      const response = await fetch(`/api/user-management/${userId}/deny`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -139,7 +139,7 @@ export default function PendingRequestsPage() {
   ) => {
     try {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-      await fetch("/api/email/send", {
+      await fetch("/api/email-notifications/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -164,7 +164,7 @@ export default function PendingRequestsPage() {
     lastName: string,
   ) => {
     try {
-      await fetch("/api/email/send", {
+      await fetch("/api/email-notifications/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -278,3 +278,4 @@ export default function PendingRequestsPage() {
     </div>
   );
 }
+

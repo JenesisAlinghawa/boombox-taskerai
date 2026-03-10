@@ -1,6 +1,6 @@
 /**
  * Cloudinary Upload Utility
- * Handles uploading files to Cloudinary storage
+ * Handles uploading files to Cloudinary storage with size validation
  */
 
 import { v2 as cloudinary } from "cloudinary";
@@ -9,15 +9,37 @@ interface UploadOptions {
   filename: string;
   contentType: string;
   body: Buffer;
+  maxSize?: number; // Max file size in bytes (optional)
 }
 
 /**
- * Upload a file to Cloudinary
- * @param options Upload options (filename, contentType, body)
+ * Format bytes to human-readable size
+ */
+export function formatFileSize(bytes: number): string {
+  if (bytes === 0) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
+}
+
+/**
+ * Upload a file to Cloudinary with size validation
+ * @param options Upload options (filename, contentType, body, maxSize)
  * @returns Public URL of the uploaded file
+ * @throws Error if file exceeds maxSize
  */
 export async function uploadToBlob(options: UploadOptions): Promise<string> {
-  const { filename, contentType, body } = options;
+  const { filename, contentType, body, maxSize } = options;
+
+  // Validate file size if maxSize is specified
+  if (maxSize && body.length > maxSize) {
+    const maxSizeStr = formatFileSize(maxSize);
+    const actualSizeStr = formatFileSize(body.length);
+    throw new Error(
+      `File size (${actualSizeStr}) exceeds maximum allowed size (${maxSizeStr})`
+    );
+  }
 
   if (
     !process.env.CLOUDINARY_CLOUD_NAME ||

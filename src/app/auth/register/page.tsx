@@ -1,32 +1,91 @@
 "use client";
 
-import RegisterForm from "@/app/components/auth/registerForm";
+import RegisterForm from "@/app/components/auth/UserRegistrationFormComponent";
+import Image from "next/image";
 
 export default function RegisterPage() {
   return (
     <div
       style={{
         minHeight: "100vh",
-        width: "100vw",
+        width: "100%",
         display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        flexDirection: "column",
         background: "transparent",
-        padding: "24px",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
+      {/* TaskerAI Logo - Top Left */}
       <div
         style={{
-          width: "100%",
-          maxWidth: "680px",
+          position: "absolute",
+          top: 24,
+          left: 24,
+          zIndex: 10,
+        }}
+      >
+        <Image
+          src="/assets/images/taskeraiLogo.png"
+          alt="TaskerAI"
+          width={48}
+          height={48}
+          priority
+          style={{ cursor: "pointer" }}
+        />
+      </div>
+
+      {/* Main Content - Two Column Layout */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-start",
+          paddingLeft: "180px",
+          paddingRight: "20px",
+          position: "relative",
+          zIndex: 2,
+        }}
+      >
+        {/* Left Column - Form Container (Smaller) */}
+        <div
+          style={{
+            width: "530px",
+            height: "620px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <RegisterForm />
+        </div>
+      </div>
+
+      {/* Right Column - Boombox Image */}
+      <div
+        style={{
+          position: "absolute",
+          right: 0,
+          top: 0,
+          width: "45%",
+          height: "100%",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          padding: "24px",
-          boxSizing: "border-box",
+          zIndex: 1,
         }}
       >
-        <RegisterForm />
+        <Image
+          src="/assets/images/BBX-Logo.png"
+          alt="Boombox"
+          width={400}
+          height={400}
+          style={{
+            objectFit: "contain",
+            opacity: 0.9,
+          }}
+        />
       </div>
     </div>
   );

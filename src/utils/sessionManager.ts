@@ -1,9 +1,9 @@
 /**
- * Session Manager - Handles user session persistence using cloud API
+ * Session Manager - Handles employee session persistence using cloud API
  * Replaces localStorage for production deployment
  */
 
-export interface User {
+export interface Employee {
   id: number;
   firstName: string;
   lastName: string;
@@ -18,15 +18,15 @@ export interface User {
 }
 
 /**
- * Save user session to localStorage and cloud
+ * Save employee session to localStorage and cloud
  * In production, this would sync with a cloud database
  */
-export const saveUserSession = (user: User) => {
+export const saveUserSession = (employee: Employee) => {
   if (typeof window !== "undefined") {
     // Store userId in localStorage for API calls
-    localStorage.setItem("userId", user.id.toString());
-    // Keep user data in localStorage as fallback
-    localStorage.setItem("user", JSON.stringify(user));
+    localStorage.setItem("userId", employee.id.toString());
+    // Keep employee data in localStorage as fallback
+    localStorage.setItem("user", JSON.stringify(employee));
   }
 };
 
@@ -42,7 +42,7 @@ export const getCurrentUser = async (userId?: string | number): Promise<User | n
       return null;
     }
     
-    const response = await fetch("/api/session", {
+    const response = await fetch("/api/session-management", {
       headers: { "x-user-id": String(id) },
     });
 

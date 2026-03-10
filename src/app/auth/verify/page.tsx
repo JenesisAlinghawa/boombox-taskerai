@@ -52,7 +52,7 @@ export default async function VerifyPage({ searchParams }: Props) {
               lastName: decoded.lastName,
               role: "EMPLOYEE",
               isVerified: true, // Email is verified
-              active: false, // Account inactive until OWNER approves
+              active: false, // Pending admin/owner approval
             },
           });
 
@@ -72,7 +72,7 @@ export default async function VerifyPage({ searchParams }: Props) {
                   email: newUser.email,
                   status: "pending",
                   title: "New User Registration",
-                  message: `${newUser.firstName} ${newUser.lastName} (${newUser.email}) verified their email. Click to review in Team Management.",
+                  message: `${newUser.firstName} ${newUser.lastName} (${newUser.email}) verified their email. Click to review in Team Management.`,
                 },
               });
             }
@@ -82,7 +82,7 @@ export default async function VerifyPage({ searchParams }: Props) {
 
           status = "success";
           message =
-            "Email verified successfully! Your account has been created. Please wait for the owner to approve your account before signing in.";
+            "Email verified successfully! Your account has been created. Please wait for the admin or owner to confirm your account before you can log in.";
         }
       } else if (decoded.id) {
         // EXISTING USER EMAIL VERIFICATION (if needed)

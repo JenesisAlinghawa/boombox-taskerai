@@ -35,7 +35,9 @@ function InvitePageContent() {
 
   const verifyToken = async () => {
     try {
-      const response = await fetch(`/api/invite/verify?token=${token}`);
+      const response = await fetch(
+        `/api/team-invitations/verify?token=${token}`,
+      );
       if (!response.ok) {
         throw new Error("Invalid or expired invite link");
       }
@@ -66,7 +68,7 @@ function InvitePageContent() {
         throw new Error("Password must be at least 8 characters");
       }
 
-      const response = await fetch("/api/invite/accept", {
+      const response = await fetch("/api/team-invitations/accept", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

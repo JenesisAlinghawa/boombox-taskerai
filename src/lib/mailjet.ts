@@ -20,14 +20,14 @@ function getTransporter() {
 
 export async function sendEmail(to: string, subject: string, html: string, text?: string) {
   if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
-    console.warn('⚠️  Gmail credentials not configured in .env.local');
-    console.warn('   Email would be sent to:', to);
-    console.warn('   Subject:', subject);
-    console.warn('   Please add GMAIL_USER and GMAIL_APP_PASSWORD to .env.local');
-    return;
+    console.error('❌ Email sending failed: Gmail credentials not configured');
+    console.error('   GMAIL_USER:', GMAIL_USER ? '✓ Set' : '✗ Missing');
+    console.error('   GMAIL_APP_PASSWORD:', GMAIL_APP_PASSWORD ? '✓ Set' : '✗ Missing');
+    throw new Error('Email service is not configured. Please contact support.');
   }
 
   try {
+    console.log(`[Email] Attempting to send to: ${to}`);
     const transporter = getTransporter();
     const res = await transporter.sendMail({
       from: GMAIL_USER,
@@ -38,8 +38,12 @@ export async function sendEmail(to: string, subject: string, html: string, text?
     });
     console.log('✓ Email sent successfully to:', to);
     return res;
-  } catch (err) {
-    console.error('❌ Gmail send error:', err);
+  } catch (err: any) {
+    console.error('❌ Gmail send error details:', {
+      message: err.message,
+      code: err.code,
+      response: err.response,
+    });
     throw err;
   }
 }

@@ -41,7 +41,7 @@ export function useAITaskPrioritization() {
       setError(null);
 
       try {
-        const response = await fetch("/api/tasks/ai-prioritize", {
+        const response = await fetch("/api/task-management/ai-prioritize", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
