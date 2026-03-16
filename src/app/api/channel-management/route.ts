@@ -3,13 +3,23 @@ import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { uploadToBlob, generateBlobKey } from '@/lib/blob'
 
+// Cache channels for 30 seconds per user to avoid Prisma connection pool issues on cold start
+const channelCache = new Map<string, { data: any; timestamp: number }>();
+
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url)
-    const userId = parseInt(url.searchParams.get('userId') || '0')
+    const userId = url.searchParams.get('userId')
 
     if (!userId) {
       return NextResponse.json({ error: 'User ID required' }, { status: 400 })
+    }
+
+    // Check cache first
+    const cached = channelCache.get(userId);
+    if (cached && Date.now() - cached.timestamp < 30000) {
+      console.log("[Channels] Cache hit for userId:", userId);
+      return NextResponse.json(cached.data);
     }
 
     const channels = await prisma.channel.findMany({
@@ -19,15 +29,27 @@ export async function GET(req: NextRequest) {
         },
       },
       include: {
-        members: true,
-        messages: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                profilePicture: true,
+                role: true,
+              },
+            },
+          },
         },
       },
     })
 
-    return NextResponse.json({ channels })
+    const response = { channels };
+    channelCache.set(userId, { data: response, timestamp: Date.now() });
+
+    return NextResponse.json(response)
   } catch (error: any) {
     console.error('Get channels error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -46,7 +68,7 @@ export async function POST(req: NextRequest) {
     let name: string
     let description: string | null
     let isPrivate: boolean
-    let memberIds: number[] = []
+    let memberIds: string[] = []
     let profilePictureUrl: string | null = null
 
     if (contentType.includes('multipart/form-data')) {
@@ -102,8 +124,8 @@ export async function POST(req: NextRequest) {
             { userId: user.id },
             // Add other selected members (excluding creator if they selected themselves)
             ...memberIds
-              .filter((id: number) => id !== user.id)
-              .map((id: number) => ({ userId: id })),
+              .filter((id: string) => id !== user.id)
+              .map((id: string) => ({ userId: id })),
           ],
         },
       },

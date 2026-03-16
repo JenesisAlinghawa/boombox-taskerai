@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { X, Upload, Search } from "lucide-react";
 
-interface Employee {
-  id: number;
+interface User {
+  id: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -18,10 +18,10 @@ interface ChannelCreationModalProps {
   onSubmit: (data: {
     name: string;
     description: string;
-    memberIds: number[];
+    memberIds: string[];
     profilePictureFile?: File;
   }) => Promise<void>;
-  currentUserId: number;
+  currentUserId: string;
 }
 
 export function ChannelCreationModal({
@@ -32,7 +32,7 @@ export function ChannelCreationModal({
 }: ChannelCreationModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [selectedMembers, setSelectedMembers] = useState<Set<number>>(
+  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(
     new Set(),
   );
   const [profilePictureFile, setProfilePictureFile] = useState<File | null>(
@@ -98,7 +98,7 @@ export function ChannelCreationModal({
     }
   };
 
-  const toggleMember = (userId: number) => {
+  const toggleMember = (userId: string) => {
     const newSelectedMembers = new Set(selectedMembers);
     if (newSelectedMembers.has(userId)) {
       newSelectedMembers.delete(userId);

@@ -3,16 +3,16 @@
  * 
  * Allows OWNER to promote users to higher roles
  * 
- * How Co-Owner Delegation Works:
+ * How Admin Promotion Works:
  * - Only OWNER can call this endpoint
- * - Can promote users to MANAGER or CO_OWNER
- * - CO_OWNER cannot promote other users (prevents privilege escalation)
+ * - Can promote users to ADMIN
+ * - ADMIN cannot promote other users (prevents privilege escalation)
  * - This ensures a clear chain of command with single authority (OWNER)
  * 
  * POST /api/users/promote
  * Body: {
  *   userId: number,
- *   newRole: "MANAGER" | "CO_OWNER"
+ *   newRole: "ADMIN" | "OWNER"
  * }
  */
 
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     // Validate role
     if (!isValidRole(newRole)) {
       return NextResponse.json(
-        { error: `Invalid role. Must be one of: EMPLOYEE, TEAM_LEAD, MANAGER, CO_OWNER, OWNER` },
+        { error: `Invalid role. Must be one of: EMPLOYEE, ADMIN, OWNER` },
         { status: 400 }
       );
     }

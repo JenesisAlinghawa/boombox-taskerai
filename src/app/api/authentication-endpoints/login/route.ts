@@ -54,6 +54,24 @@ export async function POST(request: NextRequest) {
 
     // Return user data without password
     const { password: _, ...userWithoutPassword } = user
+    
+    // Log the successful login
+    try {
+      await prisma.log.create({
+        data: {
+          userId: user.id,
+          action: 'User logged in',
+          data: {
+            email: user.email,
+            loginTime: new Date().toISOString(),
+          },
+        },
+      });
+    } catch (logError) {
+      console.error('Failed to log login event:', logError);
+      // Don't throw - logging failure shouldn't prevent login
+    }
+    
     return NextResponse.json({
       success: true,
       user: userWithoutPassword,

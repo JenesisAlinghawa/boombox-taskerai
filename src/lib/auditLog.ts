@@ -1,7 +1,7 @@
 import prisma from "./prisma.js";
 
 export interface AuditLogData {
-  userId?: number | null;
+  userId?: string | null;
   action: string; // e.g., "TASK_CREATED", "LOGIN_SUCCESS"
   resource: string; // e.g., "Task", "User", "Auth"
   resourceId?: number | null;
@@ -52,7 +52,7 @@ export function getIpAddress(request?: Request): string | undefined {
  * Log authentication events
  */
 export async function logAuthEvent(data: {
-  userId?: number;
+  userId?: string;
   action: "LOGIN_SUCCESS" | "LOGIN_FAILED" | "LOGOUT" | "PASSWORD_RESET";
   email?: string;
   ipAddress?: string;
@@ -78,7 +78,7 @@ export async function logAuthEvent(data: {
  * Log task-related events
  */
 export async function logTaskEvent(data: {
-  userId: number;
+  userId: string;
   action:
     | "TASK_CREATED"
     | "TASK_UPDATED"
@@ -86,7 +86,7 @@ export async function logTaskEvent(data: {
     | "TASK_ASSIGNED"
     | "TASK_COMPLETED"
     | "PRIORITY_CHANGED";
-  taskId: number;
+  taskId: string;
   changes?: {
     field: string;
     oldValue: any;
@@ -98,8 +98,9 @@ export async function logTaskEvent(data: {
     userId: data.userId,
     action: data.action,
     resource: "Task",
-    resourceId: data.taskId,
+    resourceId: null,
     details: {
+      taskId: data.taskId,
       changes: data.changes || [],
     },
     ipAddress: data.ipAddress,
@@ -110,7 +111,7 @@ export async function logTaskEvent(data: {
  * Log AI operations
  */
 export async function logAiEvent(data: {
-  userId: number;
+  userId: string;
   action: "AI_INSIGHT_GENERATED" | "AI_PRIORITY_CALCULATED";
   details: Record<string, any>;
   ipAddress?: string;
@@ -128,10 +129,10 @@ export async function logAiEvent(data: {
  * Log comment events
  */
 export async function logCommentEvent(data: {
-  userId: number;
+  userId: string;
   action: "COMMENT_CREATED" | "COMMENT_UPDATED" | "COMMENT_DELETED";
   commentId: number;
-  taskId: number;
+  taskId: string;
   details?: Record<string, any>;
   ipAddress?: string;
 }) {
@@ -156,7 +157,7 @@ export async function logErrorEvent(data: {
   ipAddress?: string;
 }) {
   await logAuditEvent({
-    userId: data.userId,
+    userId: data.userId ? String(data.userId) : undefined,
     action: data.action,
     resource: data.resource,
     details: {

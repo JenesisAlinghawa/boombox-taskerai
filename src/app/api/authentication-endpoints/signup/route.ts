@@ -16,7 +16,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import bcrypt from "bcryptjs";
+import bcrypt from "bcrypt";
 import { createNotification } from "@/lib/notificationService";
 
 export async function POST(request: NextRequest) {

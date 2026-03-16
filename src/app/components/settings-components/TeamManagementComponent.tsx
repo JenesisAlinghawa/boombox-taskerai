@@ -5,7 +5,7 @@ import { Plus, Users, Check, Trash2, MoreVertical } from "lucide-react";
 import { useConfirm } from "@/app/components/providers-popups/ConfirmationDialogProviderComponent";
 
 interface User {
-  id: number;
+  id: string;
   email: string;
   firstName: string;
   lastName: string;
@@ -21,7 +21,7 @@ interface Props {
   onError: (error: string) => void;
 }
 
-const ROLES = ["USER", "MANAGER", "ADMIN", "OWNER"];
+const ROLES = ["EMPLOYEE", "ADMIN", "OWNER"];
 
 export function TeamManagementComponent({
   currentUser,
@@ -33,13 +33,13 @@ export function TeamManagementComponent({
   const [inviteEmail, setInviteEmail] = useState("");
   const [teamLoading, setTeamLoading] = useState(false);
   const [inviting, setInviting] = useState(false);
-  const [showRoleDropdown, setShowRoleDropdown] = useState<number | null>(null);
-  const [showDeleteDropdown, setShowDeleteDropdown] = useState<number | null>(
+  const [showRoleDropdown, setShowRoleDropdown] = useState<string | null>(null);
+  const [showDeleteDropdown, setShowDeleteDropdown] = useState<string | null>(
     null,
   );
-  const [approvingUserId, setApprovingUserId] = useState<number | null>(null);
-  const [rejectingUserId, setRejectingUserId] = useState<number | null>(null);
-  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+  const [approvingUserId, setApprovingUserId] = useState<string | null>(null);
+  const [rejectingUserId, setRejectingUserId] = useState<string | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (canManageUsers) {
@@ -73,14 +73,26 @@ export function TeamManagementComponent({
     setInviting(true);
 
     try {
+      const sessionUserId =
+        typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+
       const response = await fetch("/api/team-invitations/send", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(sessionUserId && { "x-user-id": sessionUserId }),
+        },
         body: JSON.stringify({ email: inviteEmail }),
       });
 
-      if (!response.ok) throw new Error("Failed to send invite");
+      const data = await response.json();
 
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to send invite");
+      }
+
+      // Refresh users list to show the new pending user
+      await fetchUsers();
       setInviteEmail("");
       onError(""); // Clear any previous errors
     } catch (err) {
@@ -90,7 +102,7 @@ export function TeamManagementComponent({
     }
   };
 
-  const promoteUser = async (userId: number, newRole: string) => {
+  const promoteUser = async (userId: string, newRole: string) => {
     try {
       const sessionUserId =
         typeof window !== "undefined" ? localStorage.getItem("userId") : null;
@@ -113,7 +125,7 @@ export function TeamManagementComponent({
   };
 
   const deleteUser = async (
-    userId: number,
+    userId: string,
     action: "deactivate" | "delete",
   ) => {
     const user = users.find((u) => u.id === userId);
@@ -184,7 +196,7 @@ export function TeamManagementComponent({
     }
   };
 
-  const approveUser = async (userId: number) => {
+  const approveUser = async (userId: string) => {
     setApprovingUserId(userId);
     try {
       const sessionUserId =
@@ -200,16 +212,14 @@ export function TeamManagementComponent({
       }
 
       fetchUsers();
-      alert("User approved successfully!");
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to approve user");
-      alert(err instanceof Error ? err.message : "Failed to approve user");
     } finally {
       setApprovingUserId(null);
     }
   };
 
-  const rejectUser = async (userId: number) => {
+  const rejectUser = async (userId: string) => {
     if (
       !(await confirm({
         message:
@@ -233,10 +243,8 @@ export function TeamManagementComponent({
       }
 
       fetchUsers();
-      alert("User rejected and account deleted");
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to reject user");
-      alert(err instanceof Error ? err.message : "Failed to reject user");
     } finally {
       setRejectingUserId(null);
     }
@@ -251,65 +259,65 @@ export function TeamManagementComponent({
   }
 
   return (
-    <div className="w-full space-y-2">
+    <div className="w-full space-y-6">
       {/* Invite Section */}
-      <div className="bg-blue-100 backdrop-blur-md border border-black/10 rounded-sm p-6">
-        <h3 className="font-semibold text-black/80 mb-4 flex items-center gap-2">
+      <div className="bg-blue-100/95 backdrop-blur-lg border border-black/20 rounded-sm p-6">
+        <h3 className="font-bold text-lg text-black/80 mb-6 flex items-center gap-2">
           <Plus size={18} />
           Add New Team Member
         </h3>
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           <input
             type="email"
             value={inviteEmail}
             onChange={(e) => setInviteEmail(e.target.value)}
             placeholder="Enter email address"
-            className="flex-1 px-4 py-2 border border-black/10 rounded-sm bg-white/50 text-black placeholder-black/40 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            className="flex-1 px-3 py-2 border border-black/10 rounded-sm bg-blue-100/50 text-black placeholder-black/40 focus:outline-none focus:border-blue-400 transition-all text-sm"
           />
           <button
             onClick={inviteUser}
             disabled={inviting || !inviteEmail}
-            className="px-6 py-2 bg-blue-600 text-white rounded-sm hover:bg-blue-700 transition-colors disabled:opacity-50 font-medium"
+            className="px-6 py-2 bg-blue-600 text-white rounded-sm hover:bg-blue-700 transition-colors disabled:opacity-50 font-medium text-sm"
           >
             {inviting ? "Sending..." : "Send Invite"}
           </button>
         </div>
-        <p className="text-xs text-black/60 mt-2">
+        <p className="text-xs text-black/60 mt-3">
           An invitation link will be sent to their email
         </p>
       </div>
 
       {/* Users List */}
-      <div className="bg-blue-100 backdrop-blur-md border border-black/10 rounded-sm p-6">
-        <h3 className="font-semibold text-black/80 mb-4 flex items-center gap-2">
+      <div className="bg-blue-100/95 backdrop-blur-lg border border-black/20 rounded-sm p-6">
+        <h3 className="font-bold text-lg text-black/80 mb-6 flex items-center gap-2">
           <Users size={18} />
           Team Members ({users.length})
         </h3>
 
         {teamLoading ? (
-          <p className="text-black/60">Loading team members...</p>
+          <p className="text-black/60 text-sm">Loading team members...</p>
         ) : users.length === 0 ? (
-          <p className="text-black/60">No team members yet</p>
+          <p className="text-black/60 text-sm">No team members yet</p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {users.map((user) => (
               <div
                 key={user.id}
-                className="p-4 border border-black/10 rounded-sm flex items-center justify-between hover:bg-white/30 transition-colors bg-white/20"
+                className="p-4 border border-black/10 rounded-sm flex items-center justify-between hover:bg-blue-100 transition-colors bg-blue-100/50"
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <h4 className="font-medium text-black/80">
+                    <h4 className="font-semibold text-black/80 text-sm">
                       {user.firstName} {user.lastName}
                     </h4>
-                    <span className="text-xs font-medium px-2 py-1 bg-blue-500 text-white rounded">
+                    <span className="text-xs font-semibold px-2 py-1 bg-blue-600 text-white rounded-sm">
                       {user.role}
                     </span>
                   </div>
-                  <p className="text-sm text-black/70 truncate">{user.email}</p>
+                  <p className="text-xs text-black/70 truncate">{user.email}</p>
                   <p className="text-xs text-black/60 mt-1">
                     {!user.active && (
-                      <span className="inline-block px-2 py-0.5 bg-amber-200 text-amber-800 rounded">
+                      <span className="inline-block px-2 py-0.5 bg-amber-200 text-amber-800 rounded-sm text-xs font-semibold">
                         Pending Approval
                       </span>
                     )}
@@ -325,7 +333,7 @@ export function TeamManagementComponent({
                             <button
                               onClick={() => approveUser(user.id)}
                               disabled={approvingUserId === user.id}
-                              className="text-sm px-3 py-1 bg-green-200 text-green-800 rounded hover:bg-green-300 transition-colors disabled:opacity-50 whitespace-nowrap flex items-center gap-1 font-medium"
+                              className="text-xs px-3 py-1 bg-green-600 text-white rounded-sm hover:bg-green-700 transition-colors disabled:opacity-50 whitespace-nowrap flex items-center gap-1 font-semibold"
                             >
                               <Check size={14} />
                               {approvingUserId === user.id
@@ -335,7 +343,7 @@ export function TeamManagementComponent({
                             <button
                               onClick={() => rejectUser(user.id)}
                               disabled={rejectingUserId === user.id}
-                              className="text-sm px-3 py-1 bg-red-200 text-red-800 rounded hover:bg-red-300 transition-colors disabled:opacity-50 whitespace-nowrap font-medium"
+                              className="text-xs px-3 py-1 bg-red-600 text-white rounded-sm hover:bg-red-700 transition-colors disabled:opacity-50 whitespace-nowrap font-semibold"
                             >
                               {rejectingUserId === user.id
                                 ? "Rejecting..."
@@ -345,71 +353,79 @@ export function TeamManagementComponent({
                         )}
 
                         {user.active && (
-                          <div className="relative">
-                            <button
-                              onClick={() =>
-                                setShowRoleDropdown(
-                                  showRoleDropdown === user.id ? null : user.id,
-                                )
-                              }
-                              className="text-sm px-3 py-1 bg-white/40 text-black/80 rounded hover:bg-white/60 transition-colors whitespace-nowrap font-medium border border-black/10"
-                            >
-                              Change Role
-                            </button>
-
-                            {showRoleDropdown === user.id && (
-                              <div className="absolute right-0 mt-1 bg-white border border-black/10 rounded shadow-lg z-10 w-40">
-                                {ROLES.map((role) => (
-                                  <button
-                                    key={role}
-                                    onClick={() => promoteUser(user.id, role)}
-                                    className="w-full text-left px-4 py-2 hover:bg-blue-50 transition-colors text-sm text-black/80 font-medium"
-                                  >
-                                    {role}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        <div className="relative">
-                          <button
-                            onClick={() =>
-                              setShowDeleteDropdown(
-                                showDeleteDropdown === user.id ? null : user.id,
-                              )
-                            }
-                            className="p-1 text-black/60 hover:bg-red-100 hover:text-red-700 rounded transition-colors"
-                            title="Delete options"
-                            disabled={deletingUserId === user.id}
-                          >
-                            <MoreVertical size={16} />
-                          </button>
-
-                          {showDeleteDropdown === user.id && (
-                            <div className="absolute right-0 mt-1 bg-white border border-black/10 rounded shadow-lg z-10 w-48">
+                          <>
+                            <div className="relative">
                               <button
                                 onClick={() =>
-                                  deleteUser(user.id, "deactivate")
+                                  setShowRoleDropdown(
+                                    showRoleDropdown === user.id
+                                      ? null
+                                      : user.id,
+                                  )
                                 }
-                                disabled={deletingUserId === user.id}
-                                className="w-full text-left px-4 py-2 hover:bg-yellow-50 transition-colors text-sm text-yellow-700 font-medium flex items-center gap-2 disabled:opacity-50"
+                                className="text-xs px-3 py-1 bg-blue-600 text-white rounded-sm hover:bg-blue-700 transition-colors whitespace-nowrap font-semibold border border-black/10"
                               >
-                                <Trash2 size={14} />
-                                Deactivate User
+                                Change Role
                               </button>
-                              <button
-                                onClick={() => deleteUser(user.id, "delete")}
-                                disabled={deletingUserId === user.id}
-                                className="w-full text-left px-4 py-2 hover:bg-red-100 transition-colors text-sm text-red-800 font-medium flex items-center gap-2 border-t border-black/10 disabled:opacity-50"
-                              >
-                                <Trash2 size={14} />
-                                Delete User
-                              </button>
+
+                              {showRoleDropdown === user.id && (
+                                <div className="absolute right-0 mt-1 bg-white border border-black/10 rounded-sm shadow-lg z-10 w-40">
+                                  {ROLES.map((role) => (
+                                    <button
+                                      key={role}
+                                      onClick={() => promoteUser(user.id, role)}
+                                      className="w-full text-left px-4 py-2 hover:bg-blue-50 transition-colors text-xs text-black/80 font-semibold"
+                                    >
+                                      {role}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
+
+                            <div className="relative">
+                              <button
+                                onClick={() =>
+                                  setShowDeleteDropdown(
+                                    showDeleteDropdown === user.id
+                                      ? null
+                                      : user.id,
+                                  )
+                                }
+                                className="p-1 text-black/60 hover:bg-red-100 hover:text-red-700 rounded-sm transition-colors"
+                                title="Delete options"
+                                disabled={deletingUserId === user.id}
+                              >
+                                <MoreVertical size={16} />
+                              </button>
+
+                              {showDeleteDropdown === user.id && (
+                                <div className="absolute right-0 mt-1 bg-white border border-black/10 rounded-sm shadow-lg z-10 w-48">
+                                  <button
+                                    onClick={() =>
+                                      deleteUser(user.id, "deactivate")
+                                    }
+                                    disabled={deletingUserId === user.id}
+                                    className="w-full text-left px-4 py-2 hover:bg-yellow-50 transition-colors text-xs text-yellow-700 font-semibold flex items-center gap-2 disabled:opacity-50"
+                                  >
+                                    <Trash2 size={14} />
+                                    Deactivate User
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      deleteUser(user.id, "delete")
+                                    }
+                                    disabled={deletingUserId === user.id}
+                                    className="w-full text-left px-4 py-2 hover:bg-red-100 transition-colors text-xs text-red-800 font-semibold flex items-center gap-2 border-t border-black/10 disabled:opacity-50"
+                                  >
+                                    <Trash2 size={14} />
+                                    Delete User
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
                       </>
                     )}
                 </div>

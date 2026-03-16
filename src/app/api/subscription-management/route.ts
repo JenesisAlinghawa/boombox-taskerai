@@ -4,7 +4,7 @@ import { addClient, removeClient } from '@/lib/sse'
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url)
-    const userId = parseInt(url.searchParams.get('userId') || '0')
+    const userId = url.searchParams.get('userId')
     if (!userId) return new Response('User ID required', { status: 400 })
 
     const stream = new ReadableStream({

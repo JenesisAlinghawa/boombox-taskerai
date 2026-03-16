@@ -1,170 +1,123 @@
-import React from "react";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  Legend,
-} from "recharts";
-import { Zap } from "lucide-react";
+import React, { useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { Zap, AlertCircle } from "lucide-react";
+import type { Task } from "@/app/components/tasks/types";
 
 interface TaskSummaryProps {
-  completed: number;
-  total: number;
-  inProgress: number;
-  pending: number;
-  overdue: number;
-  aiInsight: string;
+  tasks?: Task[];
 }
 
-const TaskSummary = ({
-  completed,
-  total,
-  inProgress,
-  pending,
-  overdue,
-  aiInsight,
-}: TaskSummaryProps) => {
-  const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+const TaskSummary = ({ tasks = [] }: TaskSummaryProps) => {
+  const router = useRouter();
 
-  const pieData = [
-    { name: "Completed", value: completed },
-    { name: "In Progress", value: inProgress },
-    { name: "Pending", value: pending },
-    { name: "Overdue", value: overdue },
-  ];
+  // Sort tasks by priority and deadline
+  const sortedTasks = useMemo(() => {
+    const priorityScore = { high: 3, medium: 2, low: 1 };
 
-  const COLORS = ["#10b981", "#3b82f6", "#9D00FF", "#ef4444"];
+    // Sort by: priority (high first) → then deadline (soonest first)
+    return [...tasks].sort((a, b) => {
+      const aScore =
+        priorityScore[a.priority as keyof typeof priorityScore] || 0;
+      const bScore =
+        priorityScore[b.priority as keyof typeof priorityScore] || 0;
 
-  // activeIndex retained for tooltip color calculation below
-  const [activeIndex, setActiveIndex] = React.useState<number | null>(null);
-  const activeColor = activeIndex !== null ? COLORS[activeIndex] : "#ffffff";
+      if (aScore !== bScore) return bScore - aScore; // Higher priority first
 
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (!active || !payload || !payload.length) return null;
-    const { name, value } = payload[0];
-    const idx = pieData.findIndex((e) => e.name === name);
-    const color = COLORS[idx] || "#000";
-    const plural = value !== 1 ? "s" : "";
-    return (
-      <div
-        style={{
-          background: color,
-          padding: "4px 8px",
-          borderRadius: 4,
-          border: "1px solid #fff",
-          fontSize: 10,
-          color: "#fff",
-        }}
-      >
-        {value} {name.toLowerCase()} task{plural}
-      </div>
-    );
-  };
-
-  const CustomLegend = ({ payload }: any) => {
-    if (!payload) return null;
-    return (
-      <div className="flex flex-col justify-start gap-2">
-        {payload.map((entry: any, idx: number) => (
-          <div
-            key={idx}
-            className="flex items-center gap-1 text-[10px] text-black/70"
-          >
-            <span
-              style={{
-                display: "inline-block",
-                width: 10,
-                height: 10,
-                background: entry.color,
-              }}
-            ></span>
-            <span>{entry.value}</span>
-          </div>
-        ))}
-      </div>
-    );
-  };
+      if (a.dueDate && b.dueDate) {
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime(); // Soonest deadline first
+      }
+      return 0;
+    });
+  }, [tasks]);
 
   return (
-    <div className="bg-blue-100 backdrop-blur-lg border border-black/10 rounded-sm p-4 h-[262px] flex-1 flex flex-col transition-all duration-200 hover:border-black/50">
-      <h2 className="text-xs font-normal text-black mb-4">Task Summary</h2>
+    <div
+      className="
+        bg-gradient-to-b from-amber-50 to-white
+        border border-amber-200
+        rounded-xl
+        shadow-sm
+        overflow-hidden
+        h-full
+        flex
+        flex-col
+        transition-all
+        duration-200
+        hover:shadow-md
+      "
+    >
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-gray-100 bg-amber-50/80 flex items-center gap-2">
+        <Zap size={18} className="text-amber-600" />
+        <h2 className="text-base font-medium text-gray-900">Do This First</h2>
+      </div>
 
-      <div className="flex flex-1 flex-row items-end justify-between">
-        <div className="flex flex-col gap-6 ml-5 mb-2">
-          {/* Total stats on top of insight */}
-          <div className="text-left pl-16">
-            <p className="text-xl font-normal text-black">{completionRate}%</p>
-            <p className="text-xs text-black">
-              {completed} of {total} tasks completed
-            </p>
-          </div>
-
-          {/* AI Insight */}
-          <div className="flex items-start gap-2 text-xs border-t border-black/10 pb-10">
-            <Zap size={14} className="text-yellow-500 flex-shrink-0 mt-0.5" />
-            <p className="text-black max-w-[230px]">{aiInsight}</p>
-          </div>
-        </div>
-
-        {/* Right Section: Pie Chart and Legend */}
-        <div className="flex items-center gap-4 ml-10 flex-1 min-h-0 min-w-0">
-          {/* Pie Chart */}
-          <div className="w-[250px] h-[250px] min-h-0 min-w-0 m-0 mt-[-42px] ">
-            <ResponsiveContainer
-              width="100%"
-              height="100%"
-              minWidth={0}
-              minHeight={0}
-            >
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={0}
-                  outerRadius={110}
-                  paddingAngle={0}
-                  dataKey="value"
-                  nameKey="name"
-                  onMouseEnter={(_, index) => setActiveIndex(index)}
-                  onMouseLeave={() => setActiveIndex(null)}
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index]} />
-                  ))}
-                </Pie>
-
-                <Tooltip
-                  content={<CustomTooltip />}
-                  cursor={{ fill: "rgba(255,255,255,0.1)" }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Legend at Right */}
-          <div className="flex flex-col justify-center gap-2">
-            {pieData.map((entry, idx) => (
+      {/* Content - Scrollable list of tasks */}
+      <div className="flex-1 overflow-y-auto p-2.5">
+        {sortedTasks.length > 0 ? (
+          <div className="space-y-2">
+            {sortedTasks.map((task) => (
               <div
-                key={idx}
-                className="flex items-center gap-2 text-[11px] text-black/70"
+                key={task.id}
+                onClick={() => router.push(`/tasks?focus=${task.id}`)}
+                className="
+                  flex items-start gap-3.5 
+                  bg-amber-100 
+                  hover:bg-amber-200/80 
+                  active:bg-amber-200 
+                  transition-all duration-200 
+                  cursor-pointer 
+                  rounded-lg 
+                  px-4 py-2.5
+                  border border-amber-200/60 
+                  hover:border-amber-300/70 
+                  hover:shadow-sm
+                "
               >
-                <span
-                  style={{
-                    display: "inline-block",
-                    width: 12,
-                    height: 12,
-                    background: COLORS[idx],
-                    borderRadius: "2px",
-                  }}
-                ></span>
-                <span>{entry.name}</span>
+                <Zap size={18} className="text-amber-600 flex-shrink-0 mt-1" />
+
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {task.title}
+                  </p>
+
+                  <div className="mt-1 text-xs text-gray-600 flex flex-wrap gap-x-3">
+                    {task.createdBy && (
+                      <span>
+                        by {task.createdBy.name || task.createdBy.email}
+                      </span>
+                    )}
+                    {task.dueDate && <span>due {task.dueDate}</span>}
+                  </div>
+                </div>
+
+                {task.priority && (
+                  <span
+                    className={`
+                      text-xs px-2.5 py-1 rounded-full font-medium self-start mt-0.5 flex-shrink-0
+                      ${
+                        task.priority === "high"
+                          ? "bg-red-200/80 text-red-800"
+                          : task.priority === "medium"
+                            ? "bg-yellow-200/80 text-yellow-800"
+                            : "bg-green-200/80 text-green-800"
+                      }
+                    `}
+                  >
+                    {task.priority}
+                  </span>
+                )}
               </div>
             ))}
           </div>
-        </div>
+        ) : (
+          <div className="h-full flex items-center justify-center px-6 text-center">
+            <div>
+              <AlertCircle size={32} className="mx-auto text-gray-300 mb-2" />
+              <p className="text-sm text-gray-500">No tasks to prioritize</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

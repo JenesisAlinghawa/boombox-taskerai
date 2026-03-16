@@ -9,11 +9,10 @@ import { ToastProvider } from "@/app/components/providers-popups/ToastNotificati
 import { ConfirmProvider } from "@/app/components/providers-popups/ConfirmationDialogProviderComponent";
 import DashboardHeader from "@/app/components/dashboard/DashboardPageHeaderComponent";
 import TaskTimeline from "@/app/components/dashboard/TaskTimelineVisualizationComponent";
-import DijkstraPanel from "@/app/components/dashboard/TaskOptimizationDijkstraAlgorithmPanelComponent";
-import PendingTasks from "@/app/components/dashboard/PendingTasksDisplaySectionComponent";
-import StatusCard from "@/app/components/dashboard/TaskStatusSummaryCardsComponent";
-import WeeklyProgressChart from "@/app/components/dashboard/WeeklyTaskTrendLineChartComponent";
-import TaskSummary from "@/app/components/dashboard/TaskSummaryOverviewComponent";
+import TaskStatusGrid from "@/app/components/dashboard/TaskStatusGridComponent";
+import TaskSummary from "@/app/components/dashboard/DoThisFirst";
+import { AnalyticsTaskExecutionSummary } from "@/app/components/analytics/AnalyticsTaskExecutionSummaryPieChartComponent";
+import { NaturalLanguageAutomatedInsights } from "@/app/components/analytics/NaturalLanguageAutomatedInsightsComponent";
 
 interface DashboardData {
   pending: number;
@@ -21,22 +20,35 @@ interface DashboardData {
   completed: number;
   overdue: number;
   pendingTasks: Array<{
-    id: number;
+    id: string;
     title: string;
     priority: string;
     dueDate?: string;
   }>;
-  weeklyData: {
-    labels: string[];
-    inProgress: number[];
-    completed: number[];
-    overdue: number[];
-  };
+  inProgressTasks: Array<{
+    id: string;
+    title: string;
+    priority: string;
+    dueDate?: string;
+  }>;
+  overdueTasks: Array<{
+    id: string;
+    title: string;
+    priority: string;
+    dueDate?: string;
+  }>;
+  completedTasks: Array<{
+    id: string;
+    title: string;
+    priority: string;
+    dueDate?: string;
+  }>;
   calendarTasks: Array<{
     date: number;
     taskCount: number;
   }>;
   aiInsight: string;
+  userRole?: "ADMIN" | "OWNER" | "EMPLOYEE";
 }
 
 export default function DashboardPage() {
@@ -49,12 +61,9 @@ export default function DashboardPage() {
     completed: 0,
     overdue: 0,
     pendingTasks: [],
-    weeklyData: {
-      labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-      inProgress: [0, 0, 0, 0, 0, 0, 0],
-      completed: [0, 0, 0, 0, 0, 0, 0],
-      overdue: [0, 0, 0, 0, 0, 0, 0],
-    },
+    inProgressTasks: [],
+    overdueTasks: [],
+    completedTasks: [],
     calendarTasks: [],
     aiInsight: "",
   });
@@ -62,34 +71,103 @@ export default function DashboardPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
+  // Log task data for debugging
+  useEffect(() => {
+    const totalTasks =
+      data.overdueTasks.length +
+      data.inProgressTasks.length +
+      data.pendingTasks.length;
+    console.log("[Dashboard] Do This First receiving tasks:", totalTasks);
+    if (totalTasks > 0) {
+      console.log(
+        "[Dashboard] Overdue:",
+        data.overdueTasks.length,
+        "In Progress:",
+        data.inProgressTasks.length,
+        "Pending:",
+        data.pendingTasks.length,
+      );
+    }
+  }, [data.overdueTasks, data.inProgressTasks, data.pendingTasks]);
+
+  // Function to refresh dashboard data
+  const refreshDashboard = React.useCallback(
+    async (user?: any) => {
+      try {
+        const userToUse = user || currentUser;
+        if (!userToUse?.id) return;
+
+        console.log("[Dashboard] Refreshing dashboard data");
+        const response = await fetch("/api/dashboard-data", {
+          headers: { "x-user-id": String(userToUse.id) },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            errorData.error ||
+              `Failed to fetch dashboard data (${response.status})`,
+          );
+        }
+
+        const dashboardData = await response.json();
+        console.log("[Dashboard] Refreshed data received:", dashboardData);
+        setData(dashboardData);
+        setErrorMessage(null);
+      } catch (error) {
+        console.error("[Dashboard] Error refreshing dashboard:", error);
+      }
+    },
+    [currentUser],
+  );
+
+  // Initial dashboard load - runs once on mount
   useEffect(() => {
     let isMounted = true;
 
     const loadDashboard = async () => {
       try {
         setIsLoading(true);
+        setErrorMessage(null);
         const user = await getCurrentUser();
+        console.log("[Dashboard] Current user:", user);
         if (!user) {
+          console.log("[Dashboard] No user found, redirecting to login");
           router.push("/auth/login");
           return;
         }
 
+        console.log("[Dashboard] Fetching dashboard data for user:", user.id);
         const response = await fetch("/api/dashboard-data", {
           headers: { "x-user-id": String(user.id) },
         });
 
-        if (!response.ok) throw new Error("Failed to fetch dashboard data");
+        console.log("[Dashboard] API response status:", response.status);
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            errorData.error ||
+              `Failed to fetch dashboard data (${response.status})`,
+          );
+        }
 
         const dashboardData = await response.json();
+        console.log("[Dashboard] Data received:", dashboardData);
 
         if (isMounted) {
           setData(dashboardData);
+          setCurrentUser(user);
           setIsLoading(false);
         }
       } catch (error) {
-        console.error("Failed to load dashboard:", error);
+        console.error("[Dashboard] Error loading dashboard:", error);
+        const errorMsg =
+          error instanceof Error ? error.message : "Unknown error occurred";
         if (isMounted) {
+          setErrorMessage(errorMsg);
           setIsLoading(false);
         }
       }
@@ -101,7 +179,82 @@ export default function DashboardPage() {
     return () => {
       isMounted = false;
     };
-  }, []); // Remove router from dependencies to prevent unnecessary re-runs
+  }, [router]);
+
+  // Set up periodic refresh and event listeners - separate effect
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    let isMounted = true;
+
+    // Set up periodic refresh every 10 seconds
+    const refreshInterval = setInterval(() => {
+      if (isMounted) {
+        refreshDashboard();
+      }
+    }, 10000);
+
+    // Listen for task update events from other tabs/windows
+    const handleStorageChange = () => {
+      console.log("[Dashboard] Storage change detected, refreshing...");
+      if (isMounted) {
+        refreshDashboard();
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+
+    // Cleanup function to prevent state updates on unmounted component
+    return () => {
+      isMounted = false;
+      clearInterval(refreshInterval);
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, [currentUser, refreshDashboard]);
+
+  // Update calendar when month/year changes - separate effect to avoid full dashboard refresh
+  useEffect(() => {
+    if (!currentUser) return;
+
+    let isMounted = true;
+
+    const fetchCalendarTasks = async () => {
+      try {
+        console.log(
+          `[Dashboard] Fetching calendar tasks for ${currentMonth}/${currentYear}`,
+        );
+        const response = await fetch(
+          `/api/dashboard-data/calendar?month=${currentMonth}&year=${currentYear}`,
+          {
+            headers: { "x-user-id": String(currentUser.id) },
+          },
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error("Calendar fetch error:", errorData);
+          return;
+        }
+
+        const { calendarTasks } = await response.json();
+        console.log("[Dashboard] Calendar tasks updated:", calendarTasks);
+
+        if (isMounted) {
+          setData((prev) => ({
+            ...prev,
+            calendarTasks,
+          }));
+        }
+      } catch (error) {
+        console.error("[Dashboard] Error fetching calendar tasks:", error);
+      }
+    };
+
+    fetchCalendarTasks();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentMonth, currentYear, currentUser]);
 
   return (
     <ConfirmProvider>
@@ -111,35 +264,79 @@ export default function DashboardPage() {
             <div className="flex items-center justify-center h-64">
               <div className="text-black/62">Loading dashboard...</div>
             </div>
+          ) : errorMessage ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="bg-red-100/80 border border-red-300/50 rounded-sm p-6 max-w-md">
+                <p className="text-red-700 font-medium mb-2">
+                  Error Loading Dashboard
+                </p>
+                <p className="text-sm text-red-600">{errorMessage}</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="mt-4 px-4 py-2 bg-red-600 text-white rounded-sm hover:bg-red-700 text-sm"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-11 gap-2 w-full h-full mx-auto lg:overflow-hidden p-0">
-              {/* LEFT COLUMN: */}
-              <div className="lg:col-span-6 flex flex-col gap-2 h-full min-h-0">
-                <div className="shrink-0">
-                  <DashboardHeader />
-                </div>
-
-                {/* Dijkstra Con*/}
-                <div className="flex-[0.7] grid grid-cols-1 sm:grid-cols-2 gap-2 min-h-0">
-                  <div className="h-full bg-blue-100 backdrop-blur-md rounded-sm border border-black/10 overflow-hidden transition-all duration-200 hover:border-black/50">
-                    <DijkstraPanel />
+            <div className="w-full mx-auto p-0 overflow-y-auto h-screen">
+              <div className="grid grid-cols-1 lg:grid-cols-11 gap-2 w-full p-0 min-h-full">
+                {/* LEFT COLUMN: Task Grid + AI Insights */}
+                <div className="lg:col-span-6 flex flex-col gap-2">
+                  <div className="shrink-0">
+                    <DashboardHeader />
                   </div>
-                  {/* Pending Con*/}
-                  <div className="h-full bg-blue-100 backdrop-blur-md rounded-sm border border-black/10 overflow-hidden transition-all duration-200 hover:border-black/50">
-                    <PendingTasks tasks={data.pendingTasks} />
-                  </div>
-                </div>
 
-                {/* Weekly Chart: */}
-                <div className="flex-[0.6] mb-0 p-0 overflow-hidden transition-all duration-200 hover:border-black/50">
-                  <WeeklyProgressChart data={data.weeklyData} />
+                  {/* Task Status Grid */}
+                  <div className="h-96">
+                    <TaskStatusGrid
+                      pending={data.pending}
+                      inProgress={data.inProgress}
+                      completed={data.completed}
+                      overdue={data.overdue}
+                      pendingTasks={data.pendingTasks}
+                      inProgressTasks={data.inProgressTasks}
+                      overdueTasks={data.overdueTasks}
+                      completedTasks={data.completedTasks}
+                    />
+                  </div>
+
+                {/* AI Insights */}
+                <div className="h-72">
+                  <NaturalLanguageAutomatedInsights
+                    loading={isLoading}
+                    insights={[
+                      {
+                        text: `Your completion rate is at ${Math.round((data.completed / (data.completed + data.inProgress + data.pending + data.overdue || 1)) * 100)}%, which is ${Math.round((data.completed / (data.completed + data.inProgress + data.pending + data.overdue || 1)) * 100) > 70 ? "excellent" : Math.round((data.completed / (data.completed + data.inProgress + data.pending + data.overdue || 1)) * 100) > 50 ? "good" : "needs improvement"}. Keep pushing!`,
+                        type: Math.round((data.completed / (data.completed + data.inProgress + data.pending + data.overdue || 1)) * 100) > 70 ? "positive" : Math.round((data.completed / (data.completed + data.inProgress + data.pending + data.overdue || 1)) * 100) > 50 ? "info" : "warning",
+                        icon: "chart",
+                      },
+                      {
+                        text: `${data.inProgress} task${data.inProgress !== 1 ? "s are" : " is"} currently in progress. Steady pace maintained.`,
+                        type: "info",
+                        icon: "trending",
+                      },
+                      ...(data.overdue > 0
+                        ? [
+                            {
+                              text: `⚠️ ${data.overdue} overdue task${data.overdue !== 1 ? "s" : ""} need immediate attention to stay on track.`,
+                              type: "warning" as const,
+                              icon: "alert" as const,
+                            },
+                          ]
+                        : []),
+                    ]}
+                    anomalies={[]}
+                    naturalLanguageSummary={`You have ${data.pending + data.inProgress + data.completed + data.overdue} tasks in total. ${data.completed > 0 ? `Completion rate is ${Math.round((data.completed / (data.completed + data.inProgress + data.pending + data.overdue || 1)) * 100)}%.` : ""} Currently focused on ${data.inProgress} in-progress task${data.inProgress !== 1 ? "s" : ""}. ${data.overdue > 0 ? `Urgent: ${data.overdue} task${data.overdue !== 1 ? "s" : ""} ${data.overdue !== 1 ? "are" : "is"} overdue.` : "On track with no overdue items."}`}
+                  />
                 </div>
               </div>
 
-              {/* RIGHT COLUMN: */}
-              <div className="lg:col-span-5 flex flex-col gap-2 h-full min-h-0">
-                {/* Task Timeline:  */}
-                <div className="flex-[0.7] min-h-0 backdrop-blur-lg border border-black/10 rounded-sm overflow-hidden bg-blue-100 transition-all duration-200 hover:border-black/50">
+              {/* RIGHT COLUMN: Timeline, Task Summary + Task Execution */}
+              <div className="lg:col-span-5 flex flex-col gap-2">
+                {/* Timeline */}
+                <div className="h-80">
                   <TaskTimeline
                     currentMonth={currentMonth}
                     currentYear={currentYear}
@@ -149,48 +346,27 @@ export default function DashboardPage() {
                   />
                 </div>
 
-                {/* Status Cards */}
-                <div className="grid grid-cols-2 xl:grid-cols-4 lg:grid-cols-2 gap-2 shrink-0">
-                  <StatusCard
-                    count={data.pending}
-                    label="Pending tasks"
-                    icon="clock"
-                    color="from-purple-500/20 to-purple-600/20"
-                  />
-                  <StatusCard
-                    count={data.inProgress}
-                    label="In Progress"
-                    icon="play"
-                    color="from-blue-500/20 to-blue-600/20"
-                  />
-                  <StatusCard
-                    count={data.completed}
-                    label="Completed"
-                    icon="check"
-                    color="from-green-500/20 to-green-600/20"
-                  />
-                  <StatusCard
-                    count={data.overdue}
-                    label="Overdue"
-                    icon="alert"
-                    color="from-red-500/20 to-red-600/20"
+                {/* Task Summary - Do This First */}
+                <div className="h-64">
+                  <TaskSummary
+                    tasks={[
+                      ...data.overdueTasks,
+                      ...data.inProgressTasks,
+                      ...data.pendingTasks,
+                    ]}
+                    currentUser={currentUser}
+                    userRole={data.userRole}
+                    filterMode="dashboard"
                   />
                 </div>
 
-                {/* Task Summary*/}
-                <div className="flex-[0.6] mb-0 p-0 transition-all duration-200 hover:border-black/50">
-                  <TaskSummary
+                {/* Task Execution Summary - Overall Pie Chart */}
+                <div className="h-80">
+                  <AnalyticsTaskExecutionSummary
                     completed={data.completed}
-                    total={
-                      data.pending +
-                      data.inProgress +
-                      data.completed +
-                      data.overdue
-                    }
                     inProgress={data.inProgress}
                     pending={data.pending}
                     overdue={data.overdue}
-                    aiInsight={data.aiInsight}
                   />
                 </div>
               </div>

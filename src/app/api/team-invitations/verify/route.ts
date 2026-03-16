@@ -7,6 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { getEmailFromToken } from "@/lib/inviteTokenStore";
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,13 +20,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // TODO: Verify token from database or cache
-    // For now, extract email from token if needed
-    // In production, store invites in database with expiry
+    // Verify token and get email
+    const email = getEmailFromToken(token);
+    
+    if (!email) {
+      return NextResponse.json(
+        { error: "Invalid or expired invite link" },
+        { status: 400 }
+      );
+    }
 
-    // Placeholder: return empty data to be filled by user
+    // Return email and pre-filled data
     return NextResponse.json({
-      email: "",
+      email,
       firstName: "",
       lastName: "",
     });

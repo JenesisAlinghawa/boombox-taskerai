@@ -2,21 +2,23 @@
  * Protected Users Management API
  * 
  * Role-Based Access Control:
- * - GET (list users): Only OWNER, CO_OWNER, MANAGER
- * - POST (create user): Only OWNER, CO_OWNER, MANAGER
- * - Other POST operations: Restricted to authorized roles
+ * - GET (list users): Only ADMIN, OWNER
+ * - POST (create user): Only ADMIN, OWNER
+ * - PUT (update user): Only ADMIN, OWNER
+ * - DELETE (delete user): Only OWNER
  * 
+ * Available Roles: EMPLOYEE, ADMIN, OWNER
  * Returns 403 Forbidden with clear message for unauthorized users
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser, canManageUsers } from "@/lib/auth";
-import bcrypt from "bcryptjs";
+import bcrypt from "bcrypt";
 
 /**
  * GET /api/users
- * List all users (admin only - OWNER, CO_OWNER, MANAGER)
+ * List all users (admin only - OWNER, ADMIN)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -30,7 +32,7 @@ export async function GET(request: NextRequest) {
     if (!canManageUsers(user.role)) {
       return NextResponse.json(
         {
-          error: "Only Manager, Co-Owner, or Owner can manage users",
+          error: "Only ADMIN or OWNER can manage users",
           code: "INSUFFICIENT_ROLE",
         },
         { status: 403 }
@@ -69,7 +71,7 @@ export async function GET(request: NextRequest) {
  *   email: string,
  *   password: string,
  *   name: string,
- *   role?: "EMPLOYEE" | "TEAM_LEAD" | "MANAGER" | "CO_OWNER"
+ *   role?: "EMPLOYEE" | "ADMIN" | "OWNER"
  * }
  */
 export async function POST(request: NextRequest) {
@@ -84,7 +86,7 @@ export async function POST(request: NextRequest) {
     if (!canManageUsers(user.role)) {
       return NextResponse.json(
         {
-          error: "Only Manager, Co-Owner, or Owner can manage users",
+          error: "Only ADMIN or OWNER can manage users",
           code: "INSUFFICIENT_ROLE",
         },
         { status: 403 }
@@ -102,19 +104,19 @@ export async function POST(request: NextRequest) {
 
     // Validate role if provided
     const userRole = role || "EMPLOYEE";
-    const validRoles = ["EMPLOYEE", "TEAM_LEAD", "MANAGER", "CO_OWNER"];
+    const validRoles = ["EMPLOYEE", "ADMIN", "OWNER"];
 
     if (!validRoles.includes(userRole)) {
       return NextResponse.json(
-        { error: "Invalid role. Only managers can assign EMPLOYEE, TEAM_LEAD, or MANAGER roles" },
+        { error: "Invalid role. Must be EMPLOYEE, ADMIN, or OWNER" },
         { status: 400 }
       );
     }
 
-    // Prevent non-OWNER from creating CO_OWNER or OWNER users
-    if ((userRole === "CO_OWNER" || userRole === "OWNER") && user.role !== "OWNER") {
+    // Prevent non-OWNER from creating ADMIN or OWNER users
+    if ((userRole === "ADMIN" || userRole === "OWNER") && user.role !== "OWNER") {
       return NextResponse.json(
-        { error: "Only Owner can create Co-Owner or Owner users" },
+        { error: "Only OWNER can create ADMIN or OWNER users" },
         { status: 403 }
       );
     }

@@ -33,7 +33,7 @@ export async function PATCH(
       );
     }
 
-    const userId = parseInt(id, 10);
+    const userId = id;
 
     // Find and verify the user exists
     const targetUser = await prisma.user.findUnique({

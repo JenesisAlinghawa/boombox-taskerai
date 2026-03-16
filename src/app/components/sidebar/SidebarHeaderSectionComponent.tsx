@@ -1,34 +1,20 @@
 import React from "react";
-import { SidebarClose, SidebarOpen } from "lucide-react";
 
 interface SidebarHeaderProps {
-  collapsed: boolean;
-  setCollapsed: (collapsed: boolean) => void;
+  isExpanded: boolean;
 }
 
 export const SidebarHeader = React.memo(function SidebarHeaderComponent({
-  collapsed,
-  setCollapsed,
+  isExpanded,
 }: SidebarHeaderProps) {
   return (
     <div
-      className={`flex flex-col  items-center gap-2 border-b border-black/25 transition-all duration-300 px-0 py-5`}
+      className={`flex flex-col  items-center gap-2 border-b border-black/25 transition-all duration-300 px-0 py-8`}
     >
-      {/* Collapse/Expand Button */}
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="absolute right-3 top-3 z-10 bg-transparent border-none cursor-pointer text-black px-3 py-2 flex items-center justify-center hover:text-gray-700 transition-colors"
-        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-      >
-        {collapsed ? <SidebarOpen size={16} /> : <SidebarClose size={16} />}
-      </button>
-
       {/* Logo + Title container */}
       <div
         className={`flex items-center transition-all duration-300 w-full ${
-          collapsed
-            ? "justify-center pt-[52px]"
-            : "justify-start pt-[52px] px-12"
+          isExpanded ? "justify-start pt-0 px-12" : "justify-center pt-0"
         }`}
       >
         {/* Logo that scales */}
@@ -41,7 +27,7 @@ export const SidebarHeader = React.memo(function SidebarHeaderComponent({
         </div>
 
         {/* Title appears only when expanded */}
-        {!collapsed && (
+        {isExpanded && (
           <h1 className="-ml-2.5 pt-2.5 text-sm text-black-700 whitespace-nowrap transition-all duration-300">
             askerAI
           </h1>

@@ -5,11 +5,11 @@ import { SidebarHeader } from "./SidebarHeaderSectionComponent";
 import { NavigationMenu } from "./MainNavigationMenuComponent";
 
 export function SidePanel() {
-  const [collapsed, setCollapsed] = useState(true);
+  const [isHovered, setIsHovered] = useState(false);
 
-  const width = collapsed ? 62 : 152;
+  const width = isHovered ? 152 : 62;
   const leftGap = 4;
-  const rightGap = 6;
+  const rightGap = 8;
   const verticalGap = 4;
 
   useEffect(() => {
@@ -22,6 +22,8 @@ export function SidePanel() {
 
   return (
     <aside
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{
         width,
         height: `calc(100vh - ${verticalGap * 2}px)`,
@@ -30,8 +32,8 @@ export function SidePanel() {
       }}
       className="fixed bg-blue-300  text-black p-0 z-50 shadow-md shadow-black/50 flex flex-col rounded overflow-hidden backdrop-blur-sm transition-all duration-300"
     >
-      <SidebarHeader collapsed={collapsed} setCollapsed={setCollapsed} />
-      <NavigationMenu collapsed={collapsed} />
+      <SidebarHeader isExpanded={isHovered} />
+      <NavigationMenu collapsed={!isHovered} />
     </aside>
   );
 }

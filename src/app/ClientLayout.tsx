@@ -3,7 +3,7 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import { SidePanel } from "@/app/components/sidebar/SidebarPanelContainerComponent";
-import { TaskerBotWidget } from "@/app/components/shared-headers/TaskerBotWidgetHeaderComponent";
+import { TaskerBotWidget } from "@/app/components/shared-headers/TaskerBotHeaderComponent";
 
 export default function ClientLayout({
   children,
@@ -27,7 +27,7 @@ export default function ClientLayout({
         />
 
         {/* Frosted overlay that covers the whole screen */}
-        <div className="fixed inset-0 bg-white/50 backdrop-blur-lg z-[-0.5]" />
+        <div className="fixed inset-0 bg-white/60 backdrop-blur-md z-[-0.5]" />
 
         <main
           style={{

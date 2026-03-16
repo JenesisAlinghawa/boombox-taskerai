@@ -1,19 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { logTaskEvent, getIpAddress } from "@/lib/auditLog";
-import { updateOverdueTasks, isTaskOverdue } from "@/lib/overdueTasks";
+import { updateOverdueTasks } from "@/lib/overdueTasks";
 
 interface Params {
   params: Promise<{ id: string }>;
 }
 
 // Helper to extract user from headers
-function getUserIdFromRequest(request: NextRequest): number | null {
-  const userHeader = request.headers.get('x-user-id');
-  if (userHeader) {
-    return parseInt(userHeader, 10);
-  }
-  return null;
+function getUserIdFromRequest(request: NextRequest): string | null {
+  return request.headers.get('x-user-id');
 }
 
 export async function GET(request: NextRequest, { params }: Params) {
@@ -31,23 +27,40 @@ export async function GET(request: NextRequest, { params }: Params) {
     const task = await prisma.task.findUnique({
       where: { id: taskId },
       include: {
-        createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
-        assignee: { select: { id: true, firstName: true, lastName: true, email: true } },
-        comments: { include: { user: { select: { id: true, firstName: true, lastName: true } } } },
+        createdBy: { select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true } },
+        assignees: {
+          include: {
+            assignee: { select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true } }
+          }
+        },
+        comments: { include: { user: { select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true } } } },
         attachments: true,
       },
     });
     if (!task) return NextResponse.json({ error: "Not found" }, { status: 404 });
     
     // Check if user is authorized to view this task
-    if (task.createdBy?.id !== userId && task.assignee?.id !== userId) {
+    const isCreator = task.createdBy?.id === userId;
+    const isAssignee = task.assignees?.some((a) => a.assignee?.id === userId);
+    
+    if (!isCreator && !isAssignee) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     
     return NextResponse.json({ task });
   } catch (error) {
-    console.error("Get task error:", error);
-    return NextResponse.json({ error: "Failed to fetch task" }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error("Get task error - DETAILED:", {
+      message: errorMessage,
+      stack: errorStack,
+      name: error instanceof Error ? error.name : 'Unknown',
+      error: String(error)
+    });
+    return NextResponse.json(
+      { error: "Failed to fetch task", details: errorMessage },
+      { status: 500 }
+    );
   }
 }
 
@@ -60,14 +73,42 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Log the start of the operation
+    console.log(`PATCH /api/task-management/${taskId} started for userId ${userId}`);
+
+    // Get user role
+    console.log('Fetching user role...');
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true }
+    });
+
+    if (!user) {
+      console.error(`User not found in database: userId=${userId}`);
+      return NextResponse.json(
+        { error: 'Unauthorized', details: `User ${userId} not found` },
+        { status: 401 }
+      );
+    }
+
+    const userRole = user.role || 'EMPLOYEE';
+
     // Check if user is authorized to modify this task
     const task = await prisma.task.findUnique({
       where: { id: taskId },
-      select: { createdById: true, assigneeId: true }
+      select: {
+        createdById: true,
+        status: true,
+        assignees: { select: { assigneeId: true } }
+      }
     });
 
     if (!task) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+      console.error(`Task not found: taskId=${taskId}`);
+      return NextResponse.json(
+        { error: "Not found", details: `Task ${taskId} not found` },
+        { status: 404 }
+      );
     }
 
     let body: any = {};
@@ -75,8 +116,20 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       body = await request.json();
     } catch (e) {
       // No body or invalid JSON — treat as empty update
-      console.warn('PATCH request had no JSON body or failed to parse:', e);
+      const parseErrorMsg = e instanceof Error ? e.message : String(e);
+      console.warn('PATCH request had no JSON body or failed to parse:', parseErrorMsg);
       body = {};
+    }
+
+    // Validate status if provided
+    if (body.status !== undefined) {
+      const validStatuses = ['todo', 'inprogress', 'stuck', 'done', 'completed'];
+      if (!validStatuses.includes(body.status)) {
+        return NextResponse.json(
+          { error: `Invalid status: ${body.status}. Must be one of: ${validStatuses.join(', ')}` },
+          { status: 400 }
+        );
+      }
     }
 
     // Fetch previous values for change tracking
@@ -87,106 +140,252 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         description: true,
         priority: true,
         dueDate: true,
-        assigneeId: true,
         status: true,
+        createdBy: { select: { role: true, firstName: true, lastName: true } },
+        assignees: { select: { assigneeId: true } }
       },
     });
 
-    // If user is the creator, allow all updates
-    if (task.createdById === userId) {
-      const data: any = {};
-      const changes: any[] = [];
-      if (body.title !== undefined) {
-        data.title = body.title;
-        changes.push({ field: 'title', oldValue: prev?.title, newValue: body.title });
-      }
-      if (body.description !== undefined) {
-        data.description = body.description;
-        changes.push({ field: 'description', oldValue: prev?.description, newValue: body.description });
-      }
-      if (body.priority !== undefined) {
-        data.priority = body.priority;
-        changes.push({ field: 'priority', oldValue: prev?.priority, newValue: body.priority });
-      }
-      if (body.dueDate !== undefined) {
-        data.dueDate = body.dueDate ? new Date(body.dueDate) : null;
-        changes.push({ field: 'dueDate', oldValue: prev?.dueDate, newValue: body.dueDate || null });
-      }
-      if (body.assigneeId !== undefined) {
-        data.assigneeId = body.assigneeId || null;
-        changes.push({ field: 'assigneeId', oldValue: prev?.assigneeId, newValue: body.assigneeId || null });
-      }
-      if (body.status !== undefined) {
-        // Prevent invalid transition: In Progress -> To do
-        if (prev?.status === 'inprogress' && body.status === 'todo') {
-          return NextResponse.json({ error: 'Invalid status transition: cannot revert In Progress to To Do' }, { status: 400 });
+    // Unified role-based permission check
+    const isTaskCreator = task.createdById === userId;
+    const isTaskAssignee = task.assignees?.some((a) => a.assigneeId === userId);
+    const isAdminOrOwner = userRole === 'ADMIN' || userRole === 'OWNER';
+    const taskCreatorRole = prev?.createdBy?.role || 'EMPLOYEE';
+    
+    // Only task creator or admin/owner can edit tasks
+    if (!isTaskCreator && !isAdminOrOwner) {
+      return NextResponse.json({ 
+        error: 'Forbidden',
+        warning: '⛔ Only the task creator or admins can edit this task.' 
+      }, { status: 403 });
+    }
+
+    // Determine what changes are allowed based on role and relationship to task
+    const data: any = {};
+    const changes: any[] = [];
+    let needsAssigneeUpdate = false;
+    let newAssigneeIds: string[] = [];
+
+    // Users can edit core fields if they are creator or admin/owner
+    if (body.title !== undefined) {
+      data.title = body.title;
+      changes.push({ field: 'title', oldValue: prev?.title, newValue: body.title });
+    }
+    if (body.description !== undefined) {
+      data.description = body.description;
+      changes.push({ field: 'description', oldValue: prev?.description, newValue: body.description });
+    }
+    if (body.priority !== undefined) {
+      data.priority = body.priority;
+      changes.push({ field: 'priority', oldValue: prev?.priority, newValue: body.priority });
+    }
+    if (body.dueDate !== undefined) {
+      data.dueDate = body.dueDate ? new Date(body.dueDate) : null;
+      changes.push({ field: 'dueDate', oldValue: prev?.dueDate, newValue: body.dueDate || null });
+    }
+    
+    // Assignee changes - role-based validation
+    if (body.assigneeIds !== undefined || body.assigneeId !== undefined) {
+      // Support both assigneeIds (array) and legacy assigneeId (string)
+      const incomingIds = body.assigneeIds ? (Array.isArray(body.assigneeIds) ? body.assigneeIds : [body.assigneeIds]) : (body.assigneeId ? [body.assigneeId] : []);
+      
+      // Permission check for changing assignees
+      if (userRole === 'EMPLOYEE') {
+        // EMPLOYEE can only assign tasks to themselves
+        if (incomingIds.length !== 1 || incomingIds[0] !== userId) {
+          return NextResponse.json({ 
+            error: 'Forbidden',
+            warning: '⛔ Employees can only assign tasks to themselves.' 
+          }, { status: 403 });
         }
-        changes.push({ field: 'status', oldValue: prev?.status, newValue: body.status });
+      } else if (userRole === 'ADMIN') {
+        // ADMIN can only assign to ADMIN or EMPLOYEE (not OWNER)
+        for (const assigneeId of incomingIds) {
+          const assignee = await prisma.user.findUnique({
+            where: { id: assigneeId },
+            select: { role: true }
+          });
+          if (!assignee || !(assignee.role === 'ADMIN' || assignee.role === 'EMPLOYEE')) {
+            return NextResponse.json({ 
+              error: 'Forbidden',
+              warning: `⛔ Admins can only assign tasks to Admin or Employee users.` 
+            }, { status: 403 });
+          }
+        }
       }
-
-      const updatedTask = await prisma.task.update({ 
-        where: { id: taskId }, 
-        data, 
-        include: { 
-          createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
-          assignee: { select: { id: true, firstName: true, lastName: true, email: true } } 
-        } 
-      });
-
-      // Audit log
-      if (changes.length > 0) {
-        await logTaskEvent({
-          userId: userId,
-          action: 'TASK_UPDATED',
-          taskId: taskId,
-          changes,
-          ipAddress: getIpAddress(request as any),
-        });
+      // OWNER can assign to anyone
+      
+      newAssigneeIds = incomingIds;
+      needsAssigneeUpdate = true;
+      
+      const oldIds = prev?.assignees?.map((a) => a.assigneeId) || [];
+      changes.push({ field: 'assigneeIds', oldValue: oldIds, newValue: incomingIds });
+    }
+    
+    // Only assignees can change status
+    if (body.status !== undefined) {
+      if (!isTaskAssignee) {
+        return NextResponse.json({ 
+          error: 'Forbidden',
+          warning: '⛔ Only assigned users can change task status.' 
+        }, { status: 403 });
       }
-
-      return NextResponse.json({ task: updatedTask });
+      data.status = body.status;
+      changes.push({ field: 'status', oldValue: prev?.status, newValue: body.status });
     }
 
-    // If user is the assignee, allow status changes only
-    if (task.assigneeId === userId) {
-      if (body.status === undefined) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
-
-      const oldStatus = prev?.status;
-
-      // Server-side guard: Prevent In Progress -> To Do transition by assignee
-      if (oldStatus === 'inprogress' && body.status === 'todo') {
-        return NextResponse.json({ error: 'Invalid status transition: cannot revert In Progress to To Do' }, { status: 400 });
-      }
-
-      const updatedTask = await prisma.task.update({ 
-        where: { id: taskId }, 
-        data: { status: body.status }, 
-        include: { 
+    // If no changes to apply, return current task state
+    if (Object.keys(data).length === 0 && !needsAssigneeUpdate) {
+      const currentTask = await prisma.task.findUnique({
+        where: { id: taskId },
+        include: {
           createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
-          assignee: { select: { id: true, firstName: true, lastName: true, email: true } } 
-        } 
+          assignees: {
+            include: {
+              assignee: { select: { id: true, firstName: true, lastName: true, email: true } }
+            }
+          },
+          comments: { include: { user: { select: { id: true, firstName: true, lastName: true } } } },
+          attachments: true,
+        },
       });
-
-      // Audit log for status change
-      if (oldStatus !== body.status) {
-        await logTaskEvent({
-          userId: userId,
-          action: 'TASK_UPDATED',
-          taskId: taskId,
-          changes: [{ field: 'status', oldValue: oldStatus, newValue: body.status }],
-          ipAddress: getIpAddress(request as any),
-        });
-      }
-
-      return NextResponse.json({ task: updatedTask });
+      return NextResponse.json({ task: currentTask, isAdminOrOwner });
     }
 
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Apply the update
+    console.log(`Updating task ${taskId} with data:`, JSON.stringify(data));
+    let updatedTask;
+    try {
+      // Handle assignees update separately if needed
+      if (needsAssigneeUpdate) {
+        // Delete old assignees
+        await prisma.taskAssignee.deleteMany({
+          where: { taskId: taskId }
+        });
+
+        // Create new assignees
+        if (newAssigneeIds.length > 0) {
+          await prisma.taskAssignee.createMany({
+            data: newAssigneeIds.map((id) => ({
+              taskId: taskId,
+              assigneeId: id
+            }))
+          });
+        }
+      }
+
+      // Update task fields
+      updatedTask = await prisma.task.update({
+        where: { id: taskId },
+        data,
+        include: {
+          createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+          assignees: {
+            include: {
+              assignee: { select: { id: true, firstName: true, lastName: true, email: true } }
+            }
+          },
+          comments: { include: { user: { select: { id: true, firstName: true, lastName: true } } } },
+          attachments: true,
+        },
+      });
+      console.log(`Task ${taskId} updated successfully`);
+    } catch (updateError) {
+      const updateErrorMsg = updateError instanceof Error ? updateError.message : String(updateError);
+      console.error(`Failed to update task ${taskId}:`, updateErrorMsg, updateError);
+      throw updateError;
+    }
+
+    // If status changed and autoComment is provided, add the system comment
+    const statusChanged = body.status !== undefined && prev?.status !== body.status;
+    if (statusChanged && body.autoComment) {
+      console.log(`Creating auto-comment for task ${taskId}`);
+      try {
+        await prisma.comment.create({
+          data: {
+            taskId: taskId,
+            userId: userId,
+            content: body.autoComment,
+          },
+        });
+        console.log(`Auto-comment created for task ${taskId}`);
+        // Refresh task to include the new comment
+        const finalTask = await prisma.task.findUnique({
+          where: { id: taskId },
+          include: {
+            createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+            assignees: {
+              include: {
+                assignee: { select: { id: true, firstName: true, lastName: true, email: true } }
+              }
+            },
+            comments: { include: { user: { select: { id: true, firstName: true, lastName: true } } } },
+            attachments: true,
+          },
+        });
+        if (finalTask) {
+          // Audit log if there were changes
+          if (changes.length > 0) {
+            await logTaskEvent({
+              userId: userId,
+              action: 'TASK_UPDATED',
+              taskId: taskId,
+              changes,
+              ipAddress: getIpAddress(request as any),
+            });
+          }
+          return NextResponse.json({ task: finalTask, isAdminOrOwner });
+        }
+      } catch (commentError) {
+        const commentErrorMsg = commentError instanceof Error ? commentError.message : String(commentError);
+        console.error(`Failed to create auto-comment for task ${taskId}:`, commentErrorMsg, commentError);
+        // Don't throw - comment creation failure shouldn't block status update, just return updated task
+        return NextResponse.json({ task: updatedTask, isAdminOrOwner });
+      }
+    }
+
+    // Audit log if there were changes
+    if (changes.length > 0) {
+      await logTaskEvent({
+        userId: userId,
+        action: 'TASK_UPDATED',
+        taskId: taskId,
+        changes,
+        ipAddress: getIpAddress(request as any),
+      });
+
+      // Also log to activity log for the logs page
+      try {
+        await prisma.log.create({
+          data: {
+            userId: userId,
+            taskId: taskId,
+            action: `Updated task: ${changes.map((c) => c.field).join(', ')}`,
+            data: {
+              changes,
+              taskTitle: updatedTask.title,
+            },
+          },
+        });
+      } catch (logError) {
+        console.error('Failed to create activity log:', logError);
+      }
+    }
+
+    return NextResponse.json({ task: updatedTask, isAdminOrOwner });
   } catch (error) {
-    console.error("Update task error:", error);
-    return NextResponse.json({ error: "Failed to update task" }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error("Update task error - DETAILED:", {
+      message: errorMessage,
+      stack: errorStack,
+      name: error instanceof Error ? error.name : 'Unknown',
+      error: String(error)
+    });
+    return NextResponse.json(
+      { error: "Failed to update task", details: errorMessage },
+      { status: 500 }
+    );
   }
 }
 
@@ -203,18 +402,41 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Invalid task ID" }, { status: 400 });
     }
 
-    // Check if user is authorized to delete this task (only creator can delete)
+    // Get user role
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true }
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user is authorized to delete this task
     const task = await prisma.task.findUnique({
       where: { id: taskId },
-      select: { createdById: true }
+      select: { 
+        createdById: true,
+        createdBy: { select: { firstName: true, lastName: true } }
+      }
     });
 
     if (!task) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    if (task.createdById !== userId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Only task creator can delete, or ADMIN/OWNER can delete any task
+    const isTaskCreator = task.createdById === userId;
+    const isAdmin = user.role === 'ADMIN' || user.role === 'OWNER';
+    
+    if (!isTaskCreator && !isAdmin) {
+      const creatorName = task.createdBy?.firstName 
+        ? `${task.createdBy.firstName}${task.createdBy.lastName ? ' ' + task.createdBy.lastName : ''}`
+        : 'the task creator';
+      return NextResponse.json({ 
+        error: 'Forbidden',
+        warning: `⛔ Only ${creatorName} or an administrator can delete this task.` 
+      }, { status: 403 });
     }
     
     // Delete related records first (cascade delete)
@@ -229,6 +451,12 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     } catch (e) {
       console.warn("Could not delete attachments:", e);
     }
+
+    try {
+      await prisma.taskAssignee.deleteMany({ where: { taskId } });
+    } catch (e) {
+      console.warn("Could not delete task assignees:", e);
+    }
     
     // Then delete the task
     const result = await prisma.task.delete({ where: { id: taskId } });
@@ -241,6 +469,22 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       changes: [],
       ipAddress: getIpAddress(request as any),
     });
+
+    // Also log to activity log for the logs page
+    try {
+      await prisma.log.create({
+        data: {
+          userId: userId,
+          taskId: taskId,
+          action: 'Deleted task',
+          data: {
+            taskTitle: result.title,
+          },
+        },
+      });
+    } catch (logError) {
+      console.error('Failed to create activity log:', logError);
+    }
     
     return NextResponse.json({ success: true, task: result });
   } catch (error: any) {

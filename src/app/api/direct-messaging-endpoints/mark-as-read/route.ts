@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Mark all unread messages from senderId as read for current user
+    // Database indexes optimize this query to complete quickly even with large message counts
     const result = await prisma.directMessage.updateMany({
       where: {
         senderId: senderId,

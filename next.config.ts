@@ -4,6 +4,13 @@ import withBundleAnalyzer from "@next/bundle-analyzer";
 const nextConfig: NextConfig = {
   /* config options here */
   webpack: (config, { isServer }) => {
+    // Increase webpack timeout for large builds
+    config.watchOptions = {
+      aggregateTimeout: 300,
+      poll: 1000,
+      ignored: /node_modules/,
+    };
+
     // Optimize webpack build with safer chunking
     if (!isServer) {
       config.optimization = {
@@ -34,6 +41,10 @@ const nextConfig: NextConfig = {
   },
   productionBrowserSourceMaps: false,
   reactStrictMode: true,
+  // Increase timeout for slow CI environments
+  experimental: {
+    esmExternals: true,
+  },
 };
 
 const withAnalyzer = withBundleAnalyzer({

@@ -14,6 +14,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser, canManageUsers } from "@/lib/auth";
+import { sendEmail } from "@/lib/email";
+import { storeInviteToken } from "@/lib/inviteTokenStore";
 import { v4 as uuidv4 } from "uuid";
 
 export async function POST(request: NextRequest) {
@@ -26,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     if (!canManageUsers(user.role)) {
       return NextResponse.json(
-        { error: "Only managers can send invites" },
+        { error: "Only admins and owners can send invites" },
         { status: 403 }
       );
     }
@@ -54,31 +56,55 @@ export async function POST(request: NextRequest) {
 
     // Generate secure token
     const inviteToken = uuidv4();
-    const tokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    
+    // Store token mapping for verification
+    storeInviteToken(inviteToken, email);
+
+    // Create or update user with pending status
+    let inviteUser;
+    if (existingUser) {
+      // User already exists (possibly unverified)
+      if (existingUser.isVerified) {
+        return NextResponse.json(
+          { error: "User already exists and is verified" },
+          { status: 409 }
+        );
+      }
+      // Unverified user - no need to update, just send invite to existing
+    } else {
+      // Create new unverified user
+      inviteUser = await prisma.user.create({
+        data: {
+          email: email.toLowerCase(),
+          firstName: "",
+          lastName: "",
+          password: "", // Will set on invite acceptance
+          isVerified: false,
+          active: false,
+          role: "EMPLOYEE",
+        },
+      });
+    }
 
     // Send email with invite link
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const inviteLink = `${appUrl}/invite?token=${inviteToken}`;
 
-    // TODO: Integrate with email service (Mailjet, SendGrid, etc.)
-    // For now, log the invite link
-    console.log(`Invite link for ${email}: ${inviteLink}`);
-
-    // Store invite token (in production, use a separate Invite model)
-    // For now, we'll just return success
-    await fetch("/api/email-notifications/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        to: email,
+    // Try to send email directly
+    try {
+      await sendEmail({
+        to: email.toLowerCase(),
         subject: "You've been invited to TaskerAI",
         template: "invite",
         data: {
           inviteLink,
           senderName: `${user.firstName} ${user.lastName}`,
         },
-      }),
-    }).catch((err) => console.error("Failed to send email:", err));
+      });
+    } catch (emailErr) {
+      console.error("Error sending email:", emailErr);
+      // Continue even if email fails - user can still accept with the token
+    }
 
     return NextResponse.json({
       message: "Invite sent successfully",

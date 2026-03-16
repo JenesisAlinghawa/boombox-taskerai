@@ -5,7 +5,7 @@ import { createNotification } from '@/lib/notificationService'
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url)
-    const userId = parseInt(url.searchParams.get('userId') || '0')
+    const userId = url.searchParams.get('userId')
 
     if (!userId) {
       return NextResponse.json({ error: 'User ID required' }, { status: 400 })
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     }
 
     const notif = await createNotification({
-      receiverId: Number(receiverId),
+      receiverId: receiverId,
       type,
       data: data || {},
     });

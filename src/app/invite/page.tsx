@@ -116,7 +116,9 @@ function InvitePageContent() {
             </div>
           </div>
           <h1 className="text-2xl font-normal text-black/62 mb-2">Success!</h1>
-          <p className="text-black/62 mb-4">Your account has been created.</p>
+          <p className="text-black/62 mb-4">
+            Your account has been created and automatically approved!
+          </p>
           <p className="text-sm text-black/62">Redirecting to login...</p>
         </div>
       </div>
@@ -226,7 +228,7 @@ function InvitePageContent() {
         </form>
 
         <p className="text-xs text-black/62 text-center mt-4">
-          Your account will be pending admin approval before you can log in.
+          Your account will be automatically approved after you complete setup.
         </p>
       </div>
     </div>

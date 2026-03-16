@@ -43,8 +43,8 @@ export async function GET(request: NextRequest) {
 
     // Filter sensitive data based on role
     const filteredLogs = logs.map((log) => {
-      // MANAGER and above can see all data
-      if (["MANAGER", "CO_OWNER", "OWNER"].includes(user.role)) {
+      // ADMIN and above can see all data
+      if (["ADMIN", "OWNER"].includes(user.role)) {
         return log;
       }
 

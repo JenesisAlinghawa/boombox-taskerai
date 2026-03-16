@@ -2,12 +2,7 @@ import { PrismaClient } from '@prisma/client'
 import { setupAuditMiddleware } from './auditMiddleware.js'
 
 const prismaClientSingleton = () => {
-  const client = new PrismaClient()
-  
-  // Audit middleware disabled - causing 500 errors on task operations
-  // setupAuditMiddleware(client)
-  
-  return client
+  return new PrismaClient()
 }
 
 declare global {
@@ -16,6 +11,8 @@ declare global {
 
 const prisma = global.prisma ?? prismaClientSingleton()
 
-export default prisma
+if (process.env.NODE_ENV !== 'production') {
+  global.prisma = prisma
+}
 
-if (process.env.NODE_ENV !== 'production') global.prisma = prisma
+export default prisma

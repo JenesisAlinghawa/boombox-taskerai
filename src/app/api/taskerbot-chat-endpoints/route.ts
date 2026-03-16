@@ -8,12 +8,22 @@ interface TeamMember {
   id: number;
   name: string;
   email: string;
+  role?: string;
+}
+
+interface CurrentUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
 }
 
 interface TaskerBotRequest {
   message: string;
   teamMembers: TeamMember[];
+  currentUser?: CurrentUser;
   sessionId?: string;
+  userId?: string;
 }
 
 interface TaskerBotResponse {
@@ -79,15 +89,45 @@ You're conversational, intelligent, and flexible. You handle natural language li
 - Avoid idioms, metaphors, and excessive enthusiasm.
 - Keep responses professional, friendly, and natural—no stiff formality or over-the-top excitement.
 
+## Current Context:
+
+**You are chatting with:**
+{CURRENT_USER}
+
+**Available team members for task assignment:**
+{TEAM_MEMBERS}
+
+**Today's date:** {TODAY_DATE}
+
+## Assignment Restrictions - CRITICAL:
+Based on the user's role, they can only assign tasks to certain team members:
+- **EMPLOYEE users**: Can ONLY assign to other EMPLOYEE team members. Do NOT suggest assigning to ADMIN or OWNER.
+- **ADMIN users**: Can assign to EMPLOYEE or ADMIN team members. Do NOT suggest assigning to OWNER.
+- **OWNER users**: Can assign to any team member (EMPLOYEE, ADMIN, or OWNER).
+
+When a user tries to assign to someone outside their permission level, explain the restriction and ask for a valid assignee instead.
+
+## Handling Team Member Names:
+- Users may mention team members by first name, last name, full name, nickname, email, or partial name.
+- ALWAYS search the Available team members list to identify who they're referring to.
+- Match partial names (e.g., "Jen" likely means "Jenesis" if that's in the team).
+- When unsure about a name match, ask for clarification with available options.
+- Once identified, use their FULL NAME and EMAIL for clarity.
+
+Example: If user says "assign to Jen", search team members:
+- If you find "Jenesis" in the list, you can infer they mean that person.
+- Confirm: "I'll assign this to Jenesis (jenesis@company.com)"
+
 ## Handling Casual, Greetings, or Off-Topic Inputs:
-- This covers greetings ("hi", "hey", "hello", etc.), casual check-ins, jokes, random questions, or any non-task-related messages:
-  - Respond naturally and conversationally first — acknowledge the greeting or casual remark in a friendly, brief way (e.g., greet back and react appropriately).
+- This covers greetings ("hi", "hey", "hello", etc.), casual check-ins, jokes, random questions, or any non-task-related messages.
+- ONLY apply this behavior if the message is detected as a greeting or casual input.
+- IMPORTANT: If the message contains task-related keywords (create, assign, task, due, priority, tomorrow, etc.), treat it as a TASK REQUEST, NOT a greeting.
+- For actual greetings/casual messages (not task-related):
+  - Respond naturally and conversationally first — acknowledge the greeting or casual remark in a friendly, brief way (e.g., greet back).
   - Mirror the user's tone lightly to keep it engaging.
-  - Then smoothly and gently transition to offering task help (e.g., "How can I assist with tasks today?" or "Anything task-related I can help with?").
+  - Then smoothly transition to offering task help.
   - Keep the overall response concise and professional.
-  - Do NOT interpret greetings or casual messages as task requests.
-  - Do NOT mention or assume any past/completed tasks.
-  - Only extend casual chat if the user clearly continues it; otherwise, redirect toward tasks.
+- For task requests with greeting language (e.g., "Hey! Assign me a task..."), skip the greeting ritual and go straight to task mode.
 
 ## Your Core Behavior:
 
@@ -96,7 +136,7 @@ You're conversational, intelligent, and flexible. You handle natural language li
 - FIRST, extract ALL available information from their message in a SINGLE pass:
   - Task title
   - Description (if mentioned)
-  - Assignee name/email (search team members for matches)
+  - Assignee name/email (search team members for matches based on name/email, RESPECTING ROLE RESTRICTIONS)
   - Due date (interpret natural language like "tomorrow", "in 3 days", "next Friday", etc.)
   - Priority (see priority rules below)
 - If you extract enough information to create a task, USE action "confirm" to ask for user confirmation before actually creating it
@@ -117,16 +157,10 @@ Automatically set priority based on deadline proximity:
   - Never mention, list, or assume the existence of past or completed tasks—we do not track them.
   - Respond conversationally but keep the focus on tasks.
 
-## Task Information:
-
-Available team members:
-{TEAM_MEMBERS}
-
-For dates, smartly interpret everyday language:
+## Due Date Interpretation:
 - "tomorrow" means the next day from now.
 - "next Friday" is the upcoming Friday.
-- "in 3 days" adds three days to today.
-- Today's date is: {TODAY_DATE}
+- "in 3 days" adds three days to today ({TODAY_DATE}).
 - Always use ISO format internally: YYYY-MM-DD.
 - If something's unclear, ask for clarification politely.
 
@@ -162,7 +196,10 @@ GOLDEN RULES:
 4. message must be conversational, NOT formatted as JSON text
 5. dueDate MUST be ISO format: YYYY-MM-DD
 6. priority: high if within 1 day, medium if within 2 weeks, low otherwise
-7. No markdown code blocks, no explanations, just pure JSON`;
+7. No markdown code blocks, no explanations, just pure JSON
+8. When user mentions a name, ALWAYS identify the matching team member from the Available team members list
+9. For assignee matching: compare first name, last name, full name, and email substring matches
+10. IMPORTANT: Never suggest assigning to users outside the current user's role hierarchy (see Assignment Restrictions section)`;
 
 function formatTaskState(state: TaskState): string {
   const filled = [];
@@ -190,7 +227,52 @@ function formatTaskState(state: TaskState): string {
 
 function formatTeamMembers(members: TeamMember[]): string {
   if (!members.length) return "No team members available.";
-  return members.map((m) => `- ${m.name} (${m.email})`).join("\n");
+  return members.map((m) => `- ${m.name} (${m.email}) - Role: ${m.role || "EMPLOYEE"}`).join("\n");
+}
+
+function formatCurrentUser(user: CurrentUser | undefined): string {
+  if (!user) return "User identity: Not available";
+  return `User identity: ${user.name} (${user.email}) - Role: ${user.role}`;
+}
+
+/**
+ * Validates if the current user can assign a task to a team member
+ * Rules:
+ * - EMPLOYEE can only assign to EMPLOYEE role members
+ * - ADMIN can assign to EMPLOYEE and other ADMIN members
+ * - OWNER can assign to anyone
+ */
+function isValidAssignment(currentUserRole: string | undefined, targetMemberRole: string | undefined): boolean {
+  const userRole = (currentUserRole || "EMPLOYEE").toUpperCase();
+  const memberRole = (targetMemberRole || "EMPLOYEE").toUpperCase();
+
+  // Define role hierarchy
+  const roleHierarchy: { [key: string]: number } = {
+    EMPLOYEE: 1,
+    ADMIN: 2,
+    OWNER: 3,
+  };
+
+  const userLevel = roleHierarchy[userRole] || 1;
+  const memberLevel = roleHierarchy[memberRole] || 1;
+
+  // User can only assign to members at their own level or below
+  return userLevel >= memberLevel;
+}
+
+function isTaskRequest(message: string): boolean {
+  // Keywords that indicate a task-related request
+  const taskKeywords = [
+    'assign', 'create', 'task', 'due', 'priority', 'tomorrow', 'today',
+    'deadline', 'schedule', 'urgent', 'asap', 'high', 'medium', 'low',
+    'complete', 'finish', 'done', 'pending', 'overdue', 'in progress',
+    'in 3', 'in 2', 'in 1', 'next week', 'next monday', 'next tuesday',
+    'next wednesday', 'next thursday', 'next friday', 'next saturday',
+    'next sunday', 'remind', 'alert', 'notification'
+  ];
+  
+  const lowerMessage = message.toLowerCase();
+  return taskKeywords.some(keyword => lowerMessage.includes(keyword));
 }
 
 function calculateDueDate(dueString: string | null): string | null {
@@ -271,12 +353,44 @@ async function callHfWithRetry(messages: any[], retries = 3): Promise<any> {
 export async function POST(req: NextRequest) {
   try {
     console.log("🤖 TaskerBot API: Processing request...");
-    const body = (await req.json()) as TaskerBotRequest;
-    const { message, teamMembers = [], sessionId = "default" } = body;
+    
+    // Parse FormData if files are present, otherwise parse JSON
+    let body: any = {};
+    const contentType = req.headers.get("content-type") || "";
+    
+    if (contentType.includes("multipart/form-data")) {
+      // Handle FormData with files
+      const formData = await req.formData();
+      body.message = formData.get("message") as string;
+      body.teamMembers = JSON.parse((formData.get("teamMembers") as string) || "[]");
+      body.currentUser = JSON.parse((formData.get("currentUser") as string) || "null");
+      body.sessionId = formData.get("sessionId") as string;
+      body.userId = formData.get("userId") as string;
+      body.pendingTask = JSON.parse((formData.get("pendingTask") as string) || "null");
+      
+      // Get file metadata
+      const files = formData.getAll("files") as File[];
+      if (files.length > 0) {
+        body.attachments = files.map(f => ({
+          name: f.name,
+          type: f.type,
+          size: f.size,
+        }));
+        console.log("📎 Files received:", body.attachments);
+      }
+    } else {
+      // Handle JSON
+      body = (await req.json()) as TaskerBotRequest;
+    }
+    
+    const { message, teamMembers = [], currentUser, sessionId = "default", pendingTask } = body;
     
     console.log("📝 Message received:", message.slice(0, 100));
     console.log("👥 Team members:", teamMembers.length);
     console.log("📌 Session ID:", sessionId);
+    if (pendingTask) {
+      console.log("⏳ Pending task context:", pendingTask);
+    }
 
     if (!message?.trim()) {
       return NextResponse.json(
@@ -316,20 +430,42 @@ export async function POST(req: NextRequest) {
     if (taskState.conversationHistory.length > 20) {
       taskState.conversationHistory = taskState.conversationHistory.slice(-20);
     }
-    
-    taskState.conversationHistory.push({ role: "user", content: message });
+
+    // Detect if this is a task request (to avoid unnecessary greetings)
+    const isTask = isTaskRequest(message);
+    const isFirstMessage = taskState.conversationHistory.length === 0;
+    const shouldSkipGreeting = isTask && isFirstMessage;
 
     const teamContext = `Available team members:\n${formatTeamMembers(teamMembers)}`;
     const taskStateContext = `Current task state:\n${formatTaskState(taskState)}`;
+    const userContext = `${formatCurrentUser(currentUser)}`;
     
     // Get today's date in ISO format for priority calculations
     const today = new Date().toISOString().split("T")[0];
 
+    // Debug logging
+    console.log("🔍 Context being sent to AI:");
+    console.log("1️⃣ User Context:", userContext);
+    console.log("2️⃣ Team Members Count:", teamMembers.length);
+    console.log("3️⃣ Today's Date:", today);
+    console.log("4️⃣ Is Task Request:", isTask);
+    console.log("5️⃣ Should Skip Greeting:", shouldSkipGreeting);
+
     // Build system prompt with dynamic context
-    const systemPromptWithContext = SYSTEM_PROMPT
+    let systemPromptWithContext = SYSTEM_PROMPT
+      .replace("{CURRENT_USER}", userContext)
       .replace("{TODAY_DATE}", today)
       .replace("{TEAM_MEMBERS}", teamContext)
       .replace("{TASK_STATE}", taskStateContext);
+
+    // If it's a clear task request on first message, add instruction to skip greeting
+    if (shouldSkipGreeting) {
+      systemPromptWithContext += `\n\n## IMPORTANT - First Message is Task Request:\nThe user has sent a task request as their first message. Do NOT greet them or add unnecessary pleasantries. Go straight to task mode. Extract task information and respond with JSON containing action and task details.`;
+    }
+
+    // Add user message to conversation history
+    taskState.conversationHistory.push({ role: "user", content: message });
+    updateTaskState(sessionId, { conversationHistory: taskState.conversationHistory });
 
     // Convert conversation history to messages format
     const messages = [
@@ -340,8 +476,10 @@ export async function POST(req: NextRequest) {
       })),
     ];
 
-    console.log("Sending to HF with session:", sessionId);
-    console.log("Conversation history length:", taskState.conversationHistory.length);
+    console.log("📨 Sending to HF:");
+    console.log("  - Session ID:", sessionId);
+    console.log("  - History length:", taskState.conversationHistory.length);
+    console.log("  - Skipping greeting:", shouldSkipGreeting);
 
     let responseText = "";
 
@@ -426,6 +564,40 @@ export async function POST(req: NextRequest) {
         ) {
           parsed.assigneeEmail = member.email;
           break;
+        }
+      }
+    }
+
+    // Validate assignee role if an assignee was specified
+    if (parsed.assigneeEmail && currentUser) {
+      const assignee = teamMembers.find(
+        (m: TeamMember) => m.email.toLowerCase() === parsed.assigneeEmail?.toLowerCase()
+      );
+
+      if (assignee && !isValidAssignment(currentUser.role, assignee.role)) {
+        console.warn(
+          `❌ Invalid assignment attempt: ${currentUser.name} (${currentUser.role}) tried to assign to ${assignee.name} (${assignee.role})`
+        );
+        
+        // Clear the invalid assignee and ask for a valid one
+        parsed.assigneeEmail = null;
+        parsed.action = null;
+        
+        // Build list of assignable members for this user
+        const assignableRoles = currentUser.role === "OWNER" 
+          ? ["EMPLOYEE", "ADMIN"] 
+          : currentUser.role === "ADMIN" 
+          ? ["EMPLOYEE", "ADMIN"] 
+          : ["EMPLOYEE"];
+        
+        const assignableMembers = teamMembers.filter(
+          (m: TeamMember) => assignableRoles.includes((m.role || "EMPLOYEE").toUpperCase())
+        );
+
+        if (assignableMembers.length > 0) {
+          parsed.message = `I can't assign tasks to ${assignee.name} because they have the ${assignee.role} role. As a ${currentUser.role}, you can only assign to team members with these roles: ${assignableRoles.join(", ")}. Who else would you like to assign this to?`;
+        } else {
+          parsed.message = `I can't assign tasks to ${assignee.name} because they have the ${assignee.role} role. As a ${currentUser.role}, you don't have permission to assign to available team members.`;
         }
       }
     }

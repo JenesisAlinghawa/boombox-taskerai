@@ -8,12 +8,13 @@ import { PageContainer } from "@/app/components/page-layouts/MainPageContainerLa
 import { PageContentCon } from "@/app/components/page-layouts/PageContentWrapperContainerComponent";
 import { useRouter } from "next/navigation";
 import { ProfileManagementComponent } from "@/app/components/settings-components/ProfileManagementComponent";
+import { EmailPasswordManagementComponent } from "@/app/components/settings-components/EmailPasswordManagementComponent";
 import { NotificationsComponent } from "@/app/components/settings-components/NotificationsComponent";
 import { TeamManagementComponent } from "@/app/components/settings-components/TeamManagementComponent";
 import { ConfirmProvider } from "@/app/components/providers-popups/ConfirmationDialogProviderComponent";
 
 interface User {
-  id: number;
+  id: string;
   email: string;
   firstName: string;
   lastName: string;
@@ -24,7 +25,7 @@ interface User {
   messageNotifications?: boolean;
 }
 
-type TabType = "profile" | "notifications" | "team";
+type TabType = "profile" | "accountSecurity" | "notifications" | "team";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -34,10 +35,17 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [pendingUserCount, setPendingUserCount] = useState(0);
 
   useEffect(() => {
     loadCurrentUser();
   }, []);
+
+  useEffect(() => {
+    if (currentUser?.role === "OWNER") {
+      fetchPendingUserCount();
+    }
+  }, [currentUser]);
 
   const loadCurrentUser = async () => {
     try {
@@ -52,6 +60,22 @@ export default function SettingsPage() {
       setError("Failed to load user data");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPendingUserCount = async () => {
+    try {
+      const userId =
+        typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+      const response = await fetch("/api/user-management/pending", {
+        headers: userId ? { "x-user-id": userId } : {},
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setPendingUserCount(data.users?.length || 0);
+      }
+    } catch (err) {
+      console.error("Failed to fetch pending user count:", err);
     }
   };
 
@@ -89,18 +113,16 @@ export default function SettingsPage() {
     );
   }
 
-  const canManageUsers = ["OWNER", "CO_OWNER", "MANAGER"].includes(
-    currentUser?.role || "",
-  );
+  const canManageUsers = ["OWNER", "ADMIN"].includes(currentUser?.role || "");
 
   return (
     <ConfirmProvider>
       <PageContainer title="SETTINGS">
-        <PageContentCon className="mt-0">
+        <PageContentCon className="mt-0 w-full h-auto">
           <div className="flex gap-1">
             {/* Left Sidebar Navigation */}
-            <div className="w-48 h-screen flex-shrink-0">
-              <div className="bg-blue-100 backdrop-blur-md border border-black/10 mr-1 rounded-sm p-2 space-y-2 sticky top-1">
+            <div className="w-48 h-auto flex-shrink-0 overflow-y-auto">
+              <div className="bg-blue-100 backdrop-blur-md border border-black/10 mr-1 rounded-sm p-2 space-y-2 sticky top-0">
                 <button
                   onClick={() => {
                     setActiveTab("profile");
@@ -113,6 +135,19 @@ export default function SettingsPage() {
                   }`}
                 >
                   Profile
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveTab("accountSecurity");
+                    setError(null);
+                  }}
+                  className={`w-full px-4 py-3 font-medium transition-colors rounded-sm text-left ${
+                    activeTab === "accountSecurity"
+                      ? "bg-blue-600 text-white"
+                      : "text-black/70 hover:bg-white/50"
+                  }`}
+                >
+                  Email & Password
                 </button>
                 <button
                   onClick={() => {
@@ -133,20 +168,23 @@ export default function SettingsPage() {
                       setActiveTab("team");
                       setError(null);
                     }}
-                    className={`w-full px-4 py-3 font-medium transition-colors rounded-sm text-left ${
+                    className={`w-full px-4 py-3 font-medium transition-colors rounded-sm text-left flex items-center justify-between ${
                       activeTab === "team"
                         ? "bg-blue-600 text-white"
                         : "text-black/70 hover:bg-white/50"
                     }`}
                   >
-                    Team Management
+                    <span>Team Management</span>
+                    {pendingUserCount > 0 && (
+                      <div className="w-2 h-2 rounded-full bg-red-600"></div>
+                    )}
                   </button>
                 )}
               </div>
             </div>
 
             {/* Right Content Area */}
-            <div className="flex-1 space-y-6">
+            <div className="flex-1 flex flex-col space-y-6">
               {error && (
                 <div className="p-4 bg-red-100 border border-red-300 rounded-sm flex items-center gap-1">
                   <AlertCircle size={20} className="text-red-700" />
@@ -157,6 +195,14 @@ export default function SettingsPage() {
               {/* Profile Tab */}
               {activeTab === "profile" && currentUser && (
                 <ProfileManagementComponent
+                  currentUser={currentUser}
+                  onError={setError}
+                />
+              )}
+
+              {/* Email & Password Tab */}
+              {activeTab === "accountSecurity" && currentUser && (
+                <EmailPasswordManagementComponent
                   currentUser={currentUser}
                   onError={setError}
                 />

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getCurrentUser } from "@/utils/sessionManager";
-import type { Employee } from "@/utils/sessionManager";
+import type { User } from "@/utils/sessionManager";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -73,7 +73,7 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
   const pathname = usePathname() || "";
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [animatingIcon, setAnimatingIcon] = useState<string | null>(null);
 
   // Custom icon animations
@@ -136,7 +136,7 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
     const loadUser = async () => {
       try {
         const user = await getCurrentUser();
-        setCurrentEmployee(user);
+        setCurrentUser(user);
       } catch (e) {
         console.error("Failed to load user", e);
       }
@@ -202,13 +202,13 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
   }, []);
 
   useEffect(() => {
-    if (!currentEmployee?.id) return;
+    if (!currentUser?.id) return;
     console.log(
       "[UnreadMessages] Setting up EventSource for userId:",
-      currentEmployee.id,
+      currentUser.id,
     );
     const es = new EventSource(
-      `/api/subscription-management?userId=${currentEmployee.id}`,
+      `/api/subscription-management?userId=${currentUser.id}`,
     );
 
     const onDirectMessage = (e: MessageEvent) => {
@@ -237,7 +237,7 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
     es.addEventListener("direct_message", onDirectMessage as EventListener);
     es.addEventListener("notification", onNotification as EventListener);
     return () => es.close();
-  }, [currentEmployee]);
+  }, [currentUser]);
 
   const isActive = (href: string) =>
     href === "/dashboard"
@@ -245,7 +245,7 @@ export function NavigationMenu({ collapsed }: NavigationMenuProps) {
       : pathname === href || pathname.startsWith(href + "/");
 
   const buttonStyle = (active: boolean): string =>
-    `w-full px-4 py-2.5 flex items-center gap-2.5 text-xs font-light cursor-pointer relative overflow-hidden rounded-full border border-transparent hover:border-black/50 text-black-800 transition-all duration-200 ease-out ${
+    `w-full px-4 py-2.5 flex items-center gap-2.5 text-xs font-light cursor-pointer relative overflow-hidden rounded-2xl border border-transparent hover:border-black/50 text-black-800 transition-all duration-200 ease-out ${
       active ? "shadow-[1px_1px_6px_rgba(0,0,0,0.30)]" : "shadow-none"
     }`;
 

@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import { getCurrentUser } from "@/utils/sessionManager";
 
 interface DirectMessageUser {
-  id: number;
+  id: string;
   name: string;
   email: string;
   unreadCount: number;
 }
 
 interface Props {
-  onSelectUser: (userId: number) => void;
+  onSelectUser: (userId: string) => void;
 }
 
 export default function DirectMessagesList({ onSelectUser }: Props) {
@@ -23,7 +23,9 @@ export default function DirectMessagesList({ onSelectUser }: Props) {
       try {
         const user = await getCurrentUser();
         if (!user?.id) return;
-        const res = await fetch(`/api/direct-messaging-endpoints/users?userId=${user.id}`);
+        const res = await fetch(
+          `/api/direct-messaging-endpoints/users?userId=${user.id}`,
+        );
         const data = await res.json();
         setUsers(data.users || []);
       } catch (err) {
@@ -82,4 +84,3 @@ export default function DirectMessagesList({ onSelectUser }: Props) {
     </div>
   );
 }
-

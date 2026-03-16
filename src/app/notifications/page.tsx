@@ -21,7 +21,7 @@ import {
 
 interface Notification {
   id: number;
-  userId: number;
+  userId: string;
   type: string;
   title: string;
   message: string;
@@ -35,7 +35,7 @@ export default function NotificationsPage() {
   const router = useRouter();
   useAuthProtection();
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [currentEmployee, setCurrentEmployee] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<{
     [key: string]: boolean;
@@ -47,13 +47,13 @@ export default function NotificationsPage() {
   useEffect(() => {
     const loadUser = async () => {
       const user = await getCurrentUser();
-      setCurrentEmployee(user);
+      setCurrentUser(user);
     };
     loadUser();
   }, []);
 
   const fetchNotifications = async () => {
-    if (currentEmployee?.messageNotifications === false) {
+    if (currentUser?.messageNotifications === false) {
       setNotifications([]);
       setLoading(false);
       return;
@@ -61,7 +61,7 @@ export default function NotificationsPage() {
 
     try {
       const res = await fetch(
-        `/api/notification-handlers?userId=${currentEmployee?.id}`,
+        `/api/notification-handlers?userId=${currentUser?.id}`,
       );
       const data = await res.json();
       const items = Array.isArray(data?.notifications)
@@ -76,12 +76,12 @@ export default function NotificationsPage() {
   };
 
   useEffect(() => {
-    if (!currentEmployee?.id) return;
+    if (!currentUser?.id) return;
     fetchNotifications();
 
     const interval = setInterval(() => fetchNotifications(), 3000);
     return () => clearInterval(interval);
-  }, [currentEmployee?.id]);
+  }, [currentUser?.id]);
 
   // Group notifications: messages separate, others by type
   const groupedNotifications = useMemo(() => {
@@ -252,9 +252,9 @@ export default function NotificationsPage() {
   };
 
   return (
-    <PageContainer title="NOTIFICATIONS">
-      {currentEmployee?.messageNotifications === false && (
-        <div className="p-4 mb-6 bg-yellow-100/50 border border-yellow-400/30 rounded-sm text-yellow-800 text-center backdrop-blur-sm">
+    <PageContainer title="Notifications">
+      {currentUser?.messageNotifications === false && (
+        <div className="p-4 mb-2 bg-yellow-100/50 border border-yellow-400/30 rounded-sm text-yellow-800 text-center backdrop-blur-sm">
           You have <strong>disabled in‑app notifications</strong> in your
           settings. Turn them back on to see alerts.
         </div>
@@ -266,7 +266,7 @@ export default function NotificationsPage() {
         </div>
       ) : notifications.length === 0 ? (
         <div className="bg-blue-100 backdrop-blur-lg border border-black/10 rounded-sm shadow-lg p-10 text-center text-black/60 transition-all duration-200 hover:border-black/50 hover:shadow-2xl">
-          <Bell size={32} className="mx-auto mb-3 text-black/40" />
+          <Bell size={32} className="mx-auto mb-2 text-black/40" />
           <p>No notifications yet</p>
         </div>
       ) : (
@@ -285,7 +285,7 @@ export default function NotificationsPage() {
                 return (
                   <div key={notification.id}>
                     <div
-                      className={`flex items-start gap-1 p-2.5 rounded-sm border transition-all duration-150 bg-blue-100/80 backdrop-blur-md ${
+                      className={`flex items-start gap-1 p-1 rounded-sm border transition-all duration-150 bg-blue-100/80 backdrop-blur-md ${
                         notification.isRead
                           ? "border-black/10 opacity-75 hover:opacity-90"
                           : "border-black/20 bg-blue-100 shadow-md"
@@ -313,7 +313,7 @@ export default function NotificationsPage() {
                         <h3 className="text-black/90 text-[10px] font-normal truncate">
                           {notification.title}
                         </h3>
-                        <p className="text-black/80 text-xs mt-0.5 break-words">
+                        <p className="text-black/80 text-xs mt-0 break-words">
                           {displayMessage}
                           {isTooLong && !isExpanded && "..."}
                         </p>
@@ -367,7 +367,7 @@ export default function NotificationsPage() {
                         [groupKey]: !prev[groupKey],
                       }))
                     }
-                    className="w-full flex items-center gap-1 px-4 py-2 bg-blue-100 backdrop-blur-lg border border-black/10 rounded-sm shadow-lg text-black/80 text-sm font-semibold hover:border-black/50 hover:shadow-2xl transition-all duration-200 mb-2"
+                    className="w-full flex items-center gap-1 px-4 py-2 bg-blue-100 backdrop-blur-lg border border-black/10 rounded-sm shadow-lg text-black/80 text-sm font-semibold hover:border-black/50 hover:shadow-2xl transition-all duration-200 mb-0"
                   >
                     <ChevronDown
                       size={16}

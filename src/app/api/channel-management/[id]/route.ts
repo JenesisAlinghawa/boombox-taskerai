@@ -81,6 +81,83 @@ export async function PUT(
   }
 }
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const channelId = parseInt(id);
+
+  if (!channelId) {
+    return NextResponse.json(
+      { error: "Invalid channel ID" },
+      { status: 400 }
+    );
+  }
+
+  const { name, description, profilePicture } = await request.json();
+
+  try {
+    const user = await getCurrentUser(request);
+    if (!user) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const channel = await prisma.channel.findUnique({
+      where: { id: channelId },
+    });
+
+    if (!channel) {
+      return NextResponse.json(
+        { error: "Channel not found" },
+        { status: 404 }
+      );
+    }
+
+    // Only channel creator can update channel
+    if (channel.creatorId !== user.id) {
+      return NextResponse.json(
+        { error: "Only channel creator can update channel" },
+        { status: 403 }
+      );
+    }
+
+    const updated = await prisma.channel.update({
+      where: { id: channelId },
+      data: {
+        ...(name && { name }),
+        ...(description && { description }),
+        ...(profilePicture && { profilePicture }),
+      },
+      include: {
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(updated);
+  } catch (err) {
+    console.error("Error updating channel:", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

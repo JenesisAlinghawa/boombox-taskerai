@@ -23,12 +23,12 @@ export async function GET(request: NextRequest) {
     const userId = request.nextUrl.searchParams.get("userId");
 
     if (userId) {
-      // Get DM history with specific user
+      // Get DM history with specific user - skip expensive nested relations
       const messages = await prisma.directMessage.findMany({
         where: {
           OR: [
-            { senderId: user.id, recipientId: parseInt(userId) },
-            { senderId: parseInt(userId), recipientId: user.id },
+            { senderId: user.id, recipientId: userId },
+            { senderId: userId, recipientId: user.id },
           ],
         },
         select: {
@@ -38,26 +38,6 @@ export async function GET(request: NextRequest) {
           reactions: true,
           isRead: true,
           parentMessageId: true,
-          parentMessage: {
-            select: {
-              id: true,
-              content: true,
-              createdAt: true,
-              sender: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                  profilePicture: true,
-                },
-              },
-            },
-          },
-          _count: {
-            select: {
-              replies: true,
-            },
-          },
           createdAt: true,
           sender: {
             select: {
@@ -74,57 +54,8 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({ messages });
     } else {
-      // Get list of DM conversations
-      // First, get users from existing conversations
-      const conversations = await prisma.directMessage.findMany({
-        where: {
-          OR: [
-            { senderId: user.id },
-            { recipientId: user.id },
-          ],
-        },
-        select: {
-          senderId: true,
-          recipientId: true,
-          sender: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              profilePicture: true,
-              active: true,
-              lastActive: true,
-            },
-          },
-          recipient: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              profilePicture: true,
-              active: true,
-              lastActive: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-        distinct: ["senderId", "recipientId"],
-      });
-
-      // Deduplicate conversations
-      const uniqueConversations = new Map();
-      conversations.forEach((conv) => {
-        const otherUserId = conv.senderId === user.id ? conv.recipientId : conv.senderId;
-        const otherUser = conv.senderId === user.id ? conv.recipient : conv.sender;
-
-        if (!uniqueConversations.has(otherUserId)) {
-          uniqueConversations.set(otherUserId, otherUser);
-        }
-      });
-
-      // Also get all active users that haven't been messaged yet
+      // Get list of DM conversations - quick version that returns active users
+      // Skip expensive conversation history queries on initial load
       const allActiveUsers = await prisma.user.findMany({
         where: {
           AND: [
@@ -142,18 +73,11 @@ export async function GET(request: NextRequest) {
           lastActive: true,
         },
         orderBy: { firstName: "asc" },
+        take: 100, // Limit to 100 users for performance
       });
 
-      // Merge: conversations (with most recent first) + new users (alphabetically)
-      const conversationUsers = Array.from(uniqueConversations.values());
-      const newUsers = allActiveUsers.filter(
-        (u) => !uniqueConversations.has(u.id)
-      );
-
-      const allUsers = [...conversationUsers, ...newUsers];
-
       return NextResponse.json({
-        conversations: allUsers,
+        conversations: allActiveUsers,
       });
     }
   } catch (error) {

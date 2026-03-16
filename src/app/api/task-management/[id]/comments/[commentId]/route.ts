@@ -7,18 +7,14 @@ interface Params {
 }
 
 // Helper to extract user from headers
-function getUserIdFromRequest(request: NextRequest): number | null {
-  const userHeader = request.headers.get('x-user-id');
-  if (userHeader) {
-    return parseInt(userHeader, 10);
-  }
-  return null;
+function getUserIdFromRequest(request: NextRequest): string | null {
+  return request.headers.get('x-user-id');
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const { id, commentId } = await params;
-    const taskId = Number(id);
+    const taskId = id as string;
     const cId = Number(commentId);
     const userId = getUserIdFromRequest(request);
     if (!userId) {
@@ -50,7 +46,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const comment = await prisma.comment.update({
       where: { id: cId },
       data: { content },
-      include: { user: { select: { id: true, firstName: true, lastName: true } } }
+      include: { user: { select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true } } }
     });
 
     // Audit log
@@ -62,6 +58,23 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       ipAddress: getIpAddress(request as any),
     });
 
+    // Also log to activity log for the logs page
+    try {
+      await prisma.log.create({
+        data: {
+          userId: userId,
+          taskId: taskId,
+          action: 'Edited comment',
+          data: {
+            commentId: comment.id,
+            commentContent: content.substring(0, 100), // First 100 chars
+          },
+        },
+      });
+    } catch (logError) {
+      console.error('Failed to create activity log:', logError);
+    }
+
     return NextResponse.json({ comment });
   } catch (error) {
     console.error('Update comment error:', error);
@@ -72,7 +85,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
     const { id, commentId } = await params;
-    const taskId = Number(id);
+    const taskId = id as string;
     const cId = Number(commentId);
     const userId = getUserIdFromRequest(request);
     if (!userId) {
@@ -108,6 +121,22 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       taskId: taskId,
       ipAddress: getIpAddress(request as any),
     });
+
+    // Also log to activity log for the logs page
+    try {
+      await prisma.log.create({
+        data: {
+          userId: userId,
+          taskId: taskId,
+          action: 'Deleted comment',
+          data: {
+            commentId: cId,
+          },
+        },
+      });
+    } catch (logError) {
+      console.error('Failed to create activity log:', logError);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

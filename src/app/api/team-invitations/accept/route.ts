@@ -2,7 +2,8 @@
  * Accept Invite API
  * 
  * Completes signup for invited user
- * Creates new user account and sets isVerified to false (pending approval)
+ * Creates new user account and automatically approves them (isVerified: true, active: true)
+ * since they were invited by the owner
  * 
  * POST /api/invite/accept
  * Body: {
@@ -16,8 +17,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import bcrypt from "bcryptjs";
-import { createNotification } from "@/lib/notificationService";
+import bcrypt from "bcrypt";
+import { getEmailFromToken, deleteInviteToken } from "@/lib/inviteTokenStore";
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,14 +31,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // TODO: Verify token validity and expiry
+    // Verify token is valid and matches email
+    const tokenEmail = getEmailFromToken(token);
+    
+    if (!tokenEmail) {
+      return NextResponse.json(
+        { error: "Invalid or expired invite link" },
+        { status: 400 }
+      );
+    }
+
+    if (tokenEmail !== email.toLowerCase()) {
+      return NextResponse.json(
+        { error: "Token does not match email" },
+        { status: 400 }
+      );
+    }
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
       where: { email: email.toLowerCase() },
     });
 
-    if (existingUser) {
+    if (existingUser && existingUser.isVerified) {
       return NextResponse.json(
         { error: "User already exists" },
         { status: 409 }
@@ -47,49 +63,61 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create new user
-    const newUser = await prisma.user.create({
-      data: {
-        email: email.toLowerCase(),
-        password: hashedPassword,
-        firstName,
-        lastName,
-        role: "EMPLOYEE",
-        isVerified: false,
-        active: false,
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        isVerified: true,
-      },
-    });
+    let newUser;
 
-    // Find OWNER and create notification
-    const owner = await prisma.user.findFirst({
-      where: { role: "OWNER" },
-      select: { id: true },
-    });
-
-    if (owner) {
-      await createNotification({
-        receiverId: owner.id,
-        type: "NEW_USER_REQUEST",
+    if (existingUser) {
+      // Update existing user (from previous invite attempt)
+      newUser = await prisma.user.update({
+        where: { email: email.toLowerCase() },
         data: {
-          newUserId: newUser.id,
+          password: hashedPassword,
           firstName,
           lastName,
-          email: newUser.email,
+          // AUTO-APPROVE: Set as verified and active since they were invited by owner
+          isVerified: true,
+          active: true,
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          isVerified: true,
+          active: true,
+        },
+      });
+    } else {
+      // Create new user
+      newUser = await prisma.user.create({
+        data: {
+          email: email.toLowerCase(),
+          password: hashedPassword,
+          firstName,
+          lastName,
+          role: "EMPLOYEE",
+          // AUTO-APPROVE: Set as verified and active since they were invited by owner
+          isVerified: true,
+          active: true,
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          isVerified: true,
+          active: true,
         },
       });
     }
 
+    // Delete the used token
+    deleteInviteToken(token);
+
     return NextResponse.json(
       {
-        message: "Account created successfully. Awaiting admin approval.",
+        message: "Account created successfully and approved!",
         user: newUser,
       },
       { status: 201 }

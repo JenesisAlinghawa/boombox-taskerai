@@ -1,5 +1,5 @@
 import React from "react";
-import { Edit2 } from "lucide-react";
+import { Edit2, AlertCircle, MoreVertical } from "lucide-react";
 import type { Task } from "./types";
 
 interface Props {
@@ -9,10 +9,40 @@ interface Props {
   onEdit: (taskId: string) => void;
   onContain: (taskId: string) => void;
   onStatusChange?: (taskId: string, newStatus: string) => void;
-  currentUserId?: number | null; // used to determine owner permissions
+  currentUserId?: string | null; // used to determine owner permissions (UUID)
 }
 
-export default function TaskRow({
+const getOverdueInfo = (dueDate?: string | null, status?: string) => {
+  if (!dueDate) return null;
+
+  const due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  const isDone = status === "done" || status === "completed";
+  if (isDone) return null; // Don't show overdue for done tasks
+
+  if (due < now) {
+    const daysOverdue = Math.floor(
+      (now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    return {
+      isOverdue: true,
+      daysOverdue,
+      displayText:
+        daysOverdue === 0
+          ? "Today (overdue)"
+          : daysOverdue === 1
+            ? "1 day ago"
+            : `${daysOverdue} days ago`,
+    };
+  }
+
+  return null;
+};
+
+export default function TaskListItemRowComponent({
   task,
   onOpenDetails,
   onDelete,
@@ -49,8 +79,9 @@ export default function TaskRow({
       case "todo":
         return "bg-purple-500 text-white";
       case "inprogress":
-        return "bg-amber-500 text-white";
+        return "bg-blue-500 text-white";
       case "stuck":
+        return "bg-orange-500 text-white";
       case "overdue":
         return "bg-red-500 text-white";
       case "completed":
@@ -83,36 +114,52 @@ export default function TaskRow({
   };
 
   return (
-    <tr
+    <div
       key={task.id}
       onClick={handleRowClick}
-      className="border-b border-black/10 transition-colors hover:bg-black/5 cursor-pointer"
+      className="border-b bg-white border-black/10 transition-colors hover:bg-blue-100/50  cursor-pointer py-2 px-4 flex items-center justify-between gap-3 relative overflow-visible"
     >
-      <td className="px-4 py-2 text-black">
-        {task.title}
+      {/* Task Title & Description */}
+      <div className="flex-1 min-w-0">
+        <div className="text-black font-medium text-sm">{task.title}</div>
         {task.description && (
           <div className="text-xs text-black/60 overflow-hidden text-ellipsis whitespace-nowrap max-w-[300px]">
             {task.description}
           </div>
         )}
-      </td>
+      </div>
 
-      <td className="px-4 py-2 text-black">
-        {task.assignee ? (
+      {/* Assignee */}
+      <div className="w-[120px] text-black text-xs truncate">
+        {task.assignees && task.assignees.length > 0 ? (
+          <div className="flex items-center gap-1 flex-wrap">
+            {task.assignees.slice(0, 1).map((assignment) => (
+              <span key={assignment.assignee?.id}>
+                {assignment.assignee?.name || assignment.assignee?.email}
+              </span>
+            ))}
+            {task.assignees.length > 1 && (
+              <span className="text-black/60">
+                +{task.assignees.length - 1}
+              </span>
+            )}
+          </div>
+        ) : task.assignee ? (
           `${task.assignee.name || task.assignee.email}`
         ) : (
           <span className="text-black/40">Unassigned</span>
         )}
-      </td>
+      </div>
 
-      <td className="px-4 py-2 text-center">
+      {/* Status */}
+      <div className="w-[100px] text-center ">
         <div ref={statusMenuRef} className="relative inline-block">
           <button
             onClick={(e) => {
               e.stopPropagation();
               setStatusMenuOpen(!statusMenuOpen);
             }}
-            className={`inline-block px-2 py-1 rounded text-xs font-semibold cursor-pointer transition-colors ${getStatusColor(task.status || "todo")}`}
+            className={`inline-block z-[9999999] px-2 py-1 rounded text-xs font-semibold cursor-pointer transition-all duration-200 ${getStatusColor(task.status || "todo")}`}
           >
             {task.status === "inprogress"
               ? "In Progress"
@@ -120,13 +167,15 @@ export default function TaskRow({
                 ? "Overdue"
                 : task.status === "todo"
                   ? "To Do"
-                  : task.status === "completed" || task.status === "done"
-                    ? "Done"
-                    : task.status?.charAt(0).toUpperCase()}
+                  : task.status === "stuck"
+                    ? "Stuck"
+                    : task.status === "completed" || task.status === "done"
+                      ? "Done"
+                      : task.status?.charAt(0).toUpperCase()}
           </button>
           {statusMenuOpen && (
-            <div className="absolute left-0 top-[calc(100%+4px)] bg-blue-100 border border-black/10 rounded-lg z-50 min-w-[120px]">
-              {["inprogress", "stuck", "completed"].map((status) => (
+            <div className="absolute left-0 top-[calc(100%+4px)] bg-blue-100 border border-black/10 rounded-lg z-[99999] min-w-[120px] shadow-lg animate-in fade-in slide-in-from-top-1 duration-200">
+              {["todo", "inprogress", "stuck", "done"].map((status) => (
                 <button
                   key={status}
                   onClick={(e) => {
@@ -142,23 +191,30 @@ export default function TaskRow({
                 >
                   {status === "inprogress"
                     ? "In Progress"
-                    : status === "completed"
-                      ? "Done"
-                      : status.charAt(0).toUpperCase() + status.slice(1)}
+                    : status === "stuck"
+                      ? "Stuck"
+                      : status === "done"
+                        ? "Done"
+                        : status.charAt(0).toUpperCase() + status.slice(1)}
                 </button>
               ))}
             </div>
           )}
         </div>
-      </td>
+      </div>
 
-      <td className="px-4 py-2 text-center text-black">
+      {/* Attachments Count */}
+      <div className="w-[60px] text-center text-black text-xs">
         {(task as any)._count?.attachments || task.attachments?.length || 0}
-      </td>
-      <td className="px-4 py-2 text-center text-black">
+      </div>
+
+      {/* Comments Count */}
+      <div className="w-[60px] text-center text-black text-xs">
         {(task as any)._count?.comments || task.comments?.length || 0}
-      </td>
-      <td className="px-4 py-2 text-center">
+      </div>
+
+      {/* Priority */}
+      <div className="w-[70px] text-center">
         {task.priority ? (
           <span
             className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getPriorityColor(task.priority)}`}
@@ -166,28 +222,54 @@ export default function TaskRow({
             {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
           </span>
         ) : (
-          <span className="text-black/60">—</span>
+          <span className="text-black/60 text-xs">—</span>
         )}
-      </td>
-      <td className="px-4 py-2 text-center text-black">
-        {task.dueDate
-          ? new Date(task.dueDate).toLocaleDateString("en-US")
-          : "—"}
-      </td>
+      </div>
 
-      <td className="px-4 py-2 text-center">
-        <div ref={menuRef} className="relative">
+      {/* Due Date */}
+      <div className="w-[110px] text-center">
+        {task.dueDate ? (
+          (() => {
+            const overdueInfo = getOverdueInfo(task.dueDate, task.status);
+            if (overdueInfo?.isOverdue) {
+              return (
+                <div className="flex items-center justify-center gap-1">
+                  <AlertCircle className="w-3 h-3 text-red-600" />
+                  <span className="text-red-600 font-semibold text-xs">
+                    {overdueInfo.displayText}
+                  </span>
+                </div>
+              );
+            }
+            return (
+              <span className="text-black/80 text-xs">
+                {new Date(task.dueDate).toLocaleDateString("en-US")}
+              </span>
+            );
+          })()
+        ) : (
+          <span className="text-black/40 text-xs">—</span>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="w-[50px] text-center flex-shrink-0 z-[99998]">
+        <div ref={menuRef} className="relative inline-block w-full">
           <button
-            onClick={() => setMenuOpen((o) => !o)}
-            className="bg-none border-none text-black/60 cursor-pointer text-lg p-1 hover:text-black/80 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpen((o) => !o);
+            }}
+            className="bg-none border-none text-black/60 cursor-pointer p-1 hover:text-black/80 transition-colors w-full flex justify-center"
             title="Actions"
           >
-            ⋮
+            <MoreVertical size={16} />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-[calc(100%+4px)] bg-blue-100 border border-black/10 rounded-lg z-50 min-w-[140px]">
+            <div className="absolute right-0 top-[calc(100%+4px)] bg-blue-100 border border-black/10 rounded-lg z-[99999] min-w-[140px] shadow-lg animate-in fade-in slide-in-from-top-1 duration-200">
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   onEdit(task.id);
                   setMenuOpen(false);
                 }}
@@ -198,7 +280,8 @@ export default function TaskRow({
               </button>
               {isOwner && (
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     onDelete(task.id);
                     setMenuOpen(false);
                   }}
@@ -210,7 +293,7 @@ export default function TaskRow({
             </div>
           )}
         </div>
-      </td>
-    </tr>
+      </div>
+    </div>
   );
 }

@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 
-function getUserIdFromRequest(request: NextRequest): number | null {
-  const userHeader = request.headers.get('x-user-id')
-  if (userHeader) {
-    return parseInt(userHeader, 10)
-  }
-  return null
+function getUserIdFromRequest(request: NextRequest): string | null {
+  return request.headers.get('x-user-id')
 }
 
 export async function GET(request: NextRequest) {

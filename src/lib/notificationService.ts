@@ -3,7 +3,7 @@ import { sendEvent } from "./sse.js";
 import sendEmail from "./email.ts";
 
 export interface CreateNotificationOptions {
-  receiverId: number;
+  receiverId: string;
   type: string;
   data?: any;
   /**

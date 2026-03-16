@@ -3,13 +3,13 @@
  * Replaces localStorage for production deployment
  */
 
-export interface Employee {
-  id: number;
+export interface User {
+  id: string;
   firstName: string;
   lastName: string;
   email: string;
   isVerified?: boolean;
-  role?: "EMPLOYEE" | "TEAM_LEAD" | "MANAGER" | "CO_OWNER" | "OWNER";
+  role?: "EMPLOYEE" | "ADMIN" | "OWNER";
   profilePicture?: string;
   active?: boolean;
   lastActive?: Date;
@@ -21,7 +21,7 @@ export interface Employee {
  * Save employee session to localStorage and cloud
  * In production, this would sync with a cloud database
  */
-export const saveUserSession = (employee: Employee) => {
+export const saveUserSession = (employee: User) => {
   if (typeof window !== "undefined") {
     // Store userId in localStorage for API calls
     localStorage.setItem("userId", employee.id.toString());
@@ -39,25 +39,58 @@ export const getCurrentUser = async (userId?: string | number): Promise<User | n
     
     // If no userId is found, user is not logged in
     if (!id) {
+      console.warn("[SessionManager] No userId found in localStorage or parameter");
       return null;
     }
     
+    console.log("[SessionManager] Fetching user session with ID:", id);
     const response = await fetch("/api/session-management", {
       headers: { "x-user-id": String(id) },
     });
 
     if (response.ok) {
       const data = await response.json();
+      console.log("[SessionManager] User session retrieved:", data.user?.email, "ID:", data.user?.id);
       return data.user;
+    } else if (response.status === 404) {
+      // User not found - clear stale session and redirect to login
+      console.warn("[SessionManager] User not found - session may be stale. Clearing localStorage...");
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("userId");
+        localStorage.removeItem("user");
+      }
+      // Redirect to login page if in browser  
+      if (typeof window !== "undefined" && !window.location.pathname.includes("/auth")) {
+        console.log("[SessionManager] Redirecting to login...");
+        window.location.href = "/auth/login";
+      }
+      return null;
+    } else {
+      console.error("[SessionManager] Session API returned", response.status, "for userId:", id);
     }
   } catch (error) {
-    console.error("Failed to fetch user session:", error);
+    console.error("[SessionManager] Failed to fetch user session:", error);
   }
 
-  // Fallback to localStorage only if it exists
+  // Fallback to localStorage only if it exists AND has valid UUID format
   if (typeof window !== "undefined") {
     const stored = localStorage.getItem("user");
-    return stored ? JSON.parse(stored) : null;
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        // UUID validation: should be 36 chars with dashes (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+        if (parsed.id && typeof parsed.id === 'string' && parsed.id.includes('-') && parsed.id.length === 36) {
+          console.warn("[SessionManager] Using fallback localStorage user data");
+          return parsed;
+        } else {
+          console.warn("[SessionManager] Stale localStorage data detected (integer ID), clearing...");
+          localStorage.removeItem("user");
+        }
+      } catch (e) {
+        console.warn("[SessionManager] Failed to parse localStorage user data", e);
+        localStorage.removeItem("user");
+      }
+    }
   }
 
   return null;

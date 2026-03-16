@@ -1,10 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { HfInference } from '@huggingface/inference';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const inference = new HfInference(process.env.HUGGINGFACE_API_KEY);
+
+function getUserIdFromRequest(request: NextRequest): string | null {
+  return request.headers.get('x-user-id');
+}
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify user is authenticated
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const { tasks } = await request.json();
 
     if (!tasks || !Array.isArray(tasks)) {
@@ -14,14 +27,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.HUGGINGFACE_API_KEY) {
       return NextResponse.json(
-        { error: "GEMINI_API_KEY not configured" },
+        { error: "HUGGINGFACE_API_KEY not configured" },
         { status: 500 }
       );
     }
-
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
     // Format tasks for AI analysis
     const taskSummary = tasks.map((task: any, idx: number) => ({
@@ -69,8 +80,14 @@ Respond in JSON format with:
   "summary": "Brief strategic recommendation"
 }`;
 
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+    const result = await inference.textGeneration({
+      model: "mistralai/Mistral-7B-Instruct-v0.1",
+      inputs: prompt,
+      parameters: {
+        max_new_tokens: 1024,
+      },
+    });
+    const responseText = result.generated_text;
 
     // Extract JSON from response
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);

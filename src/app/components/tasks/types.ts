@@ -1,18 +1,23 @@
-export type Employee = {
-  id: number;
+export type User = {
+  id: string;
   name?: string | null;
+  firstName?: string;
+  lastName?: string;
   email: string;
   active?: boolean;
-  role?: "EMPLOYEE" | "TEAM_LEAD" | "MANAGER" | "CO_OWNER" | "OWNER";
+  role?: "EMPLOYEE" | "ADMIN" | "OWNER";
+  profilePicture?: string | null;
 };
 
 export type Comment = {
   id: number;
   taskId: string;
-  userId?: number | null;
+  userId?: string | null;
   content: string;
   createdAt?: string;
+  parentCommentId?: number | null;
   user?: User | null;
+  replies?: Comment[];
 };
 
 export type Attachment = {
@@ -23,6 +28,11 @@ export type Attachment = {
   createdAt?: string;
 };
 
+export type TaskAssignee = {
+  assigneeId: string;
+  assignee: User;
+};
+
 export type Task = {
   id: string;
   title: string;
@@ -31,9 +41,14 @@ export type Task = {
   priority?: string | null;
   dueDate?: string | null;
   createdAt?: string;
-  createdById?: number;
+  createdById?: string;
   createdBy?: User | null;
-  assignee?: User | null;
+  assignee?: User | null; // Legacy - kept for backward compatibility
+  assignees?: TaskAssignee[]; // New - multiple assignees
   comments?: Comment[];
   attachments?: Attachment[];
+  _count?: {
+    comments: number;
+    attachments: number;
+  };
 };

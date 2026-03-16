@@ -16,11 +16,11 @@ function hashPassword(password: string): string {
 export async function POST(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-    const userId = parseInt(id, 10);
+    const userId = id; // id is now a UUID string
 
     // Get user ID from header
     const userIdFromHeader = request.headers.get("x-user-id");
-    if (!userIdFromHeader || parseInt(userIdFromHeader, 10) !== userId) {
+    if (!userIdFromHeader || userIdFromHeader !== userId) {
       return NextResponse.json(
         { error: "Unauthorized - Can only change your own password" },
         { status: 401 }

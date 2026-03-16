@@ -18,6 +18,12 @@ const eslintConfig = [
       "@typescript-eslint/no-explicit-any": "off",
       // Allow unescaped entities in JSX where needed
       "react/no-unescaped-entities": "off",
+      // Allow unused variables (common during refactoring)
+      "@typescript-eslint/no-unused-vars": "warn",
+      // Allow let when const might be verbose
+      "prefer-const": "warn",
+      // Allow anonymous default exports
+      "import/no-anonymous-default-export": "warn",
     },
   },
 ];

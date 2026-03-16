@@ -17,39 +17,15 @@ import {
   ToastProvider,
   useToast,
 } from "@/app/components/providers-popups/ToastNotificationProviderComponent";
-import { ConfirmProvider } from "@/app/components/providers-popups/ConfirmationDialogProviderComponent";
+import { ConfirmProvider, useConfirm } from "@/app/components/providers-popups/ConfirmationDialogProviderComponent";
+import TaskGroupedDisplay from "@/app/components/tasks/TaskGroupedDisplayComponent";
+import TaskSummary from "@/app/components/dashboard/DoThisFirst";
 import type {
   Task,
   Comment,
   Attachment,
-  Employee,
+  User,
 } from "@/app/components/tasks/types";
-
-const COLORS = {
-  bg: "#transparent",
-  cardBg: "#transparent",
-  text: "#ffffff",
-  muted: "#ffffff",
-  todo: "#8b5cf6",
-  inProgress: "#f59e0b",
-  stuck: "#ef4444",
-  done: "#10b981",
-  shadow: "#000000",
-};
-
-const statusColors: { [key: string]: string } = {
-  todo: COLORS.todo,
-  inprogress: COLORS.inProgress,
-  stuck: COLORS.stuck,
-  completed: COLORS.done,
-};
-
-const statusLabels: { [key: string]: string } = {
-  todo: "Todo",
-  inprogress: "Working on it",
-  stuck: "Stuck",
-  completed: "Done",
-};
 
 export default function TasksPage() {
   useAuthProtection(); // Protect this route
@@ -63,8 +39,10 @@ export default function TasksPage() {
 }
 
 function TasksPageContent() {
-  const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [showPriorityPanel, setShowPriorityPanel] = useState(false);
 
   const {
@@ -102,15 +80,18 @@ function TasksPageContent() {
     handleAddComment,
     handleDeleteComment,
     handleEditComment,
+    handleReply,
     handleAddAttachment,
     handleDeleteAttachment,
     getFilteredAndSortedTasks,
-  } = useTasks(currentEmployee);
+    taskLoadError,
+    usersLoadError,
+  } = useTasks(currentUser);
 
   // react to focus query param when page loads
   const searchParams = useSearchParams();
   useEffect(() => {
-    if (!currentEmployee) return; // Wait for user to be loaded
+    if (!currentUser) return; // Wait for user to be loaded
     const focus = searchParams.get("focus");
     if (focus) {
       const id = focus; // focus is already a string from URL
@@ -119,18 +100,53 @@ function TasksPageContent() {
         loadTaskDetails(id);
       }
     }
-  }, [searchParams, currentEmployee]);
+  }, [searchParams, currentUser]);
+
+  // Listen for task deletion events from TaskerBot or other sources
+  useEffect(() => {
+    const handleTaskDeleted = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const deletedTaskId = customEvent.detail?.taskId;
+
+      if (!deletedTaskId) return;
+
+      // Remove the deleted task from the tasks list
+      setTasks((prev) => prev.filter((t) => t.id !== deletedTaskId));
+
+      // Clear task details if viewing the deleted task
+      if (selectedTaskId === deletedTaskId) {
+        setSelectedTaskId(null);
+        setTaskDetails(null);
+      }
+    };
+
+    window.addEventListener("taskDeleted", handleTaskDeleted);
+    return () => window.removeEventListener("taskDeleted", handleTaskDeleted);
+  }, [setTasks, setSelectedTaskId, setTaskDetails, selectedTaskId]);
 
   const toast = useToast();
+  const confirm = useConfirm();
 
   const handleView = (taskId: string) => {
     setSelectedTaskId(taskId);
     loadTaskDetails(taskId);
   };
 
-  const handleEdit = (taskId: string) => {
-    setSelectedTaskId(taskId);
+  const handleEdit = async (taskId: string) => {
+    // If user is task creator, admin/owner, ask for confirmation
+    const isTaskCreator = taskDetails && currentUser && currentUser.id === taskDetails.createdById;
+    const isAdminOrOwner = currentUser && (currentUser.role === "ADMIN" || currentUser.role === "OWNER");
+    
+    if (isTaskCreator || isAdminOrOwner) {
+      const confirmed = await confirm({ 
+        message: "Confirm editing this task?" 
+      });
+      if (!confirmed) return;
+    }
+    
+    setEditingTaskId(taskId);
     loadTaskDetails(taskId);
+    setShowEditModal(true);
   };
 
   const handleContain = (taskId: string) => {
@@ -139,33 +155,77 @@ function TasksPageContent() {
     toast.success("Link copied to clipboard");
   };
 
+  const [completionConfirmTaskId, setCompletionConfirmTaskId] = useState<
+    string | null
+  >(null);
+  const [revertConfirmTaskId, setRevertConfirmTaskId] = useState<string | null>(
+    null,
+  );
+  const [revertFromStatus, setRevertFromStatus] = useState<string | null>(null);
+
   const handleStatusChange = async (taskId: string, newStatus: string) => {
-    if (!currentEmployee) {
+    if (!currentUser) {
       toast.error("You must be logged in to update task status");
       return;
     }
 
-    // Show completion confirmation for completed status
-    if (
-      (newStatus === "completed" || newStatus === "done") &&
-      taskDetails &&
-      taskDetails.status !== "completed" &&
-      taskDetails.status !== "done"
-    ) {
+    // If user is task creator, admin/owner, ask for confirmation
+    const isTaskCreator = taskDetails && currentUser.id === taskDetails.createdById;
+    const isAdminOrOwner = currentUser.role === "ADMIN" || currentUser.role === "OWNER";
+    
+    if (isTaskCreator || isAdminOrOwner) {
+      const confirmed = await confirm({ 
+        message: "Confirm changing task status?" 
+      });
+      if (!confirmed) return;
+    }
+
+    const currentStatus = (taskDetails?.status || "todo").toLowerCase();
+    const isCurrentlyDone =
+      currentStatus === "done" || currentStatus === "completed";
+    const isMarkingDone =
+      newStatus.toLowerCase() === "done" ||
+      newStatus.toLowerCase() === "completed";
+    const isRevertingFromDone = isCurrentlyDone && !isMarkingDone;
+
+    // Show confirmation for marking Done
+    if (isMarkingDone && !isCurrentlyDone) {
       setCompletionConfirmTaskId(taskId);
       return;
     }
 
-    // Update status directly for non-completion status changes
+    // Show confirmation for reverting from Done
+    if (isRevertingFromDone) {
+      setRevertConfirmTaskId(taskId);
+      setRevertFromStatus(currentStatus);
+      return;
+    }
+
+    // Perform the status change
+    await updateTaskStatus(taskId, newStatus);
+  };
+
+  const updateTaskStatus = async (
+    taskId: string,
+    newStatus: string,
+    autoComment?: string,
+  ) => {
     try {
+      const body: any = { status: newStatus };
+
+      if (autoComment) {
+        body.autoComment = autoComment;
+      }
+
       const res = await fetch(`/api/task-management/${taskId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-user-id": String(currentEmployee.id),
+          "x-user-id": String(currentUser?.id),
         },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(body),
       });
+
       if (res.ok) {
         const data = await res.json();
         setTasks((prev) => prev.map((t) => (t.id === taskId ? data.task : t)));
@@ -174,11 +234,22 @@ function TasksPageContent() {
         }
         toast.success("Task status updated");
       } else {
-        const errorData = await res
-          .json()
-          .catch(() => ({ error: "Unknown error" }));
-        console.error("Status update failed:", errorData);
-        toast.error(errorData.error || "Failed to update task status");
+        let errorData;
+        try {
+          errorData = await res.json();
+        } catch (parseError) {
+          console.error("Failed to parse error response:", parseError);
+          errorData = { error: `Server error: ${res.status}` };
+        }
+        const errorMsg = errorData?.error || "Failed to update task status";
+        const details = errorData?.details ? ` (${errorData.details})` : "";
+        console.error(
+          "Status update failed:",
+          res.status,
+          errorMsg + details,
+          errorData,
+        );
+        toast.error(errorMsg);
       }
     } catch (error) {
       console.error("Failed to update status:", error);
@@ -186,16 +257,12 @@ function TasksPageContent() {
     }
   };
 
-  const [completionConfirmTaskId, setCompletionConfirmTaskId] = useState<
-    string | null
-  >(null);
-
   // Load current user from session manager
   useEffect(() => {
     const loadUser = async () => {
       const user = await getCurrentUser();
       if (user) {
-        setCurrentEmployee(user as Employee);
+        setCurrentUser(user as User);
       }
     };
     loadUser();
@@ -206,7 +273,6 @@ function TasksPageContent() {
     handleCreateTask(createdTask);
     setShowCreateModal(false);
 
-    // automatically open the newly created task for the owner
     if (createdTask?.id) {
       setSelectedTaskId(createdTask.id);
       loadTaskDetails(createdTask.id);
@@ -215,39 +281,51 @@ function TasksPageContent() {
     toast.success("Task created");
   };
 
-  // Client-side filtering/sorting is provided by the hook via getFilteredAndSortedTasks()
+  const onEditSave = (updatedTask: any) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)),
+    );
+    setShowEditModal(false);
+    setEditingTaskId(null);
 
-  // Separate tasks into self-created and assigned
+    if (selectedTaskId === updatedTask.id) {
+      loadTaskDetails(updatedTask.id);
+    }
+
+    toast.success("Task updated");
+  };
+
   const [taskFilter, setTaskFilter] = useState<"all" | "mine">("all");
 
   const groupedTasks = () => {
     const filtered = getFilteredAndSortedTasks();
 
     if (taskFilter === "mine") {
-      // only show tasks assigned to the user
       const myTasks = filtered.filter(
-        (task) => task.assignee?.id === currentEmployee?.id,
+        (task) =>
+          task.assignees?.some((a) => a.assignee?.id === currentUser?.id) ||
+          task.assignee?.id === currentUser?.id,
       );
       return { allTasks: myTasks, assignedTasks: [] };
     }
 
-    // For "all", show all tasks created by anyone
     return { allTasks: filtered, assignedTasks: [] };
   };
 
-  // compute counts independent of the filter so header buttons show correct numbers
   const filteredAll = getFilteredAndSortedTasks();
   const ownCount = filteredAll.filter(
-    (task) => task.assignee?.id === currentEmployee?.id,
+    (task) =>
+      task.assignees?.some((a) => a.assignee?.id === currentUser?.id) ||
+      task.assignee?.id === currentUser?.id,
   ).length;
 
   return (
-    <PageContainer title="TASKS">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between mt-5 mb-5">
-        <div className="ml-6 text-sm text-black/80 font-medium">
-          {currentEmployee
-            ? `Welcome back, ${currentEmployee.name || currentEmployee.email}! Here's your task list.`
+    <PageContainer title="Tasks">
+      {/* Toolbar – compact, matches dashboard cards */}
+      <div className="flex items-center justify-between mt-4 mb-4 px-2">
+        <div className="text-sm text-gray-700 font-medium">
+          {currentUser
+            ? `Welcome back, ${currentUser.name || currentUser.email}! Here's your task list.`
             : "Your Tasks"}
         </div>
         <div className="flex items-center gap-3">
@@ -256,14 +334,23 @@ function TasksPageContent() {
             placeholder="Search tasks..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-blue-100/30 backdrop-blur-md border border-black/10 text-black/80 placeholder-black/40 px-3 py-2 rounded-sm text-sm w-72"
+            className="
+              px-3 py-2 rounded-lg bg-white border border-gray-200
+              text-gray-700 text-sm placeholder-gray-400 outline-none
+              focus:border-blue-300 focus:ring-1 focus:ring-blue-300/50
+              shadow-sm w-64
+            "
           />
           <div className="flex items-center gap-2">
-            <label className="text-sm text-black/60">Sort by</label>
+            <label className="text-sm text-gray-600">Sort by</label>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="bg-blue-100/30 backdrop-blur-md border border-black/10 text-black/80 px-3 py-2 rounded-sm text-sm"
+              className="
+                px-3 py-2 rounded-lg bg-white border border-gray-200
+                text-gray-700 text-sm focus:outline-none focus:ring-1 focus:ring-blue-300/50
+                shadow-sm
+              "
             >
               <option value="task">Task</option>
               <option value="assignee">Assignee</option>
@@ -273,22 +360,23 @@ function TasksPageContent() {
             </select>
             <button
               onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-              className="bg-blue-100/30 backdrop-blur-md border border-black/10 text-black/80 px-3 py-2 rounded-sm text-xs hover:bg-blue-100/50 transition-colors"
+              className="
+                px-3 py-2 rounded-lg bg-white border border-gray-200
+                text-gray-700 text-xs hover:bg-gray-50 transition-colors
+                shadow-sm
+              "
               title="Toggle sort direction"
             >
               {sortOrder === "asc" ? "Asc" : "Desc"}
             </button>
           </div>
           <button
-            onClick={() => setShowPriorityPanel(true)}
-            className="flex items-center gap-1 px-4 py-2 rounded-sm bg-purple-600/50 text-white text-xs font-semibold hover:bg-purple-600/70 transition-colors border border-purple-400/30"
-          >
-            <TrendingUp size={16} />
-            <span>Optimize</span>
-          </button>
-          <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-1 px-4 py-2 rounded-sm bg-blue-600 text-white text-xs hover:bg-blue-700 transition-colors border border-blue-400/30"
+            className="
+              flex items-center gap-1.5 px-4 py-2 rounded-lg
+              bg-blue-600 text-white text-sm font-medium
+              hover:bg-blue-700 transition-colors shadow-sm
+            "
           >
             <Plus size={16} />
             <span>New task</span>
@@ -297,112 +385,98 @@ function TasksPageContent() {
       </div>
 
       {/* Tasks View */}
-      <PageContentCon className="h-[calc(100vh-120px)] overflow-y-auto">
-        {/* Filter Tabs */}
-        <div className="sticky top-0 z-10 bg-transparent p-0 mb-3">
-          <div className="flex items-center gap-2">
+      <PageContentCon className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        {/* Error Display */}
+        {(taskLoadError || usersLoadError) && (
+          <div className="m-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-700 font-medium">
+              ⚠️ Error loading data:
+            </p>
+            {taskLoadError && (
+              <p className="text-sm text-red-600 mt-1">
+                Tasks: {taskLoadError}
+              </p>
+            )}
+            {usersLoadError && (
+              <p className="text-sm text-red-600 mt-1">
+                Users: {usersLoadError}
+              </p>
+            )}
             <button
-              onClick={() => setTaskFilter("all")}
-              className={`px-6 py-2 rounded-sm text-xs font-medium cursor-pointer transition-all duration-200 ${
-                taskFilter === "all"
-                  ? "bg-blue-100 backdrop-blur-md border border-black/20 text-black/80"
-                  : "bg-blue-100/30 backdrop-blur-md border border-black/10 text-black/60 hover:bg-blue-100/50 hover:border-black/20"
-              }`}
+              onClick={() => window.location.reload()}
+              className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm transition-colors"
             >
-              Team's Tasks
-            </button>
-            <button
-              onClick={() => setTaskFilter("mine")}
-              className={`px-6 py-2 rounded-sm text-xs font-medium cursor-pointer transition-all duration-200 ${
-                taskFilter === "mine"
-                  ? "bg-blue-100 backdrop-blur-md border border-black/20 text-black/80"
-                  : "bg-blue-100/30 backdrop-blur-md border border-black/10 text-black/60 hover:bg-blue-100/50 hover:border-black/20"
-              }`}
-            >
-              Your Tasks ({ownCount})
+              Retry
             </button>
           </div>
-        </div>
-        <div className="bg-blue-100 backdrop-blur-md rounded-sm border border-black/10 overflow-hidden transition-all duration-200 hover:border-black/50">
-          <table className="w-full border-collapse text-sm">
-            <thead className="bg-blue-200/50 sticky top-0">
-              <tr className="border-b border-black/10">
-                <th className="px-4 py-3 text-left font-semibold text-black/80">
-                  Task
-                </th>
-                <th className="px-4 py-3 text-left font-semibold text-black/80 min-w-[150px]">
-                  Assignee
-                </th>
-                <th className="px-4 py-3 text-center font-semibold text-black/80 min-w-[80px]">
-                  Status
-                </th>
-                <th className="px-4 py-3 text-center font-semibold text-black/80 min-w-[100px]">
-                  Attachment
-                </th>
-                <th className="px-4 py-3 text-center font-semibold text-black/80 min-w-[100px]">
-                  Comment
-                </th>
-                <th className="px-4 py-3 text-center font-semibold text-black/80 min-w-[80px]">
-                  Priority
-                </th>
-                <th className="px-4 py-3 text-center font-semibold text-black/80 min-w-[120px]">
-                  Due Date
-                </th>
-                <th className="px-4 py-3 text-center font-semibold text-black/80 min-w-[80px]">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {getFilteredAndSortedTasks().length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-10 text-center text-black">
-                    {tasks.length === 0 ? "No tasks yet" : "No matching tasks"}
-                  </td>
-                </tr>
-              ) : (
-                <>
-                  {/* All tasks when not filtered */}
-                  {taskFilter === "all" &&
-                    groupedTasks().allTasks.length > 0 && (
-                      <>
-                        {groupedTasks().allTasks.map((task: Task) => (
-                          <TaskRow
-                            key={task.id}
-                            task={task}
-                            currentUserId={currentEmployee?.id}
-                            onEdit={handleEdit}
-                            onContain={handleContain}
-                            onOpenDetails={handleView}
-                            onDelete={handleDeleteTask}
-                            onStatusChange={handleStatusChange}
-                          />
-                        ))}
-                      </>
-                    )}
+        )}
 
-                  {/* My assigned tasks when filtered */}
-                  {taskFilter === "mine" &&
-                    groupedTasks().allTasks.length > 0 && (
-                      <>
-                        {groupedTasks().allTasks.map((task: Task) => (
-                          <TaskRow
-                            key={task.id}
-                            task={task}
-                            currentUserId={currentEmployee?.id}
-                            onEdit={handleEdit}
-                            onContain={handleContain}
-                            onOpenDetails={handleView}
-                            onDelete={handleDeleteTask}
-                            onStatusChange={handleStatusChange}
-                          />
-                        ))}
-                      </>
-                    )}
-                </>
-              )}
-            </tbody>
-          </table>
+        {/* User Not Loaded Display */}
+        {!taskLoadError && !usersLoadError && !currentUser && (
+          <div className="m-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-sm text-yellow-700 font-medium">
+              ⏳ Loading user session...
+            </p>
+          </div>
+        )}
+
+        {/* Filter Tabs */}
+        <div className="flex items-center gap-2 px-4 pt-4">
+          <button
+            onClick={() => setTaskFilter("all")}
+            className={`
+              px-5 py-2 rounded-lg text-sm font-medium transition-all
+              ${
+                taskFilter === "all"
+                  ? "bg-blue-100 text-blue-800 border border-blue-200 shadow-sm"
+                  : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200"
+              }
+            `}
+          >
+            Team's Tasks ({tasks.length})
+          </button>
+          <button
+            onClick={() => setTaskFilter("mine")}
+            className={`
+              px-5 py-2 rounded-lg text-sm font-medium transition-all
+              ${
+                taskFilter === "mine"
+                  ? "bg-blue-100 text-blue-800 border border-blue-200 shadow-sm"
+                  : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200"
+              }
+            `}
+          >
+            Your Tasks ({ownCount})
+          </button>
+        </div>
+
+        {/* Task Groups Display */}
+        <div className="flex-1 px-4 py-3 overflow-auto flex flex-col gap-4">
+          {/* Do This First Section - Always show if component is ready */}
+          {currentUser && (
+            <div className="max-h-44">
+              <TaskSummary
+                tasks={getFilteredAndSortedTasks()}
+                currentUser={currentUser}
+                userRole={currentUser.role as "ADMIN" | "OWNER" | "EMPLOYEE" | undefined}
+                filterMode={taskFilter === "mine" ? "my-tasks" : "team-tasks"}
+              />
+            </div>
+          )}
+
+          {/* Task List */}
+          <div className="flex-1 overflow-auto">
+            <TaskGroupedDisplay
+              tasks={getFilteredAndSortedTasks()}
+              currentUser={currentUser}
+              filterByAssignee={taskFilter === "mine"}
+              onEdit={handleEdit}
+              onView={handleView}
+              onDelete={handleDeleteTask}
+              onStatusChange={handleStatusChange}
+              onContain={handleContain}
+            />
+          </div>
         </div>
       </PageContentCon>
 
@@ -410,7 +484,7 @@ function TasksPageContent() {
       {selectedTaskId && taskDetails && (
         <TaskDetailsPanel
           taskDetails={taskDetails}
-          currentEmployee={currentEmployee}
+          currentEmployee={currentUser}
           users={users}
           onClose={() => setSelectedTaskId(null)}
           comments={comments}
@@ -418,18 +492,20 @@ function TasksPageContent() {
           setNewComment={setNewComment}
           handleAddComment={handleAddComment}
           handleDeleteComment={handleDeleteComment}
+          handleReply={handleReply}
+          handleStatusChange={handleStatusChange}
           attachments={attachments}
         />
       )}
 
       {/* Completion Confirmation Modal */}
       {completionConfirmTaskId !== null && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center rounded-sm z-50">
-          <div className="bg-blue-100/95 backdrop-blur-lg border border-black/20 rounded-sm p-6 max-w-sm mx-4">
-            <h3 className="text-lg font-semibold text-black/80 mb-2">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-96 shadow-xl border border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900 mb-3">
               Task Completion
             </h3>
-            <p className="text-sm text-black/60 mb-4">
+            <p className="text-sm text-gray-600 mb-6">
               Are you sure you're done with this task? Once marked as completed,
               the task will be moved to your Analytics page's Completed Tasks
               section. You can undo this action there if needed.
@@ -437,36 +513,60 @@ function TasksPageContent() {
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setCompletionConfirmTaskId(null)}
-                className="px-4 py-2 rounded-sm bg-blue-100/50 border border-black/10 text-black/80 hover:bg-blue-100/70 transition-colors font-medium"
+                className="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={async () => {
-                  try {
-                    const res = await fetch(
-                      `/api/task-management/${completionConfirmTaskId}`,
-                      {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ status: "completed" }),
-                      },
-                    );
-                    if (res.ok) {
-                      setCompletionConfirmTaskId(null);
-                      loadTaskDetails(completionConfirmTaskId);
-                      toast.success(
-                        "Task marked as completed! Check Analytics > Completed Tasks.",
-                      );
-                    }
-                  } catch (error) {
-                    console.error("Failed to complete task:", error);
-                    toast.error("Failed to complete task");
-                  }
+                  const comment = `Status changed to Done by ${currentUser?.name || currentUser?.email || "System"}`;
+                  await updateTaskStatus(
+                    completionConfirmTaskId!,
+                    "done",
+                    comment,
+                  );
+                  setCompletionConfirmTaskId(null);
                 }}
-                className="px-4 py-2 rounded-sm bg-green-600 text-white hover:bg-green-700 transition-colors font-medium"
+                className="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
               >
-                Mark as Completed
+                Mark as Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Revert From Done Confirmation Modal */}
+      {revertConfirmTaskId !== null && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-96 shadow-xl border border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900 mb-3">
+              Reopen Task
+            </h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Reopen this task? It will move back to To Do. This is reversible
+              anytime.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setRevertConfirmTaskId(null);
+                  setRevertFromStatus(null);
+                }}
+                className="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  const comment = `Reverted to To Do from ${revertFromStatus} by ${currentUser?.name || currentUser?.email || "System"}`;
+                  await updateTaskStatus(revertConfirmTaskId!, "todo", comment);
+                  setRevertConfirmTaskId(null);
+                  setRevertFromStatus(null);
+                }}
+                className="px-5 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+              >
+                Reopen Task
               </button>
             </div>
           </div>
@@ -484,9 +584,23 @@ function TasksPageContent() {
       {showCreateModal && (
         <CreateTaskModal
           users={users}
-          currentEmployee={currentEmployee}
+          currentEmployee={currentUser}
           onClose={() => setShowCreateModal(false)}
           onCreate={onCreate}
+        />
+      )}
+
+      {/* Edit Task Modal */}
+      {showEditModal && taskDetails && (
+        <CreateTaskModal
+          users={users}
+          currentEmployee={currentUser}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingTaskId(null);
+          }}
+          onCreate={onEditSave}
+          editingTask={taskDetails}
         />
       )}
     </PageContainer>

@@ -1,22 +1,23 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { formatDistanceToNow } from "date-fns";
+import { useRouter } from "next/navigation";
 import { getCurrentUser } from "@/utils/sessionManager";
 import { useAuthProtection } from "@/app/hooks/useAuthProtection";
 import { PageContainer } from "@/app/components/page-layouts/MainPageContainerLayoutComponent";
 import { PageContentCon } from "@/app/components/page-layouts/PageContentWrapperContainerComponent";
-import { AlertCircle } from "lucide-react";
+import { LogsManagementComponent } from "@/app/components/logs-components/LogsManagementComponent";
+import { AlertCircle, Lock } from "lucide-react";
 
 interface Log {
   id: number;
-  taskId: number | null;
-  userId: number;
+  taskId?: string | null;
+  userId: string;
   action: string;
-  data: any;
+  data?: any;
   createdAt: string;
   user: {
-    id: number;
+    id: string;
     firstName: string;
     lastName: string;
     email: string;
@@ -25,10 +26,11 @@ interface Log {
 
 export default function LogsPage() {
   useAuthProtection(); // Protect this route
+  const router = useRouter();
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const [hasAccess, setHasAccess] = useState(true);
 
   useEffect(() => {
     fetchUserAndLogs();
@@ -43,7 +45,14 @@ export default function LogsPage() {
         return;
       }
 
-      setUserRole(user.role || "EMPLOYEE");
+      // Authorization check - only ADMIN and OWNER can access logs
+      const authorizedRoles = ["ADMIN", "OWNER"];
+      if (user.role && !authorizedRoles.includes(user.role)) {
+        setHasAccess(false);
+        setLoading(false);
+        return;
+      }
+
       fetchLogs(user.id);
     } catch (err) {
       setError("Failed to authenticate");
@@ -51,7 +60,7 @@ export default function LogsPage() {
     }
   };
 
-  const fetchLogs = async (userId: number) => {
+  const fetchLogs = async (userId: string) => {
     try {
       const response = await fetch("/api/activity-logging", {
         method: "GET",
@@ -77,72 +86,59 @@ export default function LogsPage() {
 
   if (loading) {
     return (
-      <div className="p-8 text-center bg-white/10 min-h-screen">
-        <p className="text-black/62">Loading activity logs...</p>
+      <PageContainer title="ACTIVITY LOGS">
+        <PageContentCon>
+          <div className="p-8 text-center">
+            <p className="text-black/60 text-sm">Loading activity logs...</p>
+          </div>
+        </PageContentCon>
+      </PageContainer>
+    );
+  }
+
+  // Access denied for non-admin users
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen bg-transparent flex items-center justify-center p-5">
+        <div className="max-w-xs text-center bg-red-500/10 border border-red-500/30 rounded-lg p-10 flex flex-col items-center gap-4">
+          <Lock size={48} className="text-red-400" />
+          <h2 className="m-0 text-xl font-semibold text-black/62">
+            Access Denied
+          </h2>
+          <p className="m-0 text-sm text-black/60 leading-relaxed">
+            Activity Logs are restricted to admins and above.
+          </p>
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="mt-4 px-5 py-2 bg-blue-600 text-white rounded-md cursor-pointer text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            Return to Dashboard
+          </button>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-8 bg-red-500/10 border border-red-500/20 rounded-lg">
-        <div className="flex items-center gap-3 text-red-600">
-          <AlertCircle size={24} />
-          <p className="text-lg font-normal">{error}</p>
-        </div>
-      </div>
+      <PageContainer title="ACTIVITY LOGS">
+        <PageContentCon>
+          <div className="p-8 bg-red-100/50 border border-red-300/30 rounded-sm">
+            <div className="flex items-center gap-3 text-red-700">
+              <AlertCircle size={24} />
+              <p className="text-sm font-semibold">{error}</p>
+            </div>
+          </div>
+        </PageContentCon>
+      </PageContainer>
     );
   }
 
   return (
     <PageContainer title="ACTIVITY LOGS">
-      {logs.length === 0 ? (
-        <div className="bg-white/10 border border-white/20 rounded-lg p-8 text-center">
-          <AlertCircle size={40} className="mx-auto text-black/62 mb-3" />
-          <p className="text-black/62">No activity logs yet</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {logs.map((log) => (
-            <div
-              key={log.id}
-              className="border border-white/10 rounded-lg p-4 hover:bg-white/5 transition-colors"
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <h3 className="font-normal text-black/62">{log.action}</h3>
-                  <p className="text-sm text-black/62">
-                    By {log.user.firstName} {log.user.lastName} (
-                    {log.user.email})
-                  </p>
-                </div>
-                <span className="text-xs text-black/62 whitespace-nowrap">
-                  {formatDistanceToNow(new Date(log.createdAt), {
-                    addSuffix: true,
-                  })}
-                </span>
-              </div>
-
-              {log.taskId && (
-                <p className="text-sm text-blue-600 mb-2">
-                  Task ID: {log.taskId}
-                </p>
-              )}
-
-              {log.data && (
-                <details className="text-xs text-black/62 mt-2">
-                  <summary className="cursor-pointer hover:text-black/62">
-                    View Details
-                  </summary>
-                  <pre className="mt-2 p-2 bg-white/10 rounded text-xs overflow-auto text-black/62">
-                    {JSON.stringify(log.data, null, 2)}
-                  </pre>
-                </details>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      <PageContentCon>
+        <LogsManagementComponent logs={logs} loading={false} />
+      </PageContentCon>
     </PageContainer>
   );
 }

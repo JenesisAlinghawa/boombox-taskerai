@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 import { getCurrentUser } from "@/utils/sessionManager";
 
 interface Channel {
-  id: number;
+  id: string;
   name: string;
   description?: string;
 }
 
 interface Props {
-  onSelectChannel: (channelId: number) => void;
+  onSelectChannel: (channelId: string) => void;
 }
 
 export default function ChannelsList({ onSelectChannel }: Props) {

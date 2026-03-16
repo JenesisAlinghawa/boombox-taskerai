@@ -30,7 +30,7 @@ export async function POST(
       );
     }
 
-    const userId = parseInt(id, 10);
+    const userId = id;
 
     // Prevent denying the OWNER
     const targetUser = await prisma.user.findUnique({

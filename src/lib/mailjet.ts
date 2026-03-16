@@ -20,7 +20,7 @@ function getTransporter() {
 
 export async function sendEmail(to: string, subject: string, html: string, text?: string) {
   if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
-    console.error('❌ Email sending failed: Gmail credentials not configured');
+    console.error(' Email sending failed: Gmail credentials not configured');
     console.error('   GMAIL_USER:', GMAIL_USER ? '✓ Set' : '✗ Missing');
     console.error('   GMAIL_APP_PASSWORD:', GMAIL_APP_PASSWORD ? '✓ Set' : '✗ Missing');
     throw new Error('Email service is not configured. Please contact support.');
@@ -39,7 +39,7 @@ export async function sendEmail(to: string, subject: string, html: string, text?
     console.log('✓ Email sent successfully to:', to);
     return res;
   } catch (err: any) {
-    console.error('❌ Gmail send error details:', {
+    console.error('Gmail send error details:', {
       message: err.message,
       code: err.code,
       response: err.response,

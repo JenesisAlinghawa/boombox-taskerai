@@ -13,17 +13,41 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const numUserId = parseInt(userId);
+    // Get user role to determine filtering
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    // Build query filter based on role
+    let taskFilter: any;
+    
+    if (user.role === "ADMIN" || user.role === "OWNER") {
+      // Admins and Owners see all tasks
+      taskFilter = {};
+    } else {
+      // Employees only see tasks they created or are assigned to
+      taskFilter = {
+        OR: [
+          { createdById: userId },
+          { assignees: { some: { assigneeId: userId } } },
+        ],
+      };
+    }
+
+    // userId is now a UUID string
     const now = new Date();
 
-    // Get all tasks for the user
+    // Get all tasks for the user with role-based filtering
     const tasks = await prisma.task.findMany({
-      where: {
-        OR: [
-          { createdById: numUserId },
-          { assigneeId: numUserId },
-        ],
-      },
+      where: taskFilter,
       select: {
         id: true,
         status: true,

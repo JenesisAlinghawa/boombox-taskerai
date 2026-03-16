@@ -2,78 +2,25 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import {
-  AlertCircle,
-  Lock,
-  Network,
-  Sparkles,
-  TrendingUp,
-  Zap,
-  CheckCircle,
-  Clock,
-  Paperclip,
-  MessageSquare,
-  Plus,
-} from "lucide-react";
-import {
-  ToastProvider,
-  useToast,
-} from "@/app/components/providers-popups/ToastNotificationProviderComponent";
-import TaskStatusChart from "@/app/components/analytics-charts/TaskStatusDistributionChartComponent";
-import StatusCard from "@/app/components/dashboard/TaskStatusSummaryCardsComponent";
-import WeeklyProgressChart from "@/app/components/dashboard/WeeklyTaskTrendLineChartComponent";
-import TaskSummary from "@/app/components/dashboard/TaskSummaryOverviewComponent";
+import { Lock, TrendingUp, Brain } from "lucide-react";
+import { ToastProvider } from "@/app/components/providers-popups/ToastNotificationProviderComponent";
+import { AnalyticsStatusCards } from "@/app/components/analytics/AnalyticsStatusCardsComponent";
+import { AnalyticsTaskExecutionSummary } from "@/app/components/analytics/AnalyticsTaskExecutionSummaryPieChartComponent";
+import { AnalyticsOverallWeeklyChart } from "@/app/components/analytics/AnalyticsOverallWeeklyChartComponent";
+import { NaturalLanguageAutomatedInsights } from "@/app/components/analytics/NaturalLanguageAutomatedInsightsComponent";
 import { getCurrentUser } from "@/utils/sessionManager";
 import { useAuthProtection } from "@/app/hooks/useAuthProtection";
 import { PageContainer } from "@/app/components/page-layouts/MainPageContainerLayoutComponent";
-import { PageContentCon } from "@/app/components/page-layouts/PageContentWrapperContainerComponent";
-import {
-  buildTaskGraph,
-  findCriticalPath,
-  formatPath,
-  hasCircularDependencies,
-  type TaskNode as DijkstraTaskNode,
-} from "@/utils/dijkstra";
-
-const COLORS = {
-  bg: "bg-transparent",
-  cardBg: "bg-blue-400/10",
-  text: "text-white/62",
-  muted: "text-white/40",
-  success: "#10b981",
-  warning: "#f59e0b",
-  error: "#ef4444",
-  info: "#3b82f6",
-  shadow: "#E1F1FD",
-  primary: "#5d8bb1",
-  inProgress: "#3b82f6",
-  done: "#10b981",
-  stuck: "#ef4444",
-  pending: "#f59e0b",
-};
-
-interface Recommendation {
-  title: string;
-  description: string;
-  impact: "high" | "medium" | "low";
-  icon: string;
-}
-
-interface Trend {
-  text: string;
-  icon: string;
-}
+import { TeamWorkloadCard } from "@/app/components/analytics/TeamWorkloadCardComponent";
+import { DeadlineRiskCard } from "@/app/components/analytics/DeadlineRiskCardComponent";
 
 interface AnalyticsData {
   totalTasks: number;
   completedTasks: number;
   completionRate: number;
-  avgTasksPerMember: number;
   overdueTasks: number;
-  onTrackTasks: number;
-  recommendations: Recommendation[];
-  trends: (Trend | string)[];
-  performanceSummary?: string;
+  inProgressTasks: number;
+  pendingTasks: number;
 }
 
 export default function AnalyticsPage() {
@@ -86,52 +33,28 @@ export default function AnalyticsPage() {
 
 function AnalyticsPageContent() {
   const router = useRouter();
-  useAuthProtection(); // Protect this route
-  const toast = useToast();
+  useAuthProtection();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [taskStatusCounts, setTaskStatusCounts] = useState({
-    inProgress: 0,
-    stuck: 0,
-    done: 0,
-  });
-  const [aiRecommendations, setAiRecommendations] = useState<Recommendation[]>(
-    [],
-  );
-  const [aiTrends, setAiTrends] = useState<(Trend | string)[]>([]);
-  const [hoveredSegment, setHoveredSegment] = useState<string | null>(null);
-  const [criticalPath, setCriticalPath] = useState<string | null>(null);
-  const [dijkstraError, setDijkstraError] = useState<string | null>(null);
-  const [weeklyData, setWeeklyData] = useState({
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-    inProgress: [0, 0, 0, 0, 0, 0, 0],
-    completed: [0, 0, 0, 0, 0, 0, 0],
-    overdue: [0, 0, 0, 0, 0, 0, 0],
-  });
-  const [completedTasksHistory, setCompletedTasksHistory] = useState<any[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<"completed" | "created" | "name">(
-    "completed",
-  );
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [visibleCount, setVisibleCount] = useState<number>(10);
-  const [deleteModalTaskId, setDeleteModalTaskId] = useState<number | null>(
-    null,
-  );
-  const [deleteModalTaskTitle, setDeleteModalTaskTitle] = useState("");
-  const [menuOpenTaskId, setMenuOpenTaskId] = useState<number | null>(null);
-
-  const isOwner = (task: any) =>
-    currentUser && task && task.createdById === currentUser.id;
-
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [historyData, setHistoryData] = useState<
+    Array<{
+      date: string;
+      completed: number;
+      inProgress: number;
+      overdue: number;
+    }>
+  >([]);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [teamWorkload, setTeamWorkload] = useState<any[]>([]);
+  const [atRiskTasks, setAtRiskTasks] = useState<any[]>([]);
   useEffect(() => {
     const loadUser = async () => {
       try {
         const user = await getCurrentUser();
         if (user) {
           setCurrentUser(user);
-          // Analytics restricted to MANAGER+ to prevent EMPLOYEE users from viewing team metrics
         }
       } catch (error) {
         console.error("Failed to load user:", error);
@@ -140,270 +63,287 @@ function AnalyticsPageContent() {
     loadUser();
   }, []);
 
+  // Fetch analytics data
   useEffect(() => {
     if (!currentUser) return;
 
     const fetchAnalytics = async () => {
       try {
-        // Fetch all tasks
+        setAnalyticsError(null);
         const tasksRes = await fetch("/api/task-management", {
           headers: { "x-user-id": String(currentUser.id) },
         });
+        if (!tasksRes.ok) {
+          throw new Error("Failed to fetch tasks");
+        }
         const tasksData = await tasksRes.json();
         const tasks = Array.isArray(tasksData?.tasks) ? tasksData.tasks : [];
 
-        // Fetch team for member count
-        const teamRes = await fetch("/api/team-management", {
-          headers: { "x-user-id": String(currentUser.id) },
-        });
-        const teamData = await teamRes.json();
-        const members = teamData?.team?.members || [];
+        // Calculate metrics - align with TaskGroupedDisplay logic
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
 
-        // Calculate metrics
         const totalTasks = tasks.length;
-        const completedTasks = tasks.filter(
-          (t: any) => t.status === "completed" || t.status === "done",
-        ).length;
+
+        // Helper function to normalize status
+        const normalizeStatus = (status: any): string => {
+          if (!status) return "todo";
+          return String(status).toLowerCase().replace(/\s+/g, "");
+        };
+
+        // Categorize tasks by status using the same logic as TaskGroupedDisplay
+        const completedTasks = tasks.filter((t: any) => {
+          const status = normalizeStatus(t.status);
+          return status === "completed" || status === "done";
+        }).length;
+
+        const inProgressTasks = tasks.filter((t: any) => {
+          const status = normalizeStatus(t.status);
+          return status === "inprogress" || status === "in_progress";
+        }).length;
+
+        const stuckTasks = tasks.filter((t: any) => {
+          const status = normalizeStatus(t.status);
+          return status === "stuck";
+        }).length;
+
+        const todoTasks = tasks.filter((t: any) => {
+          const status = normalizeStatus(t.status);
+          return status === "todo";
+        }).length;
+
+        // Pending: all incomplete tasks (not completed)
+        const pendingTasks = totalTasks - completedTasks;
+
+        // Overdue: not completed AND past due date
+        const overdueTasks = tasks.filter((t: any) => {
+          const status = normalizeStatus(t.status);
+          const isDone = status === "completed" || status === "done";
+          if (isDone) return false; // Completed tasks can't be overdue
+          if (!t.dueDate) return false;
+
+          const dueDate = new Date(t.dueDate);
+          dueDate.setHours(0, 0, 0, 0);
+          return dueDate < now;
+        }).length;
+
         const completionRate =
           totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-        const overdueTasks = tasks.filter(
-          (t: any) =>
-            t.status !== "completed" &&
-            t.dueDate &&
-            new Date(t.dueDate) < new Date(),
-        ).length;
-        const onTrackTasks = totalTasks - overdueTasks - completedTasks;
-        const avgTasksPerMember =
-          members.length > 0 ? Math.round(totalTasks / members.length) : 0;
 
-        // Calculate task status distribution
-        const inProgressCount = tasks.filter(
-          (t: any) => t.status === "in-progress" || t.status === "inprogress",
-        ).length;
-        const stuckCount = tasks.filter(
-          (t: any) => t.status === "stuck",
-        ).length;
-        const doneCount = tasks.filter(
-          (t: any) => t.status === "completed" || t.status === "done",
-        ).length;
+        // Calculate historical data
+        const dateMap = new Map<
+          string,
+          { completed: number; inProgress: number; overdue: number }
+        >();
 
-        setTaskStatusCounts({
-          inProgress: inProgressCount,
-          stuck: stuckCount,
-          done: doneCount,
-        });
-
-        // Calculate optimal task path using Dijkstra's algorithm
-        try {
-          // Only process tasks that have a duration and potential dependencies
-          const validTasks = tasks.map((task: any) => ({
-            id: task.id,
-            title: task.title,
-            duration: task.dueDate
-              ? Math.max(
-                  1,
-                  Math.ceil(
-                    (new Date(task.dueDate).getTime() - new Date().getTime()) /
-                      (1000 * 60 * 60 * 24),
-                  ),
-                )
-              : 1, // Default 1 day if no due date
-            priority: task.priority || "medium",
-            dependencies: [], // Placeholder for future dependency support
-          }));
-
-          if (validTasks.length > 0) {
-            const graph = buildTaskGraph(validTasks as DijkstraTaskNode[]);
-
-            // Check for circular dependencies
-            if (hasCircularDependencies(graph)) {
-              setDijkstraError("Circular dependency detected in task graph");
-              setCriticalPath(null);
-            } else {
-              // Calculate critical path
-              const criticalResult = findCriticalPath(graph);
-              const pathString = formatPath(criticalResult);
-              setCriticalPath(pathString);
-              setDijkstraError(null);
-            }
-          }
-        } catch (dijkstraErr: any) {
-          console.warn(
-            "Failed to calculate optimal path:",
-            dijkstraErr.message,
-          );
-          setDijkstraError(dijkstraErr.message || "Failed to calculate path");
-          setCriticalPath(null);
-        }
-
-        // Fetch AI-driven recommendations from Gemini
-        let localAiRecommendations: Recommendation[] = [];
-        let localAiTrends: (Trend | string)[] = [];
-        let performanceSummary = "";
-
-        try {
-          const aiRes = await fetch("/api/analytics-reports/ai", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              tasks,
-              members,
-              totalTasks,
-              completedTasks,
-              completionRate,
-              overdueTasks,
-              avgTasksPerMember,
-            }),
-          });
-
-          if (aiRes.ok) {
-            const aiData = await aiRes.json();
-            localAiRecommendations = aiData.recommendations || [];
-            localAiTrends = aiData.trends || [];
-            performanceSummary = aiData.performanceSummary || "";
-          }
-        } catch (aiError) {
-          console.warn("Failed to fetch AI analytics, using fallback", aiError);
-          // Fallback to rule-based recommendations if API fails
-          localAiRecommendations = generateRecommendations(
-            completionRate,
-            overdueTasks,
-            totalTasks,
-            completedTasks,
-            members.length,
-          );
-          localAiTrends = generateTrends(completionRate, overdueTasks, tasks);
-          performanceSummary = generatePerformanceSummary(
-            completionRate,
-            overdueTasks,
-            totalTasks,
-            completedTasks,
-            members.length,
-            avgTasksPerMember,
-          );
-        }
-
-        setAiRecommendations(
-          localAiRecommendations.length > 0
-            ? localAiRecommendations
-            : generateRecommendations(
-                completionRate,
-                overdueTasks,
-                totalTasks,
-                completedTasks,
-                members.length,
-              ),
-        );
-        setAiTrends(
-          localAiTrends.length > 0
-            ? localAiTrends
-            : generateTrends(completionRate, overdueTasks, tasks),
-        );
-
-        // Calculate weekly data
-        const weekDataLabels = [
-          "Mon",
-          "Tue",
-          "Wed",
-          "Thu",
-          "Fri",
-          "Sat",
-          "Sun",
-        ];
-        const weekInProgress = [0, 0, 0, 0, 0, 0, 0];
-        const weekCompleted = [0, 0, 0, 0, 0, 0, 0];
-        const weekOverdue = [0, 0, 0, 0, 0, 0, 0];
+        // Get date range from tasks
+        let earliestDate = new Date();
+        let latestDate = new Date();
 
         tasks.forEach((task: any) => {
-          if (task.dueDate) {
-            const dayOfWeek = new Date(task.dueDate).getDay();
-            const dayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-            if (dayIndex >= 0 && dayIndex < 7) {
-              if (task.status === "completed" || task.status === "done") {
-                weekCompleted[dayIndex]++;
-              } else if (
-                task.status === "in-progress" ||
-                task.status === "inprogress"
-              ) {
-                weekInProgress[dayIndex]++;
-              } else if (
-                task.status !== "completed" &&
-                new Date(task.dueDate) < new Date()
-              ) {
-                weekOverdue[dayIndex]++;
-              }
-            }
+          if (task.createdDate) {
+            const taskDate = new Date(task.createdDate);
+            if (taskDate < earliestDate) earliestDate = taskDate;
+            if (taskDate > latestDate) latestDate = taskDate;
+          }
+          if (task.completedDate) {
+            const completeDate = new Date(task.completedDate);
+            if (completeDate > latestDate) latestDate = completeDate;
           }
         });
 
-        setWeeklyData({
-          labels: weekDataLabels,
-          inProgress: weekInProgress,
-          completed: weekCompleted,
-          overdue: weekOverdue,
+        // Generate all dates from earliest to latest
+        const currentDate = new Date(earliestDate);
+        while (currentDate <= latestDate) {
+          const dateStr = currentDate.toISOString().split("T")[0];
+          dateMap.set(dateStr, { completed: 0, inProgress: 0, overdue: 0 });
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        // Count tasks by status on each date - align with TaskGroupedDisplay logic
+        dateMap.forEach((stats, dateStr) => {
+          const checkDate = new Date(dateStr + "T00:00:00");
+          checkDate.setHours(0, 0, 0, 0);
+
+          tasks.forEach((task: any) => {
+            const status = normalizeStatus(task.status);
+            const isCompleted = status === "completed" || status === "done";
+            const isInProgress =
+              status === "inprogress" || status === "in_progress";
+            const createdDate = task.createdAt
+              ? new Date(task.createdAt)
+              : null;
+            const updatedDate = task.updatedAt
+              ? new Date(task.updatedAt)
+              : null;
+            const dueDate = task.dueDate ? new Date(task.dueDate) : null;
+
+            // Task must exist by this date
+            if (!createdDate) return;
+            createdDate.setHours(0, 0, 0, 0);
+            if (createdDate > checkDate) return;
+
+            // Only count completed tasks if they were completed on or before this date
+            if (isCompleted) {
+              // Only show completed on the date it was marked as completed
+              if (updatedDate) {
+                const completedDateStr = new Date(updatedDate);
+                completedDateStr.setHours(0, 0, 0, 0);
+                if (dateStr === completedDateStr.toISOString().split("T")[0]) {
+                  stats.completed++;
+                }
+              }
+              return;
+            }
+
+            // For non-completed tasks, check if overdue on this date
+            if (dueDate) {
+              const dueDateCheck = new Date(dueDate);
+              dueDateCheck.setHours(0, 0, 0, 0);
+              if (dueDateCheck < checkDate) {
+                // Task is past its due date on this historical date
+                stats.overdue++;
+                return;
+              }
+            }
+
+            // Task is active (in-progress or todo/stuck) and not overdue
+            if (isInProgress) {
+              stats.inProgress++;
+            }
+          });
         });
 
-        // Extract completed tasks history with metadata
-        const completedHistory = tasks
-          .filter((t: any) => t.status === "completed" || t.status === "done")
-          .map((t: any) => ({
-            id: t.id,
-            title: t.title,
-            completedDate: t.completedDate || t.updatedAt,
-            createdDate: t.createdDate || t.createdAt,
-            dueDate: t.dueDate,
-            assignedBy: t.assignedBy?.name || t.assignedBy || "Unknown",
-            status: t.status,
-            attachments: Array.isArray(t.attachments) ? t.attachments : [],
-            comments: Array.isArray(t.comments) ? t.comments : [],
-            attachmentsCount: Array.isArray(t.attachments)
-              ? t.attachments.length
-              : 0,
-            commentCount: Array.isArray(t.comments) ? t.comments.length : 0,
-            priority: t.priority || "medium",
+        // Convert to array and sort by date
+        const historyArray = Array.from(dateMap.entries())
+          .map(([date, stats]) => ({
+            date,
+            completed: stats.completed,
+            inProgress: stats.inProgress,
+            overdue: stats.overdue,
           }))
           .sort(
-            (a: any, b: any) =>
-              new Date(b.completedDate).getTime() -
-              new Date(a.completedDate).getTime(),
+            (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
           );
 
-        setCompletedTasksHistory(completedHistory);
+        setHistoryData(historyArray);
+
+        // Fetch team members and calculate workload
+        try {
+          const teamRes = await fetch("/api/team-management", {
+            headers: { "x-user-id": String(currentUser.id) },
+          });
+          if (teamRes.ok) {
+            const teamData = await teamRes.json();
+            const members = Array.isArray(teamData?.teamMembers)
+              ? teamData.teamMembers
+              : [];
+            setTeamMembers(members);
+
+            // Calculate workload per team member
+            const workloadData = members
+              .map((member: any) => {
+                const memberTasks = tasks.filter(
+                  (t: any) => t.assignedToUser?.id === member.id || t.userId === member.id,
+                );
+                const completedByMember = memberTasks.filter((t: any) => {
+                  const status = normalizeStatus(t.status);
+                  return status === "completed" || status === "done";
+                }).length;
+                const inProgressByMember = memberTasks.filter((t: any) => {
+                  const status = normalizeStatus(t.status);
+                  return status === "inprogress" || status === "in_progress";
+                }).length;
+                const overdueByMember = memberTasks.filter((t: any) => {
+                  const status = normalizeStatus(t.status);
+                  const isDone = status === "completed" || status === "done";
+                  if (isDone) return false;
+                  if (!t.dueDate) return false;
+                  const dueDate = new Date(t.dueDate);
+                  dueDate.setHours(0, 0, 0, 0);
+                  return dueDate < now;
+                }).length;
+                const capacity = Math.round(
+                  (memberTasks.length / (tasks.length || 1)) * 100,
+                );
+                return {
+                  userId: member.id,
+                  userName: member.name || member.email,
+                  totalTasks: memberTasks.length,
+                  inProgress: inProgressByMember,
+                  completed: completedByMember,
+                  overdue: overdueByMember,
+                  capacity: Math.max(0, Math.min(100, capacity)),
+                };
+              })
+              .filter((member: any) => member.totalTasks > 0);
+            setTeamWorkload(workloadData);
+          }
+        } catch (error) {
+          console.error("[Analytics] Failed to fetch team data:", error);
+        }
+
+        // Get at-risk tasks (overdue + high priority + due soon)
+        const riskTasks = tasks
+          .filter((t: any) => {
+            const status = normalizeStatus(t.status);
+            const isDone = status === "completed" || status === "done";
+            if (isDone) return false;
+            if (!t.dueDate) return false;
+            const dueDate = new Date(t.dueDate);
+            dueDate.setHours(0, 0, 0, 0);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return (
+              dueDate <= today ||
+              (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24) <= 3
+            );
+          })
+          .map((t: any) => {
+            const dueDate = new Date(t.dueDate);
+            dueDate.setHours(0, 0, 0, 0);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const daysUntilDue = Math.ceil(
+              (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+            );
+            const priorityMap: { [key: string]: number } = {
+              high: 3,
+              medium: 2,
+              low: 1,
+            };
+            const urgencyScore = Math.min(
+              100,
+              (4 - daysUntilDue) * 20 + (priorityMap[t.priority] || 1) * 15,
+            );
+            return {
+              id: t.id,
+              title: t.title,
+              daysUntilDue: daysUntilDue > 0 ? daysUntilDue : 0,
+              daysOverdue:
+                daysUntilDue < 0 ? Math.abs(daysUntilDue) : undefined,
+              priority: (t.priority || "medium").toLowerCase(),
+              assignee: t.assignedToUser?.name || "Unassigned",
+              urgencyScore,
+            };
+          })
+          .sort((a: any, b: any) => b.urgencyScore - a.urgencyScore)
+          .slice(0, 5);
+        setAtRiskTasks(riskTasks);
 
         setAnalytics({
           totalTasks,
           completedTasks,
           completionRate,
-          avgTasksPerMember,
           overdueTasks,
-          onTrackTasks,
-          recommendations:
-            localAiRecommendations.length > 0
-              ? localAiRecommendations
-              : generateRecommendations(
-                  completionRate,
-                  overdueTasks,
-                  totalTasks,
-                  completedTasks,
-                  members.length,
-                ),
-          trends:
-            localAiTrends.length > 0
-              ? localAiTrends
-              : generateTrends(completionRate, overdueTasks, tasks),
-          performanceSummary:
-            performanceSummary ||
-            generatePerformanceSummary(
-              completionRate,
-              overdueTasks,
-              totalTasks,
-              completedTasks,
-              members.length,
-              avgTasksPerMember,
-            ),
+          inProgressTasks,
+          pendingTasks,
         });
       } catch (error) {
-        console.error("Failed to fetch analytics:", error);
+        console.error("[Analytics] Error:", error);
+        setAnalyticsError(
+          error instanceof Error ? error.message : "Unknown error",
+        );
       } finally {
         setLoading(false);
       }
@@ -412,171 +352,8 @@ function AnalyticsPageContent() {
     fetchAnalytics();
   }, [currentUser]);
 
-  const generateRecommendations = (
-    completionRate: number,
-    overdueTasks: number,
-    totalTasks: number,
-    completedTasks: number,
-    memberCount: number,
-  ): Recommendation[] => {
-    const recommendations: Recommendation[] = [];
-
-    if (completionRate < 50) {
-      recommendations.push({
-        title: "[ACTION] Accelerate Completion Rate",
-        description:
-          "Your completion rate is below 50%. Consider prioritizing high-impact tasks and breaking down complex ones.",
-        impact: "high",
-        icon: "https://img.icons8.com/color/96/000000/rocket.png",
-      });
-    }
-
-    if (overdueTasks > 0) {
-      recommendations.push({
-        title: "[URGENT] Address Overdue Tasks",
-        description: `You have ${overdueTasks} overdue task(s). Reassign them or extend deadlines to keep the team on track.`,
-        impact: "high",
-        icon: "https://img.icons8.com/color/96/000000/alarm.png",
-      });
-    }
-
-    if (totalTasks > 20) {
-      recommendations.push({
-        title: "[SUGGEST] Distribute Workload",
-        description:
-          "Consider distributing tasks more evenly across team members to prevent burnout.",
-        impact: "medium",
-        icon: "https://img.icons8.com/color/96/000000/groups.png",
-      });
-    }
-
-    if (completionRate > 70) {
-      recommendations.push({
-        title: "[SUCCESS] Maintain Momentum",
-        description:
-          "Great progress! Keep up this pace and consider increasing team capacity for more challenges.",
-        impact: "low",
-        icon: "https://img.icons8.com/color/96/000000/thumb-up.png",
-      });
-    }
-
-    if (memberCount === 0) {
-      recommendations.push({
-        title: "[INFO] Build Your Team",
-        description:
-          "Invite team members to collaborate and distribute tasks more efficiently.",
-        impact: "medium",
-        icon: "https://img.icons8.com/color/96/000000/handshake.png",
-      });
-    }
-
-    return recommendations.slice(0, 4);
-  };
-
-  const generateTrends = (
-    completionRate: number,
-    overdueTasks: number,
-    tasks: any[],
-  ): (Trend | string)[] => {
-    const trends: (Trend | string)[] = [];
-
-    if (completionRate > 0 && completionRate < 30) {
-      trends.push({
-        text: "Low completion rate trend detected",
-        icon: "https://img.icons8.com/color/96/000000/down.png",
-      });
-    } else if (completionRate > 70) {
-      trends.push({
-        text: "Strong upward trend in task completion",
-        icon: "https://img.icons8.com/color/96/000000/up.png",
-      });
-    } else {
-      trends.push({
-        text: "Steady task completion progress",
-        icon: "https://img.icons8.com/color/96/000000/right.png",
-      });
-    }
-
-    if (overdueTasks > Math.max(2, tasks.length * 0.2)) {
-      trends.push({
-        text: "High number of overdue tasks",
-        icon: "https://img.icons8.com/color/96/000000/error.png",
-      });
-    } else if (overdueTasks === 1) {
-      trends.push({
-        text: "One overdue task - address it soon",
-        icon: "https://img.icons8.com/color/96/000000/warning.png",
-      });
-    } else if (overdueTasks > 1) {
-      trends.push({
-        text: "Few overdue tasks - consider addressing them soon",
-        icon: "https://img.icons8.com/color/96/000000/warning.png",
-      });
-    } else if (overdueTasks === 0) {
-      trends.push({
-        text: "All tasks are on schedule",
-        icon: "https://img.icons8.com/color/96/000000/checkmark.png",
-      });
-    }
-
-    const inProgressCount = tasks.filter(
-      (t: any) => t.status === "in-progress" || t.status === "inprogress",
-    ).length;
-    if (inProgressCount > tasks.length * 0.3) {
-      trends.push({
-        text: "Multiple active tasks indicate good engagement",
-        icon: "https://img.icons8.com/color/96/000000/activity.png",
-      });
-    }
-
-    return trends;
-  };
-
-  const generatePerformanceSummary = (
-    completionRate: number,
-    overdueTasks: number,
-    totalTasks: number,
-    completedTasks: number,
-    memberCount: number,
-    avgTasksPerMember: number,
-  ): string => {
-    let summary = `Your team is currently tracking at ${completionRate}% completion rate with ${totalTasks} total tasks. `;
-
-    if (completionRate > 80) {
-      summary +=
-        "Exceptional performance! Your team is shipping at a high velocity. ";
-    } else if (completionRate > 60) {
-      summary +=
-        "Good progress on task completion. Continue maintaining this momentum. ";
-    } else if (completionRate > 40) {
-      summary +=
-        "Moderate progress. Consider identifying blockers and prioritizing high-impact tasks. ";
-    } else {
-      summary +=
-        "Low completion rate. Focus on breaking down tasks and removing blockers. ";
-    }
-
-    if (overdueTasks > 0) {
-      summary += `With ${overdueTasks} overdue task(s), prioritize addressing these to maintain team velocity. `;
-    }
-
-    summary += `Average task distribution per team member is ${avgTasksPerMember} tasks${
-      memberCount > 0 ? " across " + memberCount + " members" : ""
-    }. Focus on maintaining momentum while addressing any blockers.`;
-
-    return summary;
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-transparent flex items-center justify-center">
-        <div className="text-white/40 text-lg">Loading analytics...</div>
-      </div>
-    );
-  }
-
-  // Check authorization - Analytics restricted to MANAGER+
-  const authorizedRoles = ["MANAGER", "CO_OWNER", "OWNER"];
+  // Authorization check
+  const authorizedRoles = ["ADMIN", "OWNER"];
   if (
     currentUser &&
     currentUser.role &&
@@ -586,13 +363,11 @@ function AnalyticsPageContent() {
       <div className="min-h-screen bg-transparent flex items-center justify-center p-5">
         <div className="max-w-xs text-center bg-red-500/10 border border-red-500/30 rounded-lg p-10 flex flex-col items-center gap-4">
           <Lock size={48} className="text-red-400" />
-          <h2 className="m-0 text-xl font-semibold text-white/62">
+          <h2 className="m-0 text-xl font-semibold text-black/62">
             Access Denied
           </h2>
-          <p className="m-0 text-sm text-white/40 leading-relaxed">
-            Analytics is restricted to managers and above. Your current role (
-            <strong>{currentUser.role}</strong>) does not have permission to
-            access this page.
+          <p className="m-0 text-sm text-black/60 leading-relaxed">
+            Analytics is restricted to admins and above.
           </p>
           <button
             onClick={() => router.push("/dashboard")}
@@ -605,516 +380,143 @@ function AnalyticsPageContent() {
     );
   }
 
-  if (!analytics) {
-    return (
-      <div className="min-h-screen bg-transparent flex items-center justify-center">
-        <div className="text-white/40 text-lg">Failed to load analytics</div>
-      </div>
-    );
-  }
-
   return (
-    <PageContainer title="ANALYTICS">
-      {/* Key Metrics Grid - Using StatusCards for consistency */}
-      <div className="grid grid-cols-4 gap-2 mb-2">
-        <StatusCard
-          count={analytics.totalTasks}
-          label="Total Tasks"
-          icon="clock"
-          color="from-blue-500/20 to-blue-600/20"
-        />
-        <StatusCard
-          count={analytics.completedTasks}
-          label="Completed"
-          icon="check"
-          color="from-green-500/20 to-green-600/20"
-        />
-        <div className="bg-blue-400/10 backdrop-blur-lg border border-white/10 rounded-sm shadow-lg p-4 flex-1 flex-col justify-between h-full transition-all duration-300 w-auto min-w-[136px]">
-          <div className="flex w-full items-center justify-center gap-4">
-            <div className="text-purple-400">
-              <svg
-                width="28"
-                height="28"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 6v6l4 2" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-xs text-white/40 m-0">Success Rate</p>
-              <p className="text-3xl font-normal text-white/62 mt-1 pl-0 m-0">
-                {analytics.completionRate}%
-              </p>
-            </div>
-          </div>
+    <PageContainer title="Analytics">
+      {/* Error Display */}
+      {analyticsError && (
+        <div className="mb-4 p-4 bg-red-100/80 border border-red-300/50 rounded-sm">
+          <p className="text-sm text-red-700 font-medium">⚠️ Error</p>
+          <p className="text-sm text-red-600 mt-1">{analyticsError}</p>
         </div>
-        <StatusCard
-          count={analytics.overdueTasks}
-          label="Overdue"
-          icon="alert"
-          color="from-red-500/20 to-red-600/20"
-        />
-      </div>
+      )}
 
-      {/* Critical Path - Task Optimization using Dijkstra */}
-      <div className="bg-blue-400/10 backdrop-blur-lg border border-white/10 rounded-sm shadow-xl p-5 mb-2 transition-all duration-200 hover:border-white/50 hover:shadow-2xl">
-        <div className="flex items-center gap-3 mb-4">
-          <Network size={24} className="text-blue-400" />
-          <h2 className="text-base font-semibold m-0 text-white/62">
-            Optimal Task Sequence (Dijkstra's Algorithm)
-          </h2>
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-black/62">Loading AI Analytics...</div>
         </div>
-
-        {dijkstraError ? (
-          <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-md text-red-400 text-xs flex gap-2 items-center">
-            <AlertCircle size={18} />
-            <span>{dijkstraError}</span>
-          </div>
-        ) : criticalPath ? (
-          <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-md text-sm">
-            <p className="m-0 text-white/62 font-semibold">
-              🎯 <strong>Optimal Path:</strong> {criticalPath}
-            </p>
-            <p className="m-0 mt-2 text-xs text-white/40">
-              This represents the critical path - the longest sequence of
-              dependent tasks that determines the minimum project completion
-              time.
-            </p>
-          </div>
-        ) : (
-          <p className="text-xs text-white/40 m-0">
-            Loading optimal task sequence...
-          </p>
-        )}
-      </div>
-
-      {/* Two Column Layout - Campaign Performance Summary & AI Recommendations */}
-      <div className="grid grid-cols-2 gap-2 mb-2">
-        {/* Campaign Performance Summary - Left */}
-        <div className="bg-green-500/10 border border-white/10 p-5 rounded-sm shadow-xl transition-all duration-200 hover:border-white/50 hover:shadow-2xl backdrop-blur-lg">
-          <div className="flex items-center gap-2 mb-4">
-            <Sparkles size={18} className="text-green-400" />
-            <h2 className="text-base font-semibold m-0 text-white/62">
-              Campaign Performance Summary
+      ) : !analytics ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-black/62">Failed to load analytics</div>
+        </div>
+      ) : analytics.totalTasks === 0 ? (
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center max-w-md">
+            <div className="text-5xl mb-4">📋</div>
+            <h2 className="text-xl font-semibold text-black/62 m-0 mb-2">
+              No Tasks Yet
             </h2>
-          </div>
-          <div className="text-xs text-white/70 leading-relaxed">
-            <p>
-              {analytics.performanceSummary ||
-                `Your team is currently tracking at ${analytics.completionRate}% completion rate with ${analytics.totalTasks} total tasks. With ${analytics.completedTasks} completed and ${analytics.overdueTasks} overdue, the recommended focus is on maintaining momentum while addressing any blockers. Average task distribution per team member is ${analytics.avgTasksPerMember} tasks.`}
+            <p className="text-sm text-black/50 m-0 mb-6">
+              Start creating tasks to see AI-powered analytics and insights
+              about your team's performance.
             </p>
-          </div>
-
-          {/* Completion Metrics */}
-          {analytics.completedTasks > 0 && (
-            <div className="mt-4 pt-4 border-t border-green-500/20 flex flex-col gap-2">
-              <div className="text-xs font-semibold text-green-300 flex items-center gap-1">
-                <CheckCircle size={14} className="text-green-400" /> Completion
-                Metrics
-              </div>
-              <div className="flex gap-2">
-                <div className="flex-1 p-3 bg-white/5 rounded text-xs border border-white/10">
-                  <p className="text-white/40 m-0 mb-1">Completed</p>
-                  <p className="text-white/62 font-semibold m-0 text-lg">
-                    {analytics.completedTasks}
-                  </p>
-                </div>
-                <div className="flex-1 p-3 bg-white/5 rounded text-xs border border-white/10">
-                  <p className="text-white/40 m-0 mb-1">Rate</p>
-                  <p className="text-white/62 font-semibold m-0 text-lg">
-                    {analytics.completionRate}%
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* AI Recommendations - Right */}
-        <div className="bg-blue-400/10 backdrop-blur-lg border border-white/10 rounded-sm shadow-xl p-5 transition-all duration-200 hover:border-white/50 hover:shadow-2xl">
-          <div className="flex items-center gap-2 mb-4">
-            <Sparkles size={18} className="text-yellow-400" />
-            <h2 className="text-base font-semibold m-0 text-white/62">
-              AI Recommendations
-            </h2>
-          </div>
-          <div className="flex flex-col gap-3">
-            {(analytics?.recommendations || []).length > 0 ? (
-              analytics.recommendations.map((rec, i) => (
-                <div
-                  key={i}
-                  className="bg-white/5 border border-white/10 p-3 rounded-md hover:bg-white/10 transition-colors"
-                >
-                  <h3 className="text-xs font-semibold m-0 mb-1 text-white/62">
-                    {rec.title}
-                  </h3>
-                  <p className="text-xs text-white/40 m-0 leading-relaxed">
-                    {rec.description}
-                  </p>
-                </div>
-              ))
-            ) : (
-              <p className="text-xs text-white/40">
-                No recommendations available yet
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Charts Grid - Weekly Progress and Task Summary (Reversed Layout) */}
-      <div className="grid grid-cols-2 gap-2 mb-2">
-        {/* Task Summary - Left */}
-        <div className="min-h-0">
-          <TaskSummary
-            completed={analytics.completedTasks}
-            total={analytics.totalTasks}
-            inProgress={taskStatusCounts.inProgress}
-            pending={
-              analytics.totalTasks -
-              analytics.completedTasks -
-              taskStatusCounts.inProgress
-            }
-            overdue={analytics.overdueTasks}
-            aiInsight={
-              taskStatusCounts.done > taskStatusCounts.inProgress
-                ? "Strong completion rate! Your team is shipping tasks at a healthy pace. Keep maintaining this momentum."
-                : taskStatusCounts.inProgress > taskStatusCounts.stuck
-                  ? "Good progress on active work. Focus on reducing bottlenecks to improve completion rate."
-                  : "Many tasks are stuck. Prioritize unblocking these to accelerate delivery."
-            }
-          />
-        </div>
-
-        {/* Weekly Progress Chart - Right */}
-        <div className="min-h-0">
-          <WeeklyProgressChart data={weeklyData} />
-        </div>
-      </div>
-
-      {/* Completed Tasks History (detailed with filters) */}
-      <div className="bg-blue-400/10 backdrop-blur-lg border border-white/10 rounded-sm shadow-xl p-5 mb-2 transition-all duration-200 hover:border-white/50 hover:shadow-2xl">
-        <div className="flex items-center gap-2 mb-4">
-          <CheckCircle size={18} className="text-green-400" />
-          <h2 className="text-base font-semibold m-0 text-white/62">
-            Completed Tasks
-          </h2>
-        </div>
-        {/* Toolbar with welcome message, search, and sort */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="text-sm text-white/62">
-            {currentUser
-              ? `Welcome back, ${currentUser.name || currentUser.email}! Here are your completed tasks for today.`
-              : "Completed Tasks"}
-          </div>
-          <div className="flex items-center gap-3">
-            <input
-              type="text"
-              placeholder="Search task title or assignee..."
-              className="bg-white/10 border border-white/20 text-white/62 placeholder-white/40 p-2 rounded-md text-xs w-72"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-white/40">Sort by</label>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="bg-white/5 text-white/62 p-2 rounded-md text-xs"
-              >
-                <option value="name">Name (A-Z)</option>
-                <option value="created">Task Created</option>
-                <option value="completed">Task Completed</option>
-              </select>
-              <button
-                onClick={() =>
-                  setSortDir((s) => (s === "asc" ? "desc" : "asc"))
-                }
-                className="bg-white/5 text-white/62 p-2 rounded-md text-xs"
-                title="Toggle sort direction"
-              >
-                {sortDir === "asc" ? "Asc" : "Desc"}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <PageContentCon className="h-[300px] overflow-y-auto rounded-md">
-          <table className="w-full border-collapse text-sm">
-            <thead className="bg-blue-500/40 sticky top-0">
-              <tr className="border-b border-black/10">
-                <th className="px-3 py-2 text-left font-light text-white col-span-2">
-                  Task
-                </th>
-                <th className="px-3 py-2 text-left font-light text-white">
-                  Assignee
-                </th>
-                <th className="px-3 py-2 text-center font-light text-white">
-                  Attachment
-                </th>
-                <th className="px-3 py-2 text-center font-light text-white">
-                  Comment
-                </th>
-                <th className="px-3 py-2 text-center font-light text-white">
-                  Priority
-                </th>
-                <th className="px-3 py-2 text-right font-light text-white">
-                  Date Completed
-                </th>
-                <th className="px-3 py-2 text-center font-light text-white">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {(() => {
-                const q = searchQuery.trim().toLowerCase();
-                let items = completedTasksHistory.filter((task) => {
-                  if (!q) return true;
-                  return (
-                    task.title.toLowerCase().includes(q) ||
-                    (task.assignedBy || "").toLowerCase().includes(q)
-                  );
-                });
-
-                items = items.sort((a: any, b: any) => {
-                  if (sortBy === "name") {
-                    const an = a.title.toLowerCase();
-                    const bn = b.title.toLowerCase();
-                    return sortDir === "asc"
-                      ? an.localeCompare(bn)
-                      : bn.localeCompare(an);
-                  }
-                  if (sortBy === "created") {
-                    const ac = new Date(a.createdDate).getTime();
-                    const bc = new Date(b.createdDate).getTime();
-                    return sortDir === "asc" ? ac - bc : bc - ac;
-                  }
-                  // default: completed
-                  const ad = new Date(a.completedDate).getTime();
-                  const bd = new Date(b.completedDate).getTime();
-                  return sortDir === "asc" ? ad - bd : bd - ad;
-                });
-
-                const visible = items.slice(0, visibleCount);
-
-                return (
-                  <>
-                    {visible.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={6}
-                          className="py-10 text-center text-blue-200"
-                        >
-                          {completedTasksHistory.length === 0
-                            ? "No completed tasks"
-                            : "No matching tasks"}
-                        </td>
-                      </tr>
-                    ) : (
-                      visible.map((task: any, i: number) => {
-                        const completedDate = new Date(task.completedDate);
-                        return (
-                          <tr
-                            key={task.id || i}
-                            className="border-b border-white/6 hover:bg-white/2 transition-colors"
-                          >
-                            <td className="px-3 py-2 text-sm text-white/62 truncate">
-                              {task.title}
-                            </td>
-                            <td className="px-3 py-2 truncate">
-                              {task.assignedBy}
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              {task.attachments &&
-                              task.attachments.length > 0 ? (
-                                <a
-                                  href={
-                                    task.attachments[0].url ||
-                                    task.attachments[0].filename ||
-                                    "#"
-                                  }
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex items-center gap-1 text-white/60"
-                                >
-                                  <Paperclip size={14} />{" "}
-                                  {task.attachments.length}
-                                </a>
-                              ) : (
-                                <span className="text-white/40">0</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              {task.comments && task.comments.length > 0 ? (
-                                <span className="inline-flex items-center gap-1 text-white/60">
-                                  <MessageSquare size={14} />{" "}
-                                  {task.comments.length}
-                                </span>
-                              ) : (
-                                <span className="text-white/40">0</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 text-center capitalize">
-                              {task.priority || "medium"}
-                            </td>
-                            <td className="px-3 py-2 text-right">
-                              {completedDate.toLocaleDateString()}
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              {isOwner(task) && (
-                                <div className="relative">
-                                  <button
-                                    onClick={() =>
-                                      setMenuOpenTaskId(
-                                        menuOpenTaskId === task.id
-                                          ? null
-                                          : task.id,
-                                      )
-                                    }
-                                    className="p-1 text-white/60 hover:text-white transition-colors"
-                                    title="Actions"
-                                  >
-                                    ⋮
-                                  </button>
-                                  {menuOpenTaskId === task.id && (
-                                    <div className="absolute right-0 top-[calc(100%+4px)] bg-blue-950 border border-white/10 rounded-lg shadow-xl z-50 min-w-[120px]">
-                                      <button
-                                        onClick={() => {
-                                          setDeleteModalTaskId(task.id);
-                                          setDeleteModalTaskTitle(task.title);
-                                          setMenuOpenTaskId(null);
-                                        }}
-                                        className="w-full px-3 py-2 bg-none border-none text-white text-left cursor-pointer hover:bg-white/10 transition-colors text-sm"
-                                      >
-                                        Delete
-                                      </button>
-                                      <button
-                                        onClick={async () => {
-                                          try {
-                                            const res = await fetch(
-                                              `/api/task-management/${task.id}`,
-                                              {
-                                                method: "PATCH",
-                                                headers: {
-                                                  "Content-Type":
-                                                    "application/json",
-                                                },
-                                                body: JSON.stringify({
-                                                  status: "in-progress",
-                                                }),
-                                              },
-                                            );
-                                            if (res.ok) {
-                                              setCompletedTasksHistory(
-                                                completedTasksHistory.filter(
-                                                  (t) => t.id !== task.id,
-                                                ),
-                                              );
-                                              setMenuOpenTaskId(null);
-                                              toast.success(
-                                                "Task moved back to In Progress",
-                                              );
-                                            } else {
-                                              toast.error(
-                                                "Failed to undo task",
-                                              );
-                                            }
-                                          } catch (error) {
-                                            console.error(
-                                              "Failed to undo task:",
-                                              error,
-                                            );
-                                            toast.error("Failed to undo task");
-                                          }
-                                        }}
-                                        className="w-full px-3 py-2 bg-none border-none text-white text-left cursor-pointer hover:bg-white/10 transition-colors text-sm"
-                                      >
-                                        Undo
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </>
-                );
-              })()}
-            </tbody>
-          </table>
-        </PageContentCon>
-
-        <div className="flex justify-center mt-3">
-          {completedTasksHistory.length > visibleCount && (
             <button
-              onClick={() => setVisibleCount((v) => v + 10)}
-              className="px-3 py-1 rounded-md bg-blue-500/30 text-white text-xs"
+              onClick={() => router.push("/dashboard")}
+              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
             >
-              Load more
+              Create Your First Task
             </button>
-          )}
-        </div>
-      </div>
-
-      {/* Delete Confirmation Modal */}
-      {deleteModalTaskId !== null && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center rounded-md z-50">
-          <div className="bg-gray-900 border border-white/20 rounded-md p-6 max-w-sm mx-4">
-            <h3 className="text-lg font-semibold text-white mb-2">
-              Delete Task
-            </h3>
-            <p className="text-sm text-white/60 mb-4">
-              Are you sure you want to permanently delete{" "}
-              <strong className="text-white">"{deleteModalTaskTitle}"</strong>?
-              This action cannot be undone.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setDeleteModalTaskId(null)}
-                className="px-4 py-2 rounded-md bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  try {
-                    const res = await fetch(
-                      `/api/task-management/${deleteModalTaskId}`,
-                      {
-                        method: "DELETE",
-                      },
-                    );
-                    if (res.ok) {
-                      setCompletedTasksHistory(
-                        completedTasksHistory.filter(
-                          (t) => t.id !== deleteModalTaskId,
-                        ),
-                      );
-                      setDeleteModalTaskId(null);
-                      toast.success("Task deleted permanently");
-                    } else {
-                      toast.error("Failed to delete task");
-                    }
-                  } catch (error) {
-                    console.error("Failed to delete task:", error);
-                    toast.error("Failed to delete task");
-                  }
-                }}
-                className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors"
-              >
-                Delete Permanently
-              </button>
-            </div>
           </div>
         </div>
+      ) : (
+        <>
+          {/* SECTION 1: Status Overview + Task Execution */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 mb-3.5">
+            {/* Status Cards (left) */}
+            <div className="lg:col-span-1.5">
+              <AnalyticsStatusCards
+                pending={analytics.pendingTasks}
+                inProgress={analytics.inProgressTasks}
+                completed={analytics.completedTasks}
+                overdue={analytics.overdueTasks}
+              />
+            </div>
+
+            {/* Task Execution Pie (right) */}
+            <div className="lg:col-span-1.5 h-80">
+              <AnalyticsTaskExecutionSummary
+                completed={analytics.completedTasks}
+                inProgress={analytics.inProgressTasks}
+                pending={analytics.pendingTasks}
+                overdue={analytics.overdueTasks}
+              />
+            </div>
+          </div>
+
+          {/* SECTION 2: Team Workload + Deadline Risk */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 mb-3.5">
+            <TeamWorkloadCard loading={loading} teamMembers={teamWorkload} />
+            <DeadlineRiskCard
+              loading={loading}
+              tasks={atRiskTasks}
+              overdueTasks={analytics.overdueTasks}
+            />
+          </div>
+
+          {/* SECTION 3 & 4: Performance Trends + AI Insights (Side by Side) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 mb-3.5">
+            {/* Weekly Productivity Trend */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col h-80">
+              <div className="border-b border-gray-300/50 p-4 shrink-0 flex items-center gap-2 bg-blue-50">
+                <TrendingUp size={18} className="text-blue-700" />
+                <h3 className="text-sm font-semibold text-gray-800 m-0">
+                  Weekly Productivity
+                </h3>
+              </div>
+              <div className="flex-1 p-4 overflow-hidden">
+                <AnalyticsOverallWeeklyChart data={historyData} />
+              </div>
+            </div>
+
+            {/* AI Insights & Recommendations */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col h-80 overflow-y-auto">
+              <div className="border-b border-gray-300/50 p-4 shrink-0 flex items-center gap-2 bg-gradient-to-r from-blue-50 to-purple-50">
+                <Brain size={18} className="text-blue-700" />
+                <h3 className="text-sm font-semibold text-gray-800 m-0">
+                  AI Insights
+                </h3>
+              </div>
+              <div className="flex-1 p-4 overflow-y-auto">
+                <NaturalLanguageAutomatedInsights
+                  loading={loading}
+                  insights={[
+                    {
+                      text: `Your completion rate is at ${analytics.completionRate}%, which is ${
+                        analytics.completionRate > 70
+                          ? "excellent"
+                          : analytics.completionRate > 50
+                            ? "good"
+                            : "needs improvement"
+                      }. Keep pushing!`,
+                      type:
+                        analytics.completionRate > 70
+                          ? "positive"
+                          : analytics.completionRate > 50
+                            ? "info"
+                            : "warning",
+                      icon: "chart",
+                    },
+                    {
+                      text: `${analytics.inProgressTasks} task${analytics.inProgressTasks !== 1 ? "s are" : " is"} currently in progress. Steady pace maintained.`,
+                      type: "info",
+                      icon: "trending",
+                    },
+                    ...(analytics.overdueTasks > 0
+                      ? [
+                          {
+                            text: `⚠️ ${analytics.overdueTasks} overdue task${analytics.overdueTasks !== 1 ? "s" : ""} need immediate attention to stay on track.`,
+                            type: "warning" as const,
+                            icon: "alert" as const,
+                          },
+                        ]
+                      : []),
+                  ]}
+                  anomalies={[]}
+                  naturalLanguageSummary={`Team has ${analytics.totalTasks} tasks in total. Completion rate is ${analytics.completionRate}%. Currently focused on ${analytics.inProgressTasks} in-progress tasks. ${analytics.overdueTasks > 0 ? `Urgent: ${analytics.overdueTasks} tasks are overdue.` : "On track with no overdue items."}`}
+                />
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </PageContainer>
   );

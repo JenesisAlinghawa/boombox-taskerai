@@ -25,10 +25,9 @@ import {
 import { getCurrentUser } from "@/utils/sessionManager";
 import { useAuthProtection } from "@/app/hooks/useAuthProtection";
 import CreateChannelModal from "@/app/components/messaging-components/CreateNewChannelModalComponent";
-import { MessageBubble } from "@/app/components/messaging-components/ChatMessageBubbleDisplayComponent";
+import { MessageBubble } from "@/app/components/messaging-components/ChatMessageDisplayComponent";
 import { PageContainer } from "@/app/components/page-layouts/MainPageContainerLayoutComponent";
 import { PageContentCon } from "@/app/components/page-layouts/PageContentWrapperContainerComponent";
-import { io, Socket } from "socket.io-client";
 import {
   buildTaskGraph,
   findCriticalPath,
@@ -202,7 +201,6 @@ export default function MessagesPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const socketRef = useRef<Socket | null>(null);
 
   const [selectedUserTasks, setSelectedUserTasks] = useState<any[]>([]);
   const [selectedUserTaskStats, setSelectedUserTaskStats] = useState({
@@ -228,7 +226,7 @@ export default function MessagesPage() {
 
   // Debug: Log activeUserIds changes
   useEffect(() => {
-    console.log("⚡ activeUserIds updated:", activeUserIds);
+    console.log("activeUserIds updated:", activeUserIds);
   }, [activeUserIds]);
 
   useEffect(() => {
@@ -250,130 +248,25 @@ export default function MessagesPage() {
     }
   }, [menuOpen]);
 
-  // Fetch channel unread counts periodically
-  useEffect(() => {
-    if (!currentEmployee) return;
+  // Update unread count when viewing a channel (event-driven, not polling)
+  const markChannelAsRead = (channelId: number) => {
+    setChannelUnreadCounts((prev) => ({
+      ...prev,
+      [channelId]: 0,
+    }));
+  };
 
-    const fetchChannelUnreadCounts = async () => {
-      try {
-        const res = await fetch("/api/channel-management/unread", {
-          headers: {
-            "x-user-id": String(currentEmployee.id),
-          },
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setChannelUnreadCounts(data.unreadCounts || {});
-        }
-      } catch (err) {
-        console.error("Failed to fetch channel unread counts:", err);
-      }
-    };
-
-    fetchChannelUnreadCounts();
-    const interval = setInterval(fetchChannelUnreadCounts, 3000);
-
-    return () => clearInterval(interval);
-  }, [currentEmployee]);
+  // Mark DM user as read when viewing conversation
+  const markDMUserAsRead = (userId: string | number) => {
+    // Clear unread for this user when viewing their conversation
+    // Could store in state or call API if implementing real unread tracking
+  };
 
   useEffect(() => {
-    if (!currentEmployee) return;
-
-    console.log("Initializing socket connection...");
-    socketRef.current = io(undefined, {
-      path: "/socket.io/",
-      transports: ["websocket", "polling"],
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
-    });
-
-    const socket = socketRef.current;
-
-    socket.on("connect", () => {
-      console.log("Socket.io connected");
-      socket.emit("user:join", {
-        userId: String(currentEmployee.id),
-        userName: `${currentEmployee.firstName} ${currentEmployee.lastName}`,
-      });
-    });
-
-    socket.on("connect_error", (error) => {
-      console.error("Socket connection error:", error);
-    });
-
-    socket.on("users:active", (userIds: string[]) => {
-      console.log("Active users received:", userIds);
-      console.log("Current user ID:", String(currentEmployee.id));
-      console.log(
-        "Is current user online?",
-        userIds.includes(String(currentEmployee.id)),
-      );
-      setActiveUserIds(userIds);
-    });
-
-    socket.on("message:new", (newMessage: Message) => {
-      setMessages((prev) => [...prev, newMessage]);
-
-      // Mark message as read if it's from the currently open DM user
-      if (
-        selectedDMUser &&
-        newMessage.sender.id === selectedDMUser.id &&
-        currentEmployee
-      ) {
-        fetch("/api/direct-messaging-endpoints/mark-as-read", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-user-id": String(currentEmployee.id),
-          },
-          body: JSON.stringify({ senderId: selectedDMUser.id }),
-        }).catch((err) => console.error("Failed to mark as read:", err));
-      }
-    });
-
-    socket.on("message:edited", (editedMessage: Message) => {
-      setMessages((prev) =>
-        prev.map((msg) => (msg.id === editedMessage.id ? editedMessage : msg)),
-      );
-    });
-
-    socket.on("message:deleted", (messageId: number) => {
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === messageId ? { ...msg, isDeleted: true } : msg,
-        ),
-      );
-    });
-
-    socket.on(
-      "message:reaction",
-      (data: { messageId: number; emoji: string; userId: number }) => {
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === data.messageId
-              ? {
-                  ...msg,
-                  reactions: [
-                    ...(msg.reactions || []),
-                    { emoji: data.emoji, userId: data.userId },
-                  ],
-                }
-              : msg,
-          ),
-        );
-      },
-    );
-
-    socket.on("disconnect", () => {
-      console.log("Socket.io disconnected");
-    });
-
-    return () => {
-      socket.disconnect();
-    };
+    // Socket.io disabled - server not running
+    // TODO: Implement proper socket.io server integration
+    console.log("Socket.io integration disabled");
+    return () => {};
   }, [currentEmployee]);
 
   useEffect(() => {
@@ -388,31 +281,15 @@ export default function MessagesPage() {
         total: 0,
       });
 
-      // Subscribe to this specific channel room for real-time messages
-      if (currentEmployee && socketRef.current) {
-        socketRef.current.emit("channel:join", {
-          userId: currentEmployee.id,
-          channelId: selectedChannel.id,
-        });
-      }
-
-      // Poll for new messages every 2 seconds when viewing channels
-      const pollInterval = setInterval(fetchChannelMessages, 2000);
+      // Poll for new messages every 8 seconds when viewing channels
+      const pollInterval = setInterval(fetchChannelMessages, 8000);
 
       return () => clearInterval(pollInterval);
     } else if (selectedDMUser) {
       fetchDMMessages();
 
-      // Subscribe to this specific DM room for real-time messages
-      if (currentEmployee && socketRef.current) {
-        socketRef.current.emit("dm:join", {
-          userId: currentEmployee.id,
-          otherUserId: selectedDMUser.id,
-        });
-      }
-
-      // Poll for new messages every 2 seconds when viewing DMs
-      const pollInterval = setInterval(fetchDMMessages, 2000);
+      // Poll for new messages every 8 seconds when viewing DMs
+      const pollInterval = setInterval(fetchDMMessages, 8000);
 
       if (currentEmployee && selectedDMUser) {
         fetchUserTaskProgress(selectedDMUser);
@@ -496,7 +373,7 @@ export default function MessagesPage() {
         return;
       }
 
-      setCurrentEmployee(user as Employee);
+      setCurrentEmployee(user as unknown as Employee);
 
       // Set loading to false immediately so UI shows
       setLoading(false);
@@ -577,14 +454,20 @@ export default function MessagesPage() {
       console.log(
         `[Messages] Fetching messages for channel ${selectedChannel.id}...`,
       );
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const res = await fetch(
         `/api/message-endpoints?channelId=${selectedChannel.id}&limit=50`,
         {
           headers: {
             "x-user-id": String(currentEmployee.id),
           },
+          signal: controller.signal,
         },
       );
+
+      clearTimeout(timeoutId);
 
       if (!res.ok) {
         console.error(`[Messages] API error: ${res.status} ${res.statusText}`);
@@ -654,14 +537,20 @@ export default function MessagesPage() {
       console.log(
         `[Messages] Fetching DM messages with user ${selectedDMUser.id}...`,
       );
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const res = await fetch(
         `/api/direct-messaging-endpoints/${selectedDMUser.id}?userId=${currentEmployee.id}`,
         {
           headers: {
             "x-user-id": String(currentEmployee.id),
           },
+          signal: controller.signal,
         },
       );
+
+      clearTimeout(timeoutId);
 
       if (!res.ok) {
         console.error(`[Messages] API error: ${res.status} ${res.statusText}`);
@@ -997,13 +886,6 @@ export default function MessagesPage() {
           }, 500);
         }
 
-        if (socketRef.current) {
-          socketRef.current.emit("message:send", {
-            channelId: selectedChannel.id,
-            message: newMessage,
-          });
-        }
-
         setMessageInput("");
         setAttachmentFile(null);
         setReplyingTo(null);
@@ -1059,13 +941,6 @@ export default function MessagesPage() {
             };
             setMessages((prev) => [...prev, botMessage]);
           }, 500);
-        }
-
-        if (socketRef.current) {
-          socketRef.current.emit("message:send", {
-            recipientId: selectedDMUser.id,
-            message: newMessage,
-          });
         }
 
         setMessageInput("");
@@ -1437,6 +1312,7 @@ export default function MessagesPage() {
                       onSelect={(ch) => {
                         setSelectedChannel(ch);
                         setSelectedDMUser(null);
+                        markChannelAsRead(ch.id); // Mark as read when viewing
                       }}
                     />
                   ))
@@ -1510,6 +1386,7 @@ export default function MessagesPage() {
                         onSelect={(u) => {
                           setSelectedDMUser(u);
                           setSelectedChannel(null);
+                          markDMUserAsRead(u.id); // Mark conversation as read when viewing
                         }}
                       />
                     );
@@ -1635,7 +1512,7 @@ export default function MessagesPage() {
                               onReply={() =>
                                 setReplyingTo(msg.parentMessage!.id)
                               }
-                              currentUserId={currentEmployee?.id || 0}
+                              currentUserId={String(currentEmployee?.id || 0)}
                             />
                           </div>
                         )}
@@ -1689,19 +1566,47 @@ export default function MessagesPage() {
                             </div>
                           )}
                           <MessageBubble
-                            message={msg}
+                            message={{
+                              ...msg,
+                              id: String(msg.id),
+                              parentMessageId: msg.parentMessageId
+                                ? String(msg.parentMessageId)
+                                : undefined,
+                              sender: {
+                                ...msg.sender,
+                                id: String(msg.sender.id),
+                              },
+                              parentMessage: msg.parentMessage
+                                ? {
+                                    ...msg.parentMessage,
+                                    id: String(msg.parentMessage.id),
+                                    sender: {
+                                      ...msg.parentMessage.sender,
+                                      id: String(msg.parentMessage.sender.id),
+                                    },
+                                  }
+                                : undefined,
+                              reactions: msg.reactions?.map((r) => ({
+                                ...r,
+                                userId: String(r.userId),
+                              })),
+                            }}
                             isCurrentUser={
                               msg.sender.id === currentEmployee?.id
                             }
-                            onAddReaction={(messageId, emoji) =>
-                              addReaction(messageId, emoji)
+                            onAddReaction={(messageId: string, emoji: string) =>
+                              addReaction(Number(messageId), emoji)
                             }
-                            onDelete={(messageId) => deleteMessage(messageId)}
-                            onEdit={(messageId, newContent) =>
-                              editMessage(messageId, newContent)
+                            onDelete={(messageId: string) =>
+                              deleteMessage(Number(messageId))
                             }
-                            onReply={(messageId) => setReplyingTo(messageId)}
-                            currentUserId={currentEmployee?.id || 0}
+                            onEdit={(messageId: string, newContent: string) =>
+                              editMessage(Number(messageId), newContent)
+                            }
+                            onReply={(messageId: string) =>
+                              setReplyingTo(Number(messageId))
+                            }
+                            currentUserId={String(currentEmployee?.id || 0)}
                           />
                         </div>
                       </div>
@@ -2211,8 +2116,15 @@ export default function MessagesPage() {
       <CreateChannelModal
         isOpen={isChannelModalOpen}
         onClose={() => setIsChannelModalOpen(false)}
-        onSubmit={createChannel}
-        currentUserId={currentEmployee?.id || 0}
+        onSubmit={(data) =>
+          createChannel({
+            ...data,
+            memberIds: data.memberIds.map((id) =>
+              typeof id === "string" ? parseInt(id) : id,
+            ),
+          })
+        }
+        currentUserId={String(currentEmployee?.id || 0)}
       />
     </PageContainer>
   );

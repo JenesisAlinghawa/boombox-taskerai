@@ -8,12 +8,8 @@ interface Params {
 }
 
 // Helper to extract user from headers
-function getUserIdFromRequest(request: NextRequest): number | null {
-  const userHeader = request.headers.get('x-user-id');
-  if (userHeader) {
-    return parseInt(userHeader, 10);
-  }
-  return null;
+function getUserIdFromRequest(request: NextRequest): string | null {
+  return request.headers.get('x-user-id');
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
@@ -28,14 +24,19 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Verify user has access to this task
     const task = await prisma.task.findUnique({
       where: { id: taskId },
-      select: { createdById: true, assigneeId: true, attachments: true }
+      select: {
+        createdById: true,
+        assignees: { select: { assigneeId: true } },
+        attachments: true
+      }
     });
 
     if (!task) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    if (task.createdById !== userId && task.assigneeId !== userId) {
+    const assigneeIds = task.assignees.map(a => a.assigneeId);
+    if (task.createdById !== userId && !assigneeIds.includes(userId)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -83,6 +84,24 @@ export async function POST(request: NextRequest, { params }: Params) {
         filename: filename || file.name,
       },
     });
+
+    // Also log to activity log for the logs page
+    try {
+      await prisma.log.create({
+        data: {
+          userId: userId,
+          taskId: taskId,
+          action: 'Added attachment',
+          data: {
+            attachmentId: attachment.id,
+            filename: attachment.filename,
+            fileSize: file.size,
+          },
+        },
+      });
+    } catch (logError) {
+      console.error('Failed to create activity log:', logError);
+    }
 
     return NextResponse.json({ attachment });
   } catch (error: any) {

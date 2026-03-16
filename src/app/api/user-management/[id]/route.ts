@@ -13,7 +13,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const userId = parseInt(id, 10);
+    const userId = id; // id is now a UUID string
 
     // Get user from request headers
     const userIdHeader = request.headers.get("x-user-id");
@@ -24,7 +24,7 @@ export async function PUT(
       );
     }
 
-    const currentUserId = parseInt(userIdHeader, 10);
+    const currentUserId = userIdHeader; // Direct string UUID
 
     // Users can only update their own profile
     if (currentUserId !== userId) {
@@ -43,7 +43,7 @@ export async function PUT(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const { firstName, lastName, profilePicture, emailNotifications, messageNotifications } = await request.json();
+    const { firstName, lastName, profilePicture, phoneNumber, country, city, zipCode, dateOfBirth, province, barangay, emailNotifications, messageNotifications } = await request.json();
 
     if (!firstName || !lastName) {
       return NextResponse.json(
@@ -60,6 +60,29 @@ export async function PUT(
     // Only update profile picture if provided
     if (profilePicture) {
       updateData.profilePicture = profilePicture;
+    }
+
+    // Update address fields if provided
+    if (phoneNumber !== undefined) {
+      updateData.phoneNumber = phoneNumber || null;
+    }
+    if (country !== undefined) {
+      updateData.country = country || null;
+    }
+    if (city !== undefined) {
+      updateData.city = city || null;
+    }
+    if (province !== undefined) {
+      updateData.province = province || null;
+    }
+    if (barangay !== undefined) {
+      updateData.barangay = barangay || null;
+    }
+    if (zipCode !== undefined) {
+      updateData.zipCode = zipCode || null;
+    }
+    if (dateOfBirth !== undefined) {
+      updateData.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
     }
 
     // update notification settings if provided
@@ -81,6 +104,13 @@ export async function PUT(
         role: true,
         isVerified: true,
         profilePicture: true,
+        phoneNumber: true,
+        country: true,
+        city: true,
+        province: true,
+        barangay: true,
+        zipCode: true,
+        dateOfBirth: true,
         active: true,
         lastActive: true,
         emailNotifications: true,
@@ -109,7 +139,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const userId = parseInt(id, 10);
+    const userId = id; // id is now a UUID string
 
     // Get user from request headers
     const userIdHeader = request.headers.get("x-user-id");
@@ -120,7 +150,7 @@ export async function DELETE(
       );
     }
 
-    const currentUserId = parseInt(userIdHeader, 10);
+    const currentUserId = userIdHeader; // Direct string UUID
     
     // Get current user
     const currentUser = await prisma.user.findUnique({

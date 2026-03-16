@@ -36,14 +36,23 @@ export async function updateOverdueTasks(taskIds?: string[], sendNotifications: 
     if (sendNotifications) {
       const overdueTasks = await prisma.task.findMany({
         where: whereCondition,
-        select: { id: true, title: true, assigneeId: true }
+        select: {
+          id: true,
+          title: true,
+          assignees: {
+            select: {
+              assigneeId: true
+            }
+          }
+        }
       });
 
       // Send notifications for tasks that have assignees
       for (const task of overdueTasks) {
-        if (task.assigneeId) {
+        const assigneeIds = task.assignees.map(a => a.assigneeId);
+        for (const assigneeId of assigneeIds) {
           await createNotification({
-            receiverId: task.assigneeId,
+            receiverId: assigneeId,
             type: 'task_overdue',
             data: {
               title: 'Task Overdue',
@@ -93,12 +102,14 @@ export function isTaskDeadlineApproaching(task: {
 
 /**
  * Sends notifications for tasks approaching their deadline (within 24 hours)
- * Only sends notifications if the task hasn't already triggered one
+ * Only sends notifications once per task per deadline period
  */
 export async function notifyApproachingDeadlines(taskIds?: string[]) {
   try {
     const now = new Date();
     const oneDayFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
 
     // Build query for tasks with deadline approaching
     const whereCondition: any = {
@@ -116,9 +127,17 @@ export async function notifyApproachingDeadlines(taskIds?: string[]) {
           }
         },
         {
-          assigneeId: {
-            not: null
+          assignees: {
+            some: {}
           }
+        },
+        {
+          OR: [
+            // Either notification was never sent
+            { deadlineNotificationSentAt: null },
+            // Or it was sent before today (so we can notify again tomorrow if deadline extends)
+            { deadlineNotificationSentAt: { lt: startOfToday } }
+          ]
         }
       ]
     };
@@ -133,14 +152,18 @@ export async function notifyApproachingDeadlines(taskIds?: string[]) {
         id: true,
         title: true,
         dueDate: true,
-        assigneeId: true,
-        createdAt: true
+        createdById: true,
+        assignees: {
+          select: {
+            assigneeId: true
+          }
+        }
       }
     });
 
-    // Send notifications for each task
+    // Send notifications for each task and mark it as notified
     for (const task of approachingTasks) {
-      if (task.assigneeId && task.dueDate) {
+      if (task.dueDate) {
         const dueDate = new Date(task.dueDate);
         const timeLeft = dueDate.getTime() - now.getTime();
         const hours = Math.floor(timeLeft / (1000 * 60 * 60));
@@ -155,15 +178,25 @@ export async function notifyApproachingDeadlines(taskIds?: string[]) {
           timeString = 'very soon';
         }
 
-        await createNotification({
-          receiverId: task.assigneeId,
-          type: 'task_deadline_approaching',
-          data: {
-            title: 'Task Deadline Approaching',
-            message: `Your task "${task.title}" is due ${timeString}.`,
-            relatedId: task.id,
-            relatedType: 'task'
-          }
+        // Send notification to all assignees
+        const assigneeIds = task.assignees.map(a => a.assigneeId);
+        for (const assigneeId of assigneeIds) {
+          await createNotification({
+            receiverId: assigneeId,
+            type: 'task_deadline_approaching',
+            data: {
+              title: 'Task Deadline Approaching',
+              message: `Your task "${task.title}" is due ${timeString}.`,
+              relatedId: task.id,
+              relatedType: 'task'
+            }
+          });
+        }
+
+        // Mark task as notified by updating the timestamp
+        await prisma.task.update({
+          where: { id: task.id },
+          data: { deadlineNotificationSentAt: now }
         });
       }
     }
@@ -178,7 +211,7 @@ export async function notifyApproachingDeadlines(taskIds?: string[]) {
 /**
  * Sends a notification when a task is assigned to a user
  */
-export async function notifyTaskAssignment(taskId: string, assigneeId: number, taskTitle: string) {
+export async function notifyTaskAssignment(taskId: string, assigneeId: string, taskTitle: string) {
   try {
     await createNotification({
       receiverId: assigneeId,

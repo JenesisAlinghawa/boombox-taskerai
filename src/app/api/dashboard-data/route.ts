@@ -14,22 +14,44 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const numUserId = parseInt(userId);
-
     // Ensure overdue tasks are updated
     await updateOverdueTasks();
 
     // Check for approaching deadlines
     await notifyApproachingDeadlines();
 
+    // Get user role to determine filtering
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    // Build query filter based on role
+    let taskFilter: any;
+    
+    if (user.role === "ADMIN" || user.role === "OWNER") {
+      // Admins and Owners see all tasks
+      taskFilter = {};
+    } else {
+      // Employees only see tasks they created or are assigned to
+      taskFilter = {
+        OR: [
+          { createdById: userId },
+          { assignees: { some: { assigneeId: userId } } },
+        ],
+      };
+    }
+
     // Get tasks for the current user (limit to prevent memory issues)
     const tasks = await prisma.task.findMany({
-      where: {
-        OR: [
-          { createdById: numUserId },
-          { assigneeId: numUserId },
-        ],
-      },
+      where: taskFilter,
       select: {
         id: true,
         title: true,
@@ -45,7 +67,7 @@ export async function GET(request: NextRequest) {
       take: 1000, // Limit total tasks to prevent memory issues
     });
 
-    console.log(`Dashboard API: Found ${tasks.length} tasks for user ${numUserId}`);
+    console.log(`Dashboard API: Found ${tasks.length} tasks for user ${userId} with role ${user.role}`);
 
     // Calculate stats
     const now = new Date();
@@ -88,12 +110,12 @@ export async function GET(request: NextRequest) {
             (t.status === "stuck" || 
              (t.status !== "completed" &&
               t.dueDate &&
-              new Date(t.dueDate) < day))
+              new Date(t.dueDate) < now))
         ).length
       ),
     };
 
-    // Get calendar tasks for current month
+    // Get calendar tasks for current month (month-specific queries use separate /calendar endpoint)
     const monthStart = startOfMonth(now);
     const monthEnd = endOfMonth(now);
     const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -130,23 +152,30 @@ export async function GET(request: NextRequest) {
       aiInsight = "Great progress! Keep maintaining this momentum with your task completion.";
     }
 
-    return NextResponse.json({
-      pending,
-      inProgress,
-      completed,
-      overdue,
-      pendingTasks: tasks
-        .filter((t) => t.status === "todo")
-        .slice(0, 10) // Limit to 10 pending tasks to prevent memory issues
+    // Helper function to format task data
+    const formatTasks = (taskList: typeof tasks) => 
+      taskList
+        .slice(0, 10) // Limit to 10 tasks per section
         .map((t) => ({
           id: t.id,
           title: t.title,
           priority: t.priority || "medium",
           dueDate: t.dueDate ? new Date(t.dueDate).toLocaleDateString() : undefined,
-        })),
+        }));
+
+    return NextResponse.json({
+      pending,
+      inProgress,
+      completed,
+      overdue,
+      pendingTasks: formatTasks(tasks.filter((t) => t.status === "todo")),
+      inProgressTasks: formatTasks(tasks.filter((t) => t.status === "inprogress")),
+      overdueTasks: formatTasks(tasks.filter((t) => t.status === "stuck" || (t.status !== "completed" && t.dueDate && new Date(t.dueDate) < now))),
+      completedTasks: formatTasks(tasks.filter((t) => t.status === "completed")),
       weeklyData,
       calendarTasks,
       aiInsight,
+      userRole: user.role,
     });
   } catch (error) {
     console.error("Error fetching dashboard data:", error);

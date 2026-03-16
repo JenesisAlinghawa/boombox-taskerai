@@ -3,7 +3,7 @@ import type { Attachment, Comment, Task, User } from "@/app/components/tasks/typ
 import { useToast } from "@/app/components/providers-popups/ToastNotificationProviderComponent";
 import { useConfirm } from "@/app/components/providers-popups/ConfirmationDialogProviderComponent";
 
-export function useTasks(currentEmployee: User | null) {
+export function useTasks(currentUser: User | null) {
   const toast = useToast();
   // Hook-based confirm; ensure `ConfirmProvider` wraps the page
   const confirm = useConfirm();
@@ -23,26 +23,69 @@ export function useTasks(currentEmployee: User | null) {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
-  useEffect(() => {
-    if (!currentEmployee) return;
-    fetch("/api/task-management", {
-      headers: { "x-user-id": String(currentEmployee.id) },
-    })
-      .then((r) => r.json())
-      .then((d) => setTasks(Array.isArray(d?.tasks) ? d.tasks : []))
-      .catch(console.error);
+  const [taskLoadError, setTaskLoadError] = useState<string | null>(null);
+  const [usersLoadError, setUsersLoadError] = useState<string | null>(null);
 
-    fetch("/api/user-management/assignable", {
-      headers: { "x-user-id": String(currentEmployee.id) },
+  useEffect(() => {
+    if (!currentUser) {
+      console.warn("[useTasks] currentUser is null, skipping fetch");
+      return;
+    }
+
+    if (!currentUser.id) {
+      console.error("[useTasks] currentUser.id is empty:", currentUser);
+      setTaskLoadError("User ID is missing from session");
+      return;
+    }
+    
+    // Fetch tasks
+    fetch("/api/task-management", {
+      headers: { "x-user-id": String(currentUser.id) },
     })
-      .then((r) => r.json())
-      .then((d) => setUsers(d?.users || []))
-      .catch(console.error);
-  }, [currentEmployee]);
+      .then(async (r) => {
+        if (!r.ok) {
+          const errorData = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+          console.error("[useTasks] Tasks API error:", r.status, errorData, "sent userId:", currentUser.id);
+          throw new Error(errorData.error || `Failed to fetch tasks (${r.status})`);
+        }
+        return r.json();
+      })
+      .then((d) => {
+        setTasks(Array.isArray(d?.tasks) ? d.tasks : []);
+        setTaskLoadError(null);
+      })
+      .catch((err) => {
+        console.error("[useTasks] Error loading tasks:", err);
+        setTaskLoadError(err.message);
+        setTasks([]);
+      });
+
+    // Fetch assignable users
+    fetch("/api/user-management/assignable", {
+      headers: { "x-user-id": String(currentUser.id) },
+    })
+      .then(async (r) => {
+        if (!r.ok) {
+          const errorData = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+          console.error("[useTasks] Users API error:", r.status, errorData);
+          throw new Error(errorData.error || `Failed to fetch users (${r.status})`);
+        }
+        return r.json();
+      })
+      .then((d) => {
+        setUsers(d?.users || []);
+        setUsersLoadError(null);
+      })
+      .catch((err) => {
+        console.error("[useTasks] Error loading users:", err);
+        setUsersLoadError(err.message);
+        setUsers([]);
+      });
+  }, [currentUser]);
 
   const getHeaders = (additional?: Record<string, string>) => ({
     "Content-Type": "application/json",
-    ...(currentEmployee && { "x-user-id": String(currentEmployee.id) }),
+    ...(currentUser && { "x-user-id": String(currentUser.id) }),
     ...(additional || {}),
   });
 
@@ -63,7 +106,7 @@ export function useTasks(currentEmployee: User | null) {
       // On non-OK parse server error body for better feedback
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
-        const msg = errBody?.error || `Failed to update (status ${res.status})`;
+        const msg = errBody?.warning || errBody?.error || `Failed to update (status ${res.status})`;
         throw new Error(msg);
       }
 
@@ -112,7 +155,15 @@ export function useTasks(currentEmployee: User | null) {
   };
 
   const handleDeleteTask = async (id: string) => {
-    const confirmed = await confirm({ message: "Delete this task?" });
+    const task = tasks.find(t => t.id === id);
+    const isTaskCreator = task && currentUser && currentUser.id === task.createdById;
+    const isAdminOrOwner = currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'OWNER');
+    
+    const confirmMessage = isTaskCreator || isAdminOrOwner 
+      ? "Confirm deleting this task? This action cannot be undone."
+      : "Delete this task?";
+    
+    const confirmed = await confirm({ message: confirmMessage });
     if (!confirmed) return;
     try {
       const res = await fetch(`/api/task-management/${id}`, {
@@ -121,7 +172,12 @@ export function useTasks(currentEmployee: User | null) {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Server error: ${res.status}`);
+        if (err.warning) {
+          toast.error(err.warning);
+        } else {
+          toast.error(err.error || `Server error: ${res.status}`);
+        }
+        return;
       }
       setTasks((prev) => prev.filter((t) => t.id !== id));
       if (selectedTaskId === id) {
@@ -262,6 +318,34 @@ export function useTasks(currentEmployee: User | null) {
     }
   };
 
+  const handleReply = async (commentId: number, content: string) => {
+    try {
+      const res = await fetch(`/api/task-management/${selectedTaskId}/comments`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({ content, parentCommentId: commentId }),
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || `Failed to reply (${res.status})`);
+      }
+      const data = await res.json();
+      
+      // Add the new reply to the comments state
+      setComments((prev) => [...prev, data.comment]);
+      
+      // Refresh task details to get updated comments with proper structure
+      if (selectedTaskId) {
+        await loadTaskDetails(selectedTaskId);
+      }
+      
+      toast.success("Reply added");
+    } catch (err) {
+      console.error("Error adding reply:", err);
+      toast.error(err instanceof Error ? err.message : "Failed to add reply");
+    }
+  };
+
   const getFilteredAndSortedTasks = () => {
     const filtered = tasks
       .filter(
@@ -271,9 +355,15 @@ export function useTasks(currentEmployee: User | null) {
       .filter((task) => {
         const query = searchQuery.toLowerCase();
         const title = task.title.toLowerCase();
-        const assignee = task.assignee?.name?.toLowerCase() || task.assignee?.email?.toLowerCase() || "";
+        // Get assignee names from multiple assignees array or fallback to single assignee
+        const assigneeNames = task.assignees?.map(
+          (a) => a.assignee?.name?.toLowerCase() || a.assignee?.email?.toLowerCase() || ""
+        ).join(" ") || 
+        task.assignee?.name?.toLowerCase() || 
+        task.assignee?.email?.toLowerCase() || 
+        "";
         const dueDate = task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "";
-        return title.includes(query) || assignee.includes(query) || dueDate.includes(query);
+        return title.includes(query) || assigneeNames.includes(query) || dueDate.includes(query);
       });
 
     const sorted = filtered.sort((a, b) => {
@@ -323,9 +413,12 @@ export function useTasks(currentEmployee: User | null) {
     handleAddComment,
     handleDeleteComment,
     handleEditComment,
+    handleReply,
     handleAddAttachment,
     handleDeleteAttachment,
     getFilteredAndSortedTasks,
+    taskLoadError,
+    usersLoadError,
   };
 }
 

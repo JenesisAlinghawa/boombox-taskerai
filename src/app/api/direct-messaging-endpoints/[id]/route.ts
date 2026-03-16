@@ -8,8 +8,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const userId = parseInt(new URL(req.url).searchParams.get('userId') || '0')
-    const otherUserId = parseInt(id)
+    const userId = new URL(req.url).searchParams.get('userId')
+    const otherUserId = id
 
     if (!userId) {
       return NextResponse.json({ error: 'User ID required' }, { status: 400 })
@@ -28,6 +28,7 @@ export async function GET(
         },
       },
       orderBy: { createdAt: 'asc' },
+      take: 100,
     })
 
     // Mark messages as read
@@ -98,6 +99,59 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, message })
   } catch (error: any) {
     console.error('Send DM error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const messageId = parseInt(id)
+    const userId = req.headers.get('x-user-id')
+
+    if (!messageId) {
+      return NextResponse.json({ error: 'Message ID required' }, { status: 400 })
+    }
+
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID required' }, { status: 401 })
+    }
+
+    const { content } = await req.json()
+
+    if (!content || !content.trim()) {
+      return NextResponse.json({ error: 'Content required' }, { status: 400 })
+    }
+
+    // Verify user owns the message
+    const message = await prisma.directMessage.findUnique({
+      where: { id: messageId },
+    })
+
+    if (!message) {
+      return NextResponse.json({ error: 'Message not found' }, { status: 404 })
+    }
+
+    if (message.senderId !== userId) {
+      return NextResponse.json({ error: 'Unauthorized to edit this message' }, { status: 403 })
+    }
+
+    const updatedMessage = await prisma.directMessage.update({
+      where: { id: messageId },
+      data: { content },
+      include: {
+        sender: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+      },
+    })
+
+    return NextResponse.json({ success: true, message: updatedMessage })
+  } catch (error: any) {
+    console.error('Patch DM error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
