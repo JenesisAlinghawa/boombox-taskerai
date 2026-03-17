@@ -34,6 +34,13 @@ export async function POST(request: NextRequest) {
     );
 
     // Clear authentication cookies
+    response.cookies.set("userId", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 0,
+    });
+
     response.cookies.set("auth_token", "", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

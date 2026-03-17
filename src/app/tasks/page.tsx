@@ -17,7 +17,10 @@ import {
   ToastProvider,
   useToast,
 } from "@/app/components/providers-popups/ToastNotificationProviderComponent";
-import { ConfirmProvider, useConfirm } from "@/app/components/providers-popups/ConfirmationDialogProviderComponent";
+import {
+  ConfirmProvider,
+  useConfirm,
+} from "@/app/components/providers-popups/ConfirmationDialogProviderComponent";
 import TaskGroupedDisplay from "@/app/components/tasks/TaskGroupedDisplayComponent";
 import TaskSummary from "@/app/components/dashboard/DoThisFirst";
 import type {
@@ -134,16 +137,19 @@ function TasksPageContent() {
 
   const handleEdit = async (taskId: string) => {
     // If user is task creator, admin/owner, ask for confirmation
-    const isTaskCreator = taskDetails && currentUser && currentUser.id === taskDetails.createdById;
-    const isAdminOrOwner = currentUser && (currentUser.role === "ADMIN" || currentUser.role === "OWNER");
-    
+    const isTaskCreator =
+      taskDetails && currentUser && currentUser.id === taskDetails.createdById;
+    const isAdminOrOwner =
+      currentUser &&
+      (currentUser.role === "ADMIN" || currentUser.role === "OWNER");
+
     if (isTaskCreator || isAdminOrOwner) {
-      const confirmed = await confirm({ 
-        message: "Confirm editing this task?" 
+      const confirmed = await confirm({
+        message: "Confirm editing this task?",
       });
       if (!confirmed) return;
     }
-    
+
     setEditingTaskId(taskId);
     loadTaskDetails(taskId);
     setShowEditModal(true);
@@ -170,12 +176,14 @@ function TasksPageContent() {
     }
 
     // If user is task creator, admin/owner, ask for confirmation
-    const isTaskCreator = taskDetails && currentUser.id === taskDetails.createdById;
-    const isAdminOrOwner = currentUser.role === "ADMIN" || currentUser.role === "OWNER";
-    
+    const isTaskCreator =
+      taskDetails && currentUser.id === taskDetails.createdById;
+    const isAdminOrOwner =
+      currentUser.role === "ADMIN" || currentUser.role === "OWNER";
+
     if (isTaskCreator || isAdminOrOwner) {
-      const confirmed = await confirm({ 
-        message: "Confirm changing task status?" 
+      const confirmed = await confirm({
+        message: "Confirm changing task status?",
       });
       if (!confirmed) return;
     }
@@ -390,7 +398,7 @@ function TasksPageContent() {
         {(taskLoadError || usersLoadError) && (
           <div className="m-4 p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-sm text-red-700 font-medium">
-              ⚠️ Error loading data:
+              Error loading data:
             </p>
             {taskLoadError && (
               <p className="text-sm text-red-600 mt-1">
@@ -415,7 +423,7 @@ function TasksPageContent() {
         {!taskLoadError && !usersLoadError && !currentUser && (
           <div className="m-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p className="text-sm text-yellow-700 font-medium">
-              ⏳ Loading user session...
+              Loading tasks...
             </p>
           </div>
         )}

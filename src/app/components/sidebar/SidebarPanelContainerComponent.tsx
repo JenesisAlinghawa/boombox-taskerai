@@ -8,9 +8,9 @@ export function SidePanel() {
   const [isHovered, setIsHovered] = useState(false);
 
   const width = isHovered ? 152 : 62;
-  const leftGap = 4;
-  const rightGap = 8;
-  const verticalGap = 4;
+  const leftGap = 0;
+  const rightGap = 0;
+  const verticalGap = 0;
 
   useEffect(() => {
     const main = document.querySelector("main");

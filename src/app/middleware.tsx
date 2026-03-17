@@ -15,9 +15,14 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // For all other routes rely on client-side authentication checks
-  // The client pages will redirect to login if no session is found
-  // This is because middleware runs server-side and doesn't have access to localStorage
+  // Check for authentication on protected routes
+  // Get userId from cookies (set by login)
+  const userId = request.cookies.get("userId")?.value;
+
+  if (!userId) {
+    // No authentication found, redirect to login
+    return NextResponse.redirect(new URL("/auth/login", request.url));
+  }
 
   return NextResponse.next();
 }

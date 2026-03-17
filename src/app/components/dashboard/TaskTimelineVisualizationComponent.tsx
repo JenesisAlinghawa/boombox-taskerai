@@ -77,27 +77,44 @@ const TaskTimeline = ({
 
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
   ];
 
   const currentYearRange = Array.from(
     { length: 7 },
-    (_, i) => today.getFullYear() - 3 + i
+    (_, i) => today.getFullYear() - 3 + i,
   );
 
   const statusStyles = {
-    pending:    "bg-indigo-50 hover:bg-indigo-100 border-indigo-200",
+    pending: "bg-indigo-50 hover:bg-indigo-100 border-indigo-200",
     inProgress: "bg-blue-50 hover:bg-blue-100 border-blue-200",
-    overdue:    "bg-red-50 hover:bg-red-100 border-red-200",
-    completed:  "bg-green-50 hover:bg-green-100 border-green-200",
+    overdue: "bg-red-50 hover:bg-red-100 border-red-200",
+    completed: "bg-green-50 hover:bg-green-100 border-green-200",
   } as const;
 
-  const getDayStatus = (tasks: any[] | undefined): keyof typeof statusStyles | null => {
+  const getDayStatus = (
+    tasks: any[] | undefined,
+  ): keyof typeof statusStyles | null => {
     if (!tasks?.length) return null;
-    if (tasks.some(t => t.status === "completed" || t.status === "done")) return "completed";
-    if (tasks.some(t => t.status === "inprogress" || t.status === "in-progress")) return "inProgress";
-    if (tasks.some(t => t.status === "todo" || t.status === "pending")) return "pending";
+    if (tasks.some((t) => t.status === "completed" || t.status === "done"))
+      return "completed";
+    if (
+      tasks.some((t) => t.status === "inprogress" || t.status === "in-progress")
+    )
+      return "inProgress";
+    if (tasks.some((t) => t.status === "todo" || t.status === "pending"))
+      return "pending";
     return "overdue";
   };
 
@@ -116,9 +133,7 @@ const TaskTimeline = ({
     >
       {/* Header */}
       <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-        <h2 className="text-base font-medium text-gray-800">
-          Task Timeline
-        </h2>
+        <h2 className="text-base font-medium text-gray-800">Task Timeline</h2>
 
         <div className="flex items-center gap-1.5">
           <select
@@ -191,10 +206,10 @@ const TaskTimeline = ({
       </div>
 
       {/* Calendar grid – smaller cells */}
-      <div className="grid grid-cols-7 gap-0 p-1 flex-1">
+      <div className="grid grid-cols-7 gap-0 p-0 flex-1 overflow-hidden">
         {/* Empty cells */}
         {Array.from({ length: firstDay.getDay() }).map((_, i) => (
-          <div key={`empty-${i}`} className="h-16" />
+          <div key={`empty-${i}`} className="flex-1" />
         ))}
 
         {/* Days */}
@@ -202,7 +217,8 @@ const TaskTimeline = ({
           const dayNum = day.getDate();
           const isToday = isSameDay(day, today);
           const isWeekend = getDay(day) === 0 || getDay(day) === 6;
-          const dayTasks = calendarTasks.find(t => t.date === dayNum)?.tasks || [];
+          const dayTasks =
+            calendarTasks.find((t) => t.date === dayNum)?.tasks || [];
           const hasTasks = dayTasks.length > 0;
           const isSelected = selectedDay === dayNum;
 
@@ -240,8 +256,8 @@ const TaskTimeline = ({
               }}
               disabled={!hasTasks}
               className={`
-                relative h-16 flex flex-col items-center justify-center
-                text-xs font-medium rounded-md border transition-all duration-150
+                relative flex flex-col items-center justify-center
+                text-xs font-medium border transition-all duration-150
                 ${cellClass}
                 ${hasTasks ? "cursor-pointer hover:shadow-sm" : "cursor-default"}
               `}
@@ -249,9 +265,7 @@ const TaskTimeline = ({
               <span className="text-sm font-semibold">{dayNum}</span>
 
               {hasTasks && status && (
-                <div className="absolute top-1 right-1">
-                  {iconMap[status]}
-                </div>
+                <div className="absolute top-1 right-1">{iconMap[status]}</div>
               )}
 
               {hasTasks && (
@@ -285,7 +299,10 @@ const TaskTimeline = ({
           >
             <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
               <h3 className="text-base font-medium text-gray-900">
-                {format(new Date(currentYear, currentMonth, selectedDay), "EEEE, MMM d")}
+                {format(
+                  new Date(currentYear, currentMonth, selectedDay),
+                  "EEEE, MMM d",
+                )}
               </h3>
               <button
                 onClick={() => {
@@ -316,9 +333,13 @@ const TaskTimeline = ({
                       <span
                         className={`
                           px-2 py-0.5 rounded-full font-medium text-xs
-                          ${task.priority === "high" ? "bg-red-100 text-red-700" :
-                            task.priority === "medium" ? "bg-yellow-100 text-yellow-700" :
-                            "bg-green-100 text-green-700"}
+                          ${
+                            task.priority === "high"
+                              ? "bg-red-100 text-red-700"
+                              : task.priority === "medium"
+                                ? "bg-yellow-100 text-yellow-700"
+                                : "bg-green-100 text-green-700"
+                          }
                         `}
                       >
                         {task.priority}
@@ -328,14 +349,23 @@ const TaskTimeline = ({
                       <span
                         className={`
                           px-2 py-0.5 rounded-full font-medium text-xs
-                          ${task.status?.includes("done") || task.status === "completed" ? "bg-green-100 text-green-700" :
-                            task.status?.includes("progress") ? "bg-blue-100 text-blue-700" :
-                            "bg-indigo-100 text-indigo-700"}
+                          ${
+                            task.status?.includes("done") ||
+                            task.status === "completed"
+                              ? "bg-green-100 text-green-700"
+                              : task.status?.includes("progress")
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-indigo-100 text-indigo-700"
+                          }
                         `}
                       >
-                        {task.status === "todo" ? "To Do" :
-                         task.status === "inprogress" ? "In Progress" :
-                         task.status === "completed" ? "Done" : task.status}
+                        {task.status === "todo"
+                          ? "To Do"
+                          : task.status === "inprogress"
+                            ? "In Progress"
+                            : task.status === "completed"
+                              ? "Done"
+                              : task.status}
                       </span>
                     )}
                   </div>

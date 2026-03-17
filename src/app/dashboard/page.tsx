@@ -10,9 +10,8 @@ import { ConfirmProvider } from "@/app/components/providers-popups/ConfirmationD
 import DashboardHeader from "@/app/components/dashboard/DashboardPageHeaderComponent";
 import TaskTimeline from "@/app/components/dashboard/TaskTimelineVisualizationComponent";
 import TaskStatusGrid from "@/app/components/dashboard/TaskStatusGridComponent";
-import TaskSummary from "@/app/components/dashboard/DoThisFirst";
-import { AnalyticsTaskExecutionSummary } from "@/app/components/analytics/AnalyticsTaskExecutionSummaryPieChartComponent";
-import { NaturalLanguageAutomatedInsights } from "@/app/components/analytics/NaturalLanguageAutomatedInsightsComponent";
+import { AnalyticsTaskExecutionSummary } from "@/app/components/dashboard/AnalyticsTaskExecutionSummaryPieChartComponent";
+import { CombinedTaskSummaryAndInsights } from "@/app/components/dashboard/CombinedTaskSummaryAndInsightsComponent";
 
 interface DashboardData {
   pending: number;
@@ -289,7 +288,7 @@ export default function DashboardPage() {
                   </div>
 
                   {/* Task Status Grid */}
-                  <div className="h-96">
+                  <div className="h-[620px] min-h-[500px]">
                     <TaskStatusGrid
                       pending={data.pending}
                       inProgress={data.inProgress}
@@ -301,73 +300,45 @@ export default function DashboardPage() {
                       completedTasks={data.completedTasks}
                     />
                   </div>
-
-                {/* AI Insights */}
-                <div className="h-72">
-                  <NaturalLanguageAutomatedInsights
-                    loading={isLoading}
-                    insights={[
-                      {
-                        text: `Your completion rate is at ${Math.round((data.completed / (data.completed + data.inProgress + data.pending + data.overdue || 1)) * 100)}%, which is ${Math.round((data.completed / (data.completed + data.inProgress + data.pending + data.overdue || 1)) * 100) > 70 ? "excellent" : Math.round((data.completed / (data.completed + data.inProgress + data.pending + data.overdue || 1)) * 100) > 50 ? "good" : "needs improvement"}. Keep pushing!`,
-                        type: Math.round((data.completed / (data.completed + data.inProgress + data.pending + data.overdue || 1)) * 100) > 70 ? "positive" : Math.round((data.completed / (data.completed + data.inProgress + data.pending + data.overdue || 1)) * 100) > 50 ? "info" : "warning",
-                        icon: "chart",
-                      },
-                      {
-                        text: `${data.inProgress} task${data.inProgress !== 1 ? "s are" : " is"} currently in progress. Steady pace maintained.`,
-                        type: "info",
-                        icon: "trending",
-                      },
-                      ...(data.overdue > 0
-                        ? [
-                            {
-                              text: `⚠️ ${data.overdue} overdue task${data.overdue !== 1 ? "s" : ""} need immediate attention to stay on track.`,
-                              type: "warning" as const,
-                              icon: "alert" as const,
-                            },
-                          ]
-                        : []),
-                    ]}
-                    anomalies={[]}
-                    naturalLanguageSummary={`You have ${data.pending + data.inProgress + data.completed + data.overdue} tasks in total. ${data.completed > 0 ? `Completion rate is ${Math.round((data.completed / (data.completed + data.inProgress + data.pending + data.overdue || 1)) * 100)}%.` : ""} Currently focused on ${data.inProgress} in-progress task${data.inProgress !== 1 ? "s" : ""}. ${data.overdue > 0 ? `Urgent: ${data.overdue} task${data.overdue !== 1 ? "s" : ""} ${data.overdue !== 1 ? "are" : "is"} overdue.` : "On track with no overdue items."}`}
-                  />
-                </div>
-              </div>
-
-              {/* RIGHT COLUMN: Timeline, Task Summary + Task Execution */}
-              <div className="lg:col-span-5 flex flex-col gap-2">
-                {/* Timeline */}
-                <div className="h-80">
-                  <TaskTimeline
-                    currentMonth={currentMonth}
-                    currentYear={currentYear}
-                    setCurrentMonth={setCurrentMonth}
-                    setCurrentYear={setCurrentYear}
-                    calendarTasks={data.calendarTasks}
-                  />
                 </div>
 
-                {/* Task Summary - Do This First */}
-                <div className="h-64">
-                  <TaskSummary
-                    tasks={[
-                      ...data.overdueTasks,
-                      ...data.inProgressTasks,
-                      ...data.pendingTasks,
-                    ]}
-                    currentUser={currentUser}
-                    userRole={data.userRole}
-                    filterMode="dashboard"
-                  />
-                </div>
+                {/* RIGHT COLUMN: Timeline, Task Summary, Task Execution + AI Insights */}
+                <div className="lg:col-span-5 flex flex-col gap-2">
+                  {/* Timeline */}
+                  <div className="h-90">
+                    <TaskTimeline
+                      currentMonth={currentMonth}
+                      currentYear={currentYear}
+                      setCurrentMonth={setCurrentMonth}
+                      setCurrentYear={setCurrentYear}
+                      calendarTasks={data.calendarTasks}
+                    />
+                  </div>
 
-                {/* Task Execution Summary - Overall Pie Chart */}
-                <div className="h-80">
-                  <AnalyticsTaskExecutionSummary
-                    completed={data.completed}
-                    inProgress={data.inProgress}
-                    pending={data.pending}
-                    overdue={data.overdue}
-                  />
+                  {/* Task Summary - Do This First */}
+                  <div className="h-[600px]">
+                    <CombinedTaskSummaryAndInsights
+                      tasks={[
+                        ...data.overdueTasks,
+                        ...data.inProgressTasks,
+                        ...data.pendingTasks,
+                        ...data.completedTasks,
+                      ]}
+                      currentUser={currentUser}
+                      userRole={data.userRole}
+                      filterMode="dashboard"
+                    />
+                  </div>
+
+                  {/* Task Execution Summary - Overall Pie Chart */}
+                  <div className="h-64">
+                    <AnalyticsTaskExecutionSummary
+                      completed={data.completed}
+                      inProgress={data.inProgress}
+                      pending={data.pending}
+                      overdue={data.overdue}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

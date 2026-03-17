@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   ClipboardList,
   MessageCircle,
-  BarChart2,
   FileText,
   AlignCenter,
 } from "lucide-react";
@@ -40,12 +39,6 @@ const mainMenuItems = [
 ];
 
 const otherMenuItems = [
-  {
-    icon: BarChart2,
-    label: "Analytics",
-    href: "/analytics",
-    animationClass: "animate-analytics",
-  },
   {
     icon: FileText,
     label: "Logs",

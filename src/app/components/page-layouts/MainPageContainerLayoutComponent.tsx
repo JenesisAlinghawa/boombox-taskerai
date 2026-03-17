@@ -43,9 +43,7 @@ export const PageContainer = ({ children, title }: PageContainerProps) => {
   const menuItems = [
     { label: "Dashboard", path: "/dashboard" },
     { label: "Tasks", path: "/tasks" },
-    { label: "Analytics", path: "/analytics" },
     // settings accessible via profile dropdown now
-
     { label: "Teams", path: "/teams" },
     // add more as needed
   ];
@@ -107,15 +105,15 @@ export const PageContainer = ({ children, title }: PageContainerProps) => {
         display: "flex",
         flexDirection: "column",
         background: "transparent",
-        padding: 2,
-        margin: 0,
+        padding: 0,
+        marginLeft: 10,
         overflow: "visible", // allow dropdowns to escape
       }}
     >
-      <div className="relative z-[2000] bg-blue-300 rounded-sm shadow-sm px-6 py-0 m-0 mb-1 overflow-visible transition-shadow duration-200">
+      <div className="relative z-[2000] bg-blue-300 shadow-sm px-6 py-0 ml-[-10px] mb-2 overflow-visible transition-shadow duration-200">
         <div className="flex items-center justify-between gap-4">
           {/* Page Title */}
-          <div className="text-white text-lg min-w-fit hidden sm:block">
+          <div className="text-black capitalize text-lg min-w-fit hidden sm:block">
             {title || "Dashboard"}
           </div>
 
@@ -175,7 +173,7 @@ export const PageContainer = ({ children, title }: PageContainerProps) => {
                 <button
                   onClick={() => setShowDropdown(!showDropdown)}
                   title={`${employee.firstName} ${employee.lastName} (${employee.role ? employee.role.charAt(0).toUpperCase() + employee.role.slice(1).toLowerCase() : "Employee"})`}
-                  className={`relative flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 ${
+                  className={`relative flex items-center gap-2 px-1 py-1 rounded-lg transition-all duration-200 ${
                     showDropdown
                       ? "bg-white/30"
                       : "bg-white/20 hover:bg-white/30"

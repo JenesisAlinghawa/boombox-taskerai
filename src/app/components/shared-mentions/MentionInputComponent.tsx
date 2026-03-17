@@ -20,7 +20,7 @@ interface MentionInputProps {
   rows?: number;
 }
 
-export const MentionInput = React.memo(function MentionInput({
+const MentionInputComponent = ({
   value,
   onChange,
   onMentionsChange,
@@ -30,7 +30,7 @@ export const MentionInput = React.memo(function MentionInput({
   className = "",
   disabled = false,
   rows = 3,
-}: MentionInputProps) {
+}: MentionInputProps) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<MentionData[]>([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
@@ -213,4 +213,7 @@ export const MentionInput = React.memo(function MentionInput({
       )}
     </div>
   );
-});
+};
+
+export const MentionInput = React.memo(MentionInputComponent);
+MentionInput.displayName = "MentionInput";

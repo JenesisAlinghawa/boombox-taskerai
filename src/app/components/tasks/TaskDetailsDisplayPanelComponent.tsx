@@ -549,52 +549,6 @@ export default function TaskDetailsPanel({
 
         {/* Content */}
         <div className="p-6 space-y-6">
-          {/* TaskerBot Next Steps Guidance */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <span className="text-2xl flex-shrink-0">🤖</span>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-gray-900 mb-2">
-                  TaskerBot's Next Steps
-                </h3>
-                <ul className="text-sm text-gray-700 space-y-1.5">
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600 font-bold">1.</span>
-                    <span>
-                      <strong>Add details:</strong> Include comments, due dates,
-                      and descriptions to clarify the work
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600 font-bold">2.</span>
-                    <span>
-                      <strong>Communicate:</strong> Leave comments to provide
-                      updates to the assigned team members
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600 font-bold">3.</span>
-                    <span>
-                      <strong>Track progress:</strong> Monitor task status as
-                      team members work on it
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600 font-bold">4.</span>
-                    <span>
-                      <strong>Mark complete:</strong> Update the status to
-                      "Done" when the work is finished
-                    </span>
-                  </li>
-                </ul>
-                <p className="text-xs text-gray-600 mt-3 italic">
-                  💡 Need help? Open TaskerBot chat to ask questions or get task
-                  suggestions!
-                </p>
-              </div>
-            </div>
-          </div>
-
           {/* Current User Profile Card */}
           {currentUser && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-5">

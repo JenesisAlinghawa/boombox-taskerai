@@ -134,16 +134,19 @@ const TaskSummary = ({
         transition-all
         duration-200
         hover:shadow-md
+        h-full
+        flex
+        flex-col
       "
     >
       {/* Header */}
-      <div className="px-3 py-2 border-b border-amber-200 bg-amber-50/80 flex items-center gap-2">
+      <div className="px-3 py-2 border-b border-amber-200 bg-amber-50/80 flex items-center gap-2 flex-shrink-0">
         <Zap size={16} className="text-amber-600" />
         <h2 className="text-sm font-semibold text-gray-900">Do This First</h2>
       </div>
 
       {/* Content */}
-      <div className="p-2 space-y-1 max-h-40 overflow-y-auto">
+      <div className="flex-1 p-2 space-y-1 overflow-y-auto">
         {userPriorityTasks.length > 0 ? (
           userPriorityTasks.map((task, index) => (
             <div

@@ -69,16 +69,32 @@ export default function ResetPage() {
       <div
         style={{
           position: "absolute",
-          right: 0,
+          right: 100,
           top: 0,
           width: "45%",
           height: "100%",
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
           zIndex: 1,
         }}
       >
+        <div
+          style={{
+            marginBottom: "20px",
+            fontSize: "28px",
+            fontWeight: "500",
+            color: "rgba(0, 0, 0, 0.8)",
+            textAlign: "center",
+            maxWidth: "900px",
+            letterSpacing: "0.5px",
+          }}
+        >
+          A TASK MANAGEMENT SYSTEM
+          <br />
+          FOR
+        </div>
         <Image
           src="/assets/images/BBX-Logo.png"
           alt="Boombox"

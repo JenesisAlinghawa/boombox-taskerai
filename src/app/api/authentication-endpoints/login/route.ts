@@ -72,10 +72,21 @@ export async function POST(request: NextRequest) {
       // Don't throw - logging failure shouldn't prevent login
     }
     
-    return NextResponse.json({
+    // Create response with authentication cookie
+    const response = NextResponse.json({
       success: true,
       user: userWithoutPassword,
     })
+
+    // Set secure HTTP-only cookie for authentication
+    response.cookies.set('userId', user.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+    })
+
+    return response
   } catch (error) {
     console.error('Login error:', error)
     return NextResponse.json(
