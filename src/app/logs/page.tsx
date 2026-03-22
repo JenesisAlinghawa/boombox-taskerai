@@ -99,7 +99,7 @@ export default function LogsPage() {
   // Access denied for non-admin users
   if (!hasAccess) {
     return (
-      <div className="min-h-screen bg-transparent flex items-center justify-center p-5">
+      <div className="min-h-screen bg-transparent m-2 flex items-center justify-center p-5">
         <div className="max-w-xs text-center bg-red-500/10 border border-red-500/30 rounded-lg p-10 flex flex-col items-center gap-4">
           <Lock size={48} className="text-red-400" />
           <h2 className="m-0 text-xl font-semibold text-black/62">
@@ -136,7 +136,7 @@ export default function LogsPage() {
 
   return (
     <PageContainer title="ACTIVITY LOGS">
-      <PageContentCon>
+      <PageContentCon className="m-2">
         <LogsManagementComponent logs={logs} loading={false} />
       </PageContentCon>
     </PageContainer>

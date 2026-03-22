@@ -26,8 +26,21 @@ export async function GET(request: NextRequest) {
     // Check for approaching deadlines and send notifications
     await notifyApproachingDeadlines();
 
-    // Build query filter - all users see all tasks
+    // Build query filter based on role
     let taskFilter: any = {};
+    
+    if (user.role === "ADMIN" || user.role === "OWNER") {
+      // Admins and Owners see all tasks
+      taskFilter = {};
+    } else {
+      // Employees only see tasks they created or are assigned to
+      taskFilter = {
+        OR: [
+          { createdById: user.id },
+          { assignees: { some: { assigneeId: user.id } } },
+        ],
+      };
+    }
 
     // Get tasks with role-based filtering
     const tasks = await db.task.findMany({

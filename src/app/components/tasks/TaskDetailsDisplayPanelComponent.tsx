@@ -3,14 +3,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Paperclip, Smile } from "lucide-react";
 import { MediaAttachment } from "@/app/components/shared-attachments/MediaAttachmentComponent";
-import { MentionInput } from "@/app/components/shared-mentions/MentionInputComponent";
-import { MentionText } from "@/app/components/shared-mentions/MentionTextComponent";
-import {
-  parseMentions,
-  resolveMentions,
-  ParsedMention,
-  MentionData,
-} from "@/utils/mentionUtils";
 import type { Task, User } from "./types";
 
 const EMOJI_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "👏"];
@@ -30,11 +22,8 @@ const MemoizedCommentThread = React.memo(function CommentThread({
   setReplyingTo,
   replyContent,
   setReplyContent,
-  replyMentions,
-  setReplyMentions,
   isSubmittingReply,
   setIsSubmittingReply,
-  availableUsers,
   taskDetails,
   depth = 0,
 }: {
@@ -55,18 +44,13 @@ const MemoizedCommentThread = React.memo(function CommentThread({
   setReplyingTo: React.Dispatch<React.SetStateAction<number | null>>;
   replyContent: Record<number, string>;
   setReplyContent: React.Dispatch<React.SetStateAction<Record<number, string>>>;
-  replyMentions: Record<number, ParsedMention[]>;
-  setReplyMentions: React.Dispatch<
-    React.SetStateAction<Record<number, ParsedMention[]>>
-  >;
   isSubmittingReply: boolean;
   setIsSubmittingReply: React.Dispatch<React.SetStateAction<boolean>>;
-  availableUsers: MentionData[];
   taskDetails: Task;
   depth?: number;
 }) {
-  const reactions = commentReactions[comment.id] || [];
   const maxDepth = 3;
+  const reactions = commentReactions[comment.id] || [];
 
   const handleReplyChange = useCallback(
     (value: string) => {
@@ -78,16 +62,6 @@ const MemoizedCommentThread = React.memo(function CommentThread({
     [comment.id, setReplyContent],
   );
 
-  const handleReplyMentionsChange = useCallback(
-    (mentions: ParsedMention[]) => {
-      setReplyMentions((prev) => ({
-        ...prev,
-        [comment.id]: mentions,
-      }));
-    },
-    [comment.id, setReplyMentions],
-  );
-
   return (
     <div
       className={`${depth > 0 ? "ml-8 border-l-2 border-gray-200 pl-4" : ""}`}
@@ -95,7 +69,6 @@ const MemoizedCommentThread = React.memo(function CommentThread({
       <div className="pb-3 border-b border-gray-200 last:border-b-0 last:pb-0 group">
         {/* Comment Header with Avatar */}
         <div className="flex gap-3 mb-2">
-          <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center font-semibold text-xs flex-shrink-0 overflow-hidden">
             {comment.user?.profilePicture ? (
               <img
                 src={comment.user.profilePicture}
@@ -243,14 +216,12 @@ const MemoizedCommentThread = React.memo(function CommentThread({
         {/* Reply Input */}
         {replyingTo === comment.id && onReply && (
           <div className="ml-11 mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <MentionInput
+            <textarea
               value={replyContent[comment.id] || ""}
-              onChange={handleReplyChange}
-              onMentionsChange={handleReplyMentionsChange}
+              onChange={(e) => handleReplyChange(e.target.value)}
               placeholder={`Reply to ${comment.user?.name || comment.user?.email || "this comment"}...`}
-              availableUsers={availableUsers}
-              currentUserId={currentUser?.id}
               rows={2}
+              className="w-full px-3 py-2 rounded border border-gray-300 bg-white text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-300/50 resize-y"
             />
             <div className="flex gap-2 mt-2">
               <button
@@ -259,44 +230,11 @@ const MemoizedCommentThread = React.memo(function CommentThread({
                   if (isSubmittingReply || !content.trim()) return;
                   setIsSubmittingReply(true);
                   try {
-                    const resolvedMentions = await resolveMentions(
-                      replyMentions[comment.id] || [],
-                      availableUsers,
-                    );
-
                     await onReply(comment.id, content);
-
-                    const mentionedUserIds = resolvedMentions
-                      .map((m) => m.userId)
-                      .filter((id) => id !== currentUser?.id);
-
-                    for (const userId of mentionedUserIds) {
-                      await fetch("/api/notification-handlers", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          receiverId: userId,
-                          type: "mention",
-                          data: {
-                            title: "You were mentioned",
-                            message: `${currentUser?.name || currentUser?.email} mentioned you in a task comment reply`,
-                            relatedId: taskDetails.id,
-                            relatedType: "task",
-                            mentionerId: currentUser?.id,
-                            mentionerName:
-                              currentUser?.name || currentUser?.email,
-                          },
-                        }),
-                      });
-                    }
 
                     setReplyContent((prev) => ({
                       ...prev,
                       [comment.id]: "",
-                    }));
-                    setReplyMentions((prev) => ({
-                      ...prev,
-                      [comment.id]: [],
                     }));
                     setReplyingTo(null);
                   } finally {
@@ -317,10 +255,6 @@ const MemoizedCommentThread = React.memo(function CommentThread({
                     ...prev,
                     [comment.id]: "",
                   }));
-                  setReplyMentions((prev) => ({
-                    ...prev,
-                    [comment.id]: [],
-                  }));
                 }}
                 className="px-4 py-1.5 rounded bg-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-300 transition-colors"
               >
@@ -329,7 +263,6 @@ const MemoizedCommentThread = React.memo(function CommentThread({
             </div>
           </div>
         )}
-      </div>
 
       {/* Render Replies */}
       {comment.replies && comment.replies.length > 0 && (
@@ -350,11 +283,8 @@ const MemoizedCommentThread = React.memo(function CommentThread({
               setReplyingTo={setReplyingTo}
               replyContent={replyContent}
               setReplyContent={setReplyContent}
-              replyMentions={replyMentions}
-              setReplyMentions={setReplyMentions}
               isSubmittingReply={isSubmittingReply}
               setIsSubmittingReply={setIsSubmittingReply}
-              availableUsers={availableUsers}
               taskDetails={taskDetails}
               depth={depth + 1}
             />
@@ -407,9 +337,6 @@ export default function TaskDetailsPanel({
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyContent, setReplyContent] = useState<Record<number, string>>({});
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
-  const [replyMentions, setReplyMentions] = useState<
-    Record<number, ParsedMention[]>
-  >({});
 
   // Organize comments into parent-child structure
   const organizeComments = (comments: any[]) => {
@@ -435,21 +362,6 @@ export default function TaskDetailsPanel({
 
     return rootComments;
   };
-
-  // Prepare available users for mentions (memoized to prevent re-renders)
-  const availableUsers = useMemo(
-    () =>
-      users.map((user) => ({
-        id: user.id,
-        name:
-          user.firstName && user.lastName
-            ? `${user.firstName} ${user.lastName}`
-            : user.email,
-        email: user.email,
-        profilePicture: user.profilePicture || undefined,
-      })),
-    [users],
-  );
 
   const statusLabels: Record<string, string> = {
     todo: "To do",
@@ -822,11 +734,8 @@ export default function TaskDetailsPanel({
                     setReplyingTo={setReplyingTo}
                     replyContent={replyContent}
                     setReplyContent={setReplyContent}
-                    replyMentions={replyMentions}
-                    setReplyMentions={setReplyMentions}
                     isSubmittingReply={isSubmittingReply}
                     setIsSubmittingReply={setIsSubmittingReply}
-                    availableUsers={availableUsers}
                     taskDetails={taskDetails}
                   />
                 ))}

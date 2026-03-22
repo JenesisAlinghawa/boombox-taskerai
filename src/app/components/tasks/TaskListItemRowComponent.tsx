@@ -1,5 +1,5 @@
 import React from "react";
-import { Edit2, AlertCircle, MoreVertical } from "lucide-react";
+import { Edit2, Trash2, AlertCircle, MoreVertical } from "lucide-react";
 import type { Task } from "./types";
 
 interface Props {
@@ -55,6 +55,7 @@ export default function TaskListItemRowComponent({
   const [statusMenuOpen, setStatusMenuOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
   const statusMenuRef = React.useRef<HTMLDivElement>(null);
+
   // close menu on outside click
   React.useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -117,7 +118,7 @@ export default function TaskListItemRowComponent({
     <div
       key={task.id}
       onClick={handleRowClick}
-      className="border-b bg-white border-black/10 transition-colors hover:bg-blue-100/50  cursor-pointer py-2 px-4 flex items-center justify-between gap-3 relative overflow-visible"
+      className="border-b bg-white border-black/10 transition-colors hover:bg-blue-100/50 cursor-pointer py-2 px-4 flex items-center justify-between gap-3 relative overflow-visible"
     >
       {/* Task Title & Description */}
       <div className="flex-1 min-w-0">
@@ -152,14 +153,16 @@ export default function TaskListItemRowComponent({
       </div>
 
       {/* Status */}
-      <div className="w-[100px] text-center ">
+      <div className="w-[100px] text-center">
         <div ref={statusMenuRef} className="relative inline-block">
           <button
             onClick={(e) => {
               e.stopPropagation();
               setStatusMenuOpen(!statusMenuOpen);
             }}
-            className={`inline-block z-[9999999] px-2 py-1 rounded text-xs font-semibold cursor-pointer transition-all duration-200 ${getStatusColor(task.status || "todo")}`}
+            className={`inline-block z-[9999999] px-2 py-1 rounded text-xs font-semibold cursor-pointer transition-all duration-200 ${getStatusColor(
+              task.status || "todo",
+            )}`}
           >
             {task.status === "inprogress"
               ? "In Progress"
@@ -217,7 +220,9 @@ export default function TaskListItemRowComponent({
       <div className="w-[70px] text-center">
         {task.priority ? (
           <span
-            className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getPriorityColor(task.priority)}`}
+            className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getPriorityColor(
+              task.priority,
+            )}`}
           >
             {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
           </span>
@@ -266,7 +271,7 @@ export default function TaskListItemRowComponent({
             <MoreVertical size={16} />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-[calc(100%+4px)] bg-blue-100 border border-black/10 rounded-lg z-[99999] min-w-[140px] shadow-lg animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="absolute right-0 bottom-[calc(100%+4px)] bg-blue-100 border border-black/10 rounded-lg z-[99999] min-w-[140px] shadow-lg animate-in fade-in slide-in-from-bottom-1 duration-200">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -285,8 +290,9 @@ export default function TaskListItemRowComponent({
                     onDelete(task.id);
                     setMenuOpen(false);
                   }}
-                  className="w-full px-3 py-2 bg-none border-none text-red-600 text-left cursor-pointer hover:bg-red-100 hover:text-red-700 transition-colors text-sm"
+                  className="w-full px-3 py-2 bg-none border-none text-red-600 text-left cursor-pointer hover:bg-red-100 hover:text-red-700 transition-colors text-sm flex items-center gap-2"
                 >
+                  <Trash2 size={14} />
                   Delete
                 </button>
               )}

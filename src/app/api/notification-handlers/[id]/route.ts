@@ -8,11 +8,19 @@ export async function PATCH(
   try {
     const { id } = await context.params
     const notificationId = parseInt(id)
-    const { isRead } = await req.json()
 
-    if (!notificationId) {
-      return NextResponse.json({ error: 'Notification ID required' }, { status: 400 })
+    if (!notificationId || isNaN(notificationId)) {
+      return NextResponse.json({ error: 'Valid Notification ID required' }, { status: 400 })
     }
+
+    let body = { isRead: true };
+    try {
+      body = await req.json();
+    } catch (parseError) {
+      console.warn('PATCH body parse error, using defaults:', parseError)
+    }
+
+    const { isRead } = body;
 
     const notification = await prisma.notification.update({
       where: { id: notificationId },
@@ -22,7 +30,7 @@ export async function PATCH(
     return NextResponse.json({ notification })
   } catch (error: any) {
     console.error('Update notification error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error', details: error.message }, { status: 500 })
   }
 }
 
@@ -34,8 +42,8 @@ export async function DELETE(
     const { id } = await context.params
     const notificationId = parseInt(id)
 
-    if (!notificationId) {
-      return NextResponse.json({ error: 'Notification ID required' }, { status: 400 })
+    if (!notificationId || isNaN(notificationId)) {
+      return NextResponse.json({ error: 'Valid Notification ID required' }, { status: 400 })
     }
 
     await prisma.notification.delete({
@@ -45,6 +53,6 @@ export async function DELETE(
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('Delete notification error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error', details: error.message }, { status: 500 })
   }
 }

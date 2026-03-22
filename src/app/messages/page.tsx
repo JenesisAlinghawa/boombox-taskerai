@@ -100,21 +100,22 @@ const ChannelListItem = React.memo(function ChannelListItem({
   return (
     <div
       onClick={() => onSelect(channel)}
-      className={`flex items-center p-1 rounded-sm cursor-pointer w-full transition-colors border-l-4 ${
+      className={`flex items-center justify-start gap-2 px-2 py-1 border-l-blue-100 rounded-sm cursor-pointer w-full transition-colors border-l-4 ${
         isActive ? "border-blue-400 bg-blue-200" : "border-transparent"
       } hover:border-black/50 hover:bg-blue-50`}
     >
-      <div className="relative w-8 h-8 rounded-full bg-white flex items-center justify-center text-[16px] text-gray-400 font-semibold overflow-hidden border border-black/10">
-        {channel.profilePicture ? (
-          <img
-            src={channel.profilePicture}
-            alt={channel.name}
-            className="w-full h-full rounded-full object-cover object-center"
-          />
-        ) : (
-          channel.name[0].toUpperCase()
-        )}
-
+      <div className="relative w-8 h-8 flex-shrink-0">
+        <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-[16px] text-gray-400 font-semibold overflow-hidden border border-black/10">
+          {channel.profilePicture ? (
+            <img
+              src={channel.profilePicture}
+              alt={channel.name}
+              className="w-full h-full object-cover object-center"
+            />
+          ) : (
+            channel.name[0].toUpperCase()
+          )}
+        </div>
         {unreadCount && unreadCount > 0 && (
           <div
             className="absolute -bottom-1 -right-1 h-3 min-w-[14px] rounded-full bg-red-500 text-white text-[7px] font-extrabold flex items-center justify-center px-1"
@@ -124,7 +125,7 @@ const ChannelListItem = React.memo(function ChannelListItem({
           </div>
         )}
       </div>
-      <span className="ml-2 text-black/80 text-sm truncate whitespace-nowrap hidden sm:block">
+      <span className="text-black/80 text-sm truncate whitespace-nowrap hidden sm:block">
         {channel.name}
       </span>
     </div>
@@ -146,7 +147,7 @@ const UserListItem = React.memo(function UserListItem({
   return (
     <div
       onClick={() => onSelect(employee)}
-      className={`flex items-center p-1 rounded-sm cursor-pointer w-full transition-colors border-l-4 ${
+      className={`flex items-center p-1 rounded-sm border-1 border-black cursor-pointer w-full transition-colors border-l-4 ${
         isActive ? "border-blue-400 bg-blue-200" : "border-transparent"
       } hover:border-black/50 hover:bg-blue-50`}
     >
@@ -212,16 +213,28 @@ export default function MessagesPage() {
   });
   const [loadingUserTasks, setLoadingUserTasks] = useState(false);
   const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
-  const [editingChannelId, setEditingChannelId] = useState<number | null>(null);
-  const [editingChannelName, setEditingChannelName] = useState("");
-  const [editingChannelDesc, setEditingChannelDesc] = useState("");
+  const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
   const [activeUserIds, setActiveUserIds] = useState<string[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    type: "channel" | "dm";
+    id?: number;
+  } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const canViewUserTaskProgress = (currentEmployeeRole: string): boolean => {
     const highRoles = ["ADMIN", "MANAGER", "LEAD"];
     return highRoles.includes(currentEmployeeRole);
+  };
+
+  const canEditOrDeleteChannel = (channel: Channel): boolean => {
+    if (!currentEmployee) return false;
+    // Owner, Admin, or creator can edit/delete
+    return (
+      currentEmployee.role === "ADMIN" ||
+      currentEmployee.role === "OWNER" ||
+      channel.creatorId === currentEmployee.id
+    );
   };
 
   // Debug: Log activeUserIds changes
@@ -327,40 +340,92 @@ export default function MessagesPage() {
     }
   }, [messages, messageSearch]);
 
-  const createChannel = async (data: {
+  const createOrUpdateChannel = async (data: {
     name: string;
     description: string;
-    memberIds: number[];
+    memberIds: string[];
     profilePictureFile?: File;
   }) => {
     if (!currentEmployee) return;
 
+    const isEditing = editingChannel;
     try {
-      const formData = new FormData();
-      formData.append("name", data.name);
-      formData.append("description", data.description);
-      formData.append("memberIds", JSON.stringify(data.memberIds));
-      if (data.profilePictureFile) {
-        formData.append("profilePicture", data.profilePictureFile);
+      let url: string;
+      let method: string;
+      let body: FormData | string;
+
+      if (isEditing) {
+        // For editing, send JSON data
+        url = `/api/channel-management/${editingChannel.id}`;
+        method = "PUT";
+        body = JSON.stringify({
+          name: data.name,
+          description: data.description,
+        });
+      } else {
+        // For creating, send FormData to handle file upload
+        const formData = new FormData();
+        formData.append("name", data.name);
+        formData.append("description", data.description);
+        formData.append("memberIds", JSON.stringify(data.memberIds));
+        if (data.profilePictureFile) {
+          formData.append("profilePicture", data.profilePictureFile);
+        }
+        url = "/api/channel-management";
+        method = "POST";
+        body = formData;
       }
 
-      const res = await fetch("/api/channel-management", {
-        method: "POST",
-        headers: {
-          "x-user-id": String(currentEmployee.id),
-        },
-        body: formData,
+      const res = await fetch(url, {
+        method,
+        headers: isEditing
+          ? {
+              "Content-Type": "application/json",
+              "x-user-id": String(currentEmployee.id),
+            }
+          : {
+              "x-user-id": String(currentEmployee.id),
+            },
+        body,
       });
 
       if (res.ok) {
-        const data = await res.json();
-        setChannels((prev) => (data?.channel ? [data.channel, ...prev] : prev));
-        setActiveView("channels");
+        const responseData = await res.json();
+        const channel = responseData?.channel || responseData;
+
+        if (isEditing) {
+          // Update existing channel
+          setChannels((prev) =>
+            prev.map((ch) => (ch.id === channel.id ? channel : ch)),
+          );
+          if (selectedChannel?.id === channel.id) {
+            setSelectedChannel(channel);
+          }
+        } else {
+          // Add new channel
+          setChannels((prev) => (channel ? [channel, ...prev] : prev));
+          setActiveView("channels");
+        }
+
+        setEditingChannel(null);
+        setIsChannelModalOpen(false);
       } else {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error || "Failed to create channel");
+        let errorMessage = isEditing
+          ? "Failed to update channel"
+          : "Failed to create channel";
+        try {
+          const errData = await res.json();
+          errorMessage =
+            errData?.error || errData?.message || `Server error: ${res.status}`;
+          console.error("[Channel Operation] API Error:", errData);
+        } catch (parseErr) {
+          console.error("[Channel Operation] Response parse error:", parseErr);
+          errorMessage = `Server error: ${res.status} ${res.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
     } catch (err) {
+      console.error("[Channel Operation] Error:", err);
       throw err;
     }
   };
@@ -378,27 +443,22 @@ export default function MessagesPage() {
       // Set loading to false immediately so UI shows
       setLoading(false);
 
-      // Fetch channels and DMs in parallel with timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
+      // Fetch channels and DMs in parallel with 10 second timeout
       try {
         const [channelsRes, dmsRes] = await Promise.all([
           fetch(`/api/channel-management?userId=${(user as any).id}`, {
             headers: {
               "x-user-id": String((user as any).id),
             },
-            signal: controller.signal,
+            signal: AbortSignal.timeout(10000),
           }),
           fetch("/api/direct-messaging-endpoints", {
             headers: {
               "x-user-id": String((user as any).id),
             },
-            signal: controller.signal,
+            signal: AbortSignal.timeout(10000),
           }),
         ]);
-
-        clearTimeout(timeoutId);
 
         if (channelsRes.ok) {
           const data = await channelsRes.json();
@@ -437,7 +497,6 @@ export default function MessagesPage() {
           );
         }
       } catch (fetchErr: any) {
-        clearTimeout(timeoutId);
         if (fetchErr.name !== "AbortError") {
           setError("Failed to load channels and conversations");
         }
@@ -454,26 +513,28 @@ export default function MessagesPage() {
       console.log(
         `[Messages] Fetching messages for channel ${selectedChannel.id}...`,
       );
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
       const res = await fetch(
         `/api/message-endpoints?channelId=${selectedChannel.id}&limit=50`,
         {
           headers: {
             "x-user-id": String(currentEmployee.id),
           },
-          signal: controller.signal,
+          signal: AbortSignal.timeout(10000),
         },
       );
 
-      clearTimeout(timeoutId);
-
       if (!res.ok) {
         console.error(`[Messages] API error: ${res.status} ${res.statusText}`);
-        const error = await res.json().catch(() => ({}));
-        console.error("[Messages] Error details:", error);
-        setError(`Failed to fetch messages: ${error?.error || res.statusText}`);
+        try {
+          const error = await res.json();
+          console.error("[Messages] Error details:", error);
+          setError(
+            `Failed to fetch messages: ${error?.error || res.statusText}`,
+          );
+        } catch (parseErr) {
+          console.error("[Messages] Could not parse error response:", parseErr);
+          setError(`Failed to fetch messages: ${res.statusText}`);
+        }
         return;
       }
 
@@ -537,26 +598,28 @@ export default function MessagesPage() {
       console.log(
         `[Messages] Fetching DM messages with user ${selectedDMUser.id}...`,
       );
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
       const res = await fetch(
         `/api/direct-messaging-endpoints/${selectedDMUser.id}?userId=${currentEmployee.id}`,
         {
           headers: {
             "x-user-id": String(currentEmployee.id),
           },
-          signal: controller.signal,
+          signal: AbortSignal.timeout(10000),
         },
       );
 
-      clearTimeout(timeoutId);
-
       if (!res.ok) {
         console.error(`[Messages] API error: ${res.status} ${res.statusText}`);
-        const error = await res.json().catch(() => ({}));
-        console.error("[Messages] Error details:", error);
-        setError(`Failed to fetch messages: ${error?.error || res.statusText}`);
+        try {
+          const error = await res.json();
+          console.error("[Messages] Error details:", error);
+          setError(
+            `Failed to fetch messages: ${error?.error || res.statusText}`,
+          );
+        } catch (parseErr) {
+          console.error("[Messages] Could not parse error response:", parseErr);
+          setError(`Failed to fetch messages: ${res.statusText}`);
+        }
         return;
       }
 
@@ -597,10 +660,18 @@ export default function MessagesPage() {
         console.error("[Messages] Failed to mark messages as read:", markErr);
       }
     } catch (err) {
-      console.error("[Messages] Error fetching DM messages:", err);
-      setError(
-        `Failed to fetch messages: ${err instanceof Error ? err.message : "Unknown error"}`,
-      );
+      // Handle AbortError separately - it's expected when timeout occurs
+      if (err instanceof Error && err.name === "AbortError") {
+        console.warn(
+          "[Messages] Request timeout - took longer than 10 seconds",
+        );
+        setError("Request timeout - messages took too long to load");
+      } else {
+        console.error("[Messages] Error fetching DM messages:", err);
+        setError(
+          `Failed to fetch messages: ${err instanceof Error ? err.message : "Unknown error"}`,
+        );
+      }
     }
   };
 
@@ -629,7 +700,8 @@ export default function MessagesPage() {
 
       const userTasks = taskList.filter(
         (t: any) =>
-          t.assigneeId === employee.id || t.createdById === employee.id,
+          String(t.assigneeId) === String(employee.id) ||
+          String(t.createdById) === String(employee.id),
       );
 
       const stats = {
@@ -648,52 +720,6 @@ export default function MessagesPage() {
       console.error("Failed to fetch user task progress:", err);
     } finally {
       setLoadingUserTasks(false);
-    }
-  };
-
-  const handleChannelPicChange = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file || !selectedChannel || !currentEmployee) return;
-
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      const uploadRes = await fetch("/api/file-upload-handlers", {
-        method: "POST",
-        body: form,
-      });
-      if (!uploadRes.ok) throw new Error("Upload failed");
-      const { url } = await uploadRes.json();
-
-      const updateRes = await fetch(
-        `/api/channel-management/${selectedChannel.id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "x-user-id": String(currentEmployee.id),
-          },
-          body: JSON.stringify({ profilePicture: url }),
-        },
-      );
-      if (!updateRes.ok) throw new Error("Channel update failed");
-
-      // update local state
-      const updated = await updateRes.json();
-      setSelectedChannel((prev) =>
-        prev ? { ...prev, profilePicture: updated.profilePicture } : prev,
-      );
-      setChannels((prev) =>
-        prev.map((c) =>
-          c.id === selectedChannel.id
-            ? { ...c, profilePicture: updated.profilePicture }
-            : c,
-        ),
-      );
-    } catch (err) {
-      console.error("Failed to change channel picture:", err);
     }
   };
 
@@ -1137,47 +1163,36 @@ export default function MessagesPage() {
     }
   };
 
-  const handleEditChannel = async (
-    channelId: number,
-    newName: string,
-    newDesc: string,
-  ) => {
-    if (!newName.trim()) return;
-    try {
-      const res = await fetch(`/api/channel-management/${channelId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": String(currentEmployee?.id),
-        },
-        body: JSON.stringify({ name: newName, description: newDesc }),
-      });
-      if (res.ok) {
-        setChannels(
-          channels.map((ch) =>
-            ch.id === channelId
-              ? { ...ch, name: newName, description: newDesc }
-              : ch,
-          ),
-        );
-
-        if (selectedChannel?.id === channelId) {
-          setSelectedChannel({
-            ...selectedChannel,
-            name: newName,
-            description: newDesc,
-          });
-        }
-        setEditingChannelId(null);
-      }
-    } catch (err) {
-      console.error("Error editing channel:", err);
+  const handleInitEditChannel = (channel: Channel) => {
+    if (!canEditOrDeleteChannel(channel)) {
+      alert("You don't have permission to edit this channel");
+      return;
     }
+    setEditingChannel(channel);
+    setIsChannelModalOpen(true);
+    setMenuOpen(false);
+  };
+
+  const handleConfirmDeleteChannel = () => {
+    if (!selectedChannel || !canEditOrDeleteChannel(selectedChannel)) {
+      alert("You don't have permission to delete this channel");
+      setDeleteConfirmation(null);
+      return;
+    }
+
+    handleDeleteChannel(selectedChannel.id);
+  };
+
+  const handleConfirmDeleteDM = () => {
+    if (selectedDMUser) {
+      setSelectedDMUser(null);
+      setMessages([]);
+      setMenuOpen(false);
+    }
+    setDeleteConfirmation(null);
   };
 
   const handleDeleteChannel = async (channelId: number) => {
-    if (!confirm("Are you sure you want to delete this channel?")) return;
-
     try {
       const res = await fetch(`/api/channel-management/${channelId}`, {
         method: "DELETE",
@@ -1189,9 +1204,16 @@ export default function MessagesPage() {
         setChannels(channels.filter((ch) => ch.id !== channelId));
         setSelectedChannel(null);
         setMessages([]);
+        setDeleteConfirmation(null);
       }
     } catch (err) {
       console.error("Error deleting channel:", err);
+    }
+  };
+
+  const handleDeleteDMConversation = () => {
+    if (selectedDMUser) {
+      setDeleteConfirmation({ type: "dm" });
     }
   };
 
@@ -1257,9 +1279,9 @@ export default function MessagesPage() {
       `}</style>
       <div className="flex h-full gap-1">
         {/* Left Sidebar */}
-        <div className="w-52 flex-shrink-0 flex flex-col gap-1 transition-all">
+        <div className="w-52 flex-shrink-0 ml-2 mb-2 flex flex-col gap-1 transition-all">
           {/* Channels Container */}
-          <div className="h-[40%] min-h-[200px] max-h-[320px] overflow-visible flex flex-col pt-4 px-0 pl-0 pr-0 pb-4 bg-white border border-black/10 rounded-lg">
+          <div className="h-[40%] min-h-[200px] max-h-[320px] border border-black overflow-visible flex flex-col pt-4 px-0 pl-0 pr-0 pb-4 bg-white rounded-lg">
             {/* Channels Section */}
             <div
               style={{
@@ -1320,7 +1342,7 @@ export default function MessagesPage() {
                   <div
                     style={{
                       fontSize: "12px",
-                      color: "rgba(0,0,0,0.4)",
+                      color: "#000",
                       textAlign: "center",
                       padding: "16px",
                     }}
@@ -1333,7 +1355,7 @@ export default function MessagesPage() {
           </div>
 
           {/* Conversations Container */}
-          <div className="flex-1 min-h-[200px] max-h-[420px] overflow-visible flex flex-col pt-4 px-0 pl-0 pr-0 pb-4 bg-white border border-black/10 rounded-lg">
+          <div className="flex-1 min-h-[200px] max-h-[420px] overflow-visible flex flex-col pt-4 px-0 pl-0 pr-0 pb-4 bg-white border border-black rounded-lg">
             {/* Conversation Section */}
             <div
               style={{
@@ -1397,7 +1419,7 @@ export default function MessagesPage() {
         </div>
 
         {/* Main Chat Area */}
-        <div className="flex-1 border border-black/10 rounded-lg overflow-hidden bg-white">
+        <div className="flex-1 border mb-2 border-black/10 rounded-lg overflow-hidden bg-white">
           <PageContentCon className="flex flex-col overflow-hidden h-full w-full">
             {selectedChannel || selectedDMUser ? (
               <>
@@ -1449,7 +1471,7 @@ export default function MessagesPage() {
                       <div
                         style={{
                           fontSize: "12px",
-                          color: "rgba(0,0,0,0.6)",
+                          color: "#000",
                           fontFamily: "var(--font-inria-sans)",
                         }}
                       >
@@ -1477,46 +1499,9 @@ export default function MessagesPage() {
                         style={{
                           display: "flex",
                           flexDirection: "column",
-                          gap: msg.parentMessageId ? "4px" : "0",
+                          gap: 0,
                         }}
                       >
-                        {/* Render parent message if this is a reply */}
-                        {msg.parentMessage && (
-                          <div
-                            id={`message-${msg.parentMessage.id}`}
-                            style={{
-                              opacity: 0.65,
-                            }}
-                          >
-                            <MessageBubble
-                              message={
-                                {
-                                  id: msg.parentMessage.id,
-                                  content: msg.parentMessage.content,
-                                  createdAt: msg.parentMessage.createdAt,
-                                  isEdited: false,
-                                  isDeleted: false,
-                                  sender: msg.parentMessage.sender as any,
-                                  attachments: [],
-                                  reactions: [],
-                                  _count: { replies: 0 },
-                                } as any
-                              }
-                              isCurrentUser={
-                                msg.parentMessage.sender.id ===
-                                currentEmployee?.id
-                              }
-                              onAddReaction={() => {}}
-                              onDelete={() => {}}
-                              onEdit={() => {}}
-                              onReply={() =>
-                                setReplyingTo(msg.parentMessage!.id)
-                              }
-                              currentUserId={String(currentEmployee?.id || 0)}
-                            />
-                          </div>
-                        )}
-
                         {/* Render actual message with optional reply styling */}
                         <div
                           id={`message-${msg.id}`}
@@ -1524,9 +1509,6 @@ export default function MessagesPage() {
                           style={{
                             marginLeft: msg.parentMessageId ? "24px" : "0",
                             paddingLeft: msg.parentMessageId ? "12px" : "0",
-                            borderLeft: msg.parentMessageId
-                              ? "3px solid rgba(96, 165, 250, 0.4)"
-                              : "none",
                           }}
                         >
                           {showTimestamp && (
@@ -1549,7 +1531,7 @@ export default function MessagesPage() {
                               <p
                                 style={{
                                   fontSize: "11px",
-                                  color: "rgba(0,0,0,0.5)",
+                                  color: "#000",
                                   margin: 0,
                                   fontFamily: "var(--font-inria-sans)",
                                 }}
@@ -1612,6 +1594,25 @@ export default function MessagesPage() {
                       </div>
                     );
                   })}
+                  {filteredMessages.length === 0 && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        height: "100%",
+                        color: "rgba(0,0,0,0.5)",
+                        fontSize: "14px",
+                        fontFamily: "var(--font-inria-sans)",
+                      }}
+                    >
+                      {messageSearch
+                        ? "No messages match your search"
+                        : selectedChannel
+                          ? "No messages yet. Start the conversation!"
+                          : "No messages yet. Send the first message!"}
+                    </div>
+                  )}
                   <div ref={messagesEndRef} />
                 </div>
 
@@ -1674,7 +1675,7 @@ export default function MessagesPage() {
                           background: "transparent",
                           border: "none",
                           cursor: "pointer",
-                          color: "#fff",
+                          color: "#000",
                           marginLeft: "auto",
                         }}
                       >
@@ -1783,7 +1784,7 @@ export default function MessagesPage() {
         {/* Right Sidebar */}
         <div
           id="right-sidebar"
-          className="border border-black/10 rounded-lg overflow-hidden bg-white"
+          className="border mr-2 mb-2 border-black/10 rounded-lg overflow-hidden bg-white"
         >
           <PageContentCon
             style={{
@@ -1811,43 +1812,37 @@ export default function MessagesPage() {
                       <div className="absolute right-0 mt-1 bg-white border border-black/10 rounded shadow-lg z-50 min-w-[150px]">
                         {selectedChannel ? (
                           <>
-                            <button
-                              onClick={() => {
-                                setEditingChannelId(selectedChannel.id);
-                                setEditingChannelName(selectedChannel.name);
-                                setEditingChannelDesc(
-                                  selectedChannel.description ?? "",
-                                );
-                                setMenuOpen(false);
-                              }}
-                              className="w-full px-4 py-2 text-left hover:bg-blue-50 text-sm text-black/80 flex items-center gap-2 border-b border-black/5"
-                            >
-                              <Edit2 size={14} /> Edit Channel
-                            </button>
-                            <button
-                              onClick={() => {
-                                handleDeleteChannel(selectedChannel.id);
-                                setMenuOpen(false);
-                              }}
-                              className="w-full px-4 py-2 text-left hover:bg-red-50 text-sm text-red-600 flex items-center gap-2"
-                            >
-                              <Trash2 size={14} /> Delete Channel
-                            </button>
+                            {canEditOrDeleteChannel(selectedChannel) && (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    handleInitEditChannel(selectedChannel)
+                                  }
+                                  className="w-full px-4 py-2 text-left hover:bg-blue-50 text-sm text-black/80 flex items-center gap-2 border-b border-black/5"
+                                >
+                                  <Edit2 size={14} /> Edit Channel
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setDeleteConfirmation({
+                                      type: "channel",
+                                      id: selectedChannel.id,
+                                    });
+                                    setMenuOpen(false);
+                                  }}
+                                  className="w-full px-4 py-2 text-left hover:bg-red-50 text-sm text-red-600 flex items-center gap-2"
+                                >
+                                  <Trash2 size={14} /> Delete Channel
+                                </button>
+                              </>
+                            )}
                           </>
                         ) : selectedDMUser ? (
                           <button
                             onClick={() => {
-                              if (
-                                confirm(
-                                  `Delete conversation with ${selectedDMUser.firstName}?`,
-                                )
-                              ) {
-                                setSelectedDMUser(null);
-                                setMessages([]);
-                                setMenuOpen(false);
-                              }
+                              handleDeleteDMConversation();
                             }}
-                            className="w-full px-4 py-2 text-left hover:bg-red-50 text-sm text-red-600 flex items-center gap-2"
+                            className="w-full px-6 py-2 text-left hover:bg-red-50 text-sm text-red-600 flex items-center gap-2"
                           >
                             <Trash2 size={14} /> Delete Conversation
                           </button>
@@ -1889,39 +1884,15 @@ export default function MessagesPage() {
                         } border-[rgba(13,27,42,1)]`}
                       />
                     )}
-
-                    {/* edit icon for channel avatar */}
-                    {selectedChannel &&
-                      currentEmployee?.id === selectedChannel.creatorId && (
-                        <>
-                          <button
-                            onClick={() =>
-                              document
-                                .getElementById("right-sidebar-pic-input")
-                                ?.click()
-                            }
-                            className="absolute bottom-0 right-0 bg-black/30 hover:bg-black/50 p-1 rounded-full"
-                          >
-                            <Edit2 size={16} className="text-white" />
-                          </button>
-                          <input
-                            id="right-sidebar-pic-input"
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleChannelPicChange}
-                          />
-                        </>
-                      )}
                   </div>
-                  <div className="mt-1 text-white text-lg font-medium text-center">
+                  <div className="mt-1 text-black text-lg font-medium text-center">
                     {selectedDMUser
                       ? `${selectedDMUser.firstName} ${selectedDMUser.lastName}`
                       : selectedChannel
                         ? selectedChannel.name
                         : ""}
                   </div>
-                  <div className="text-sm text-white/60 text-center">
+                  <div className="text-sm text-black text-center">
                     {selectedDMUser
                       ? getStatusDisplay(selectedDMUser)
                       : selectedChannel
@@ -1967,7 +1938,7 @@ export default function MessagesPage() {
                       <div
                         style={{
                           textAlign: "center",
-                          color: "rgba(0,0,0,0.5)",
+                          color: "#000",
                           fontSize: "var(--font-size-subdescription)",
                           fontFamily: "var(--font-inria-sans)",
                         }}
@@ -2081,15 +2052,33 @@ export default function MessagesPage() {
                                 {m.user.firstName[0]}
                                 {m.user.lastName[0]}
                               </div>
-                              <span
+                              <div
                                 style={{
-                                  fontSize: "var(--font-size-subdescription)",
-                                  color: "#fff",
-                                  fontFamily: "var(--font-inria-sans)",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 2,
                                 }}
                               >
-                                {m.user.firstName} {m.user.lastName}
-                              </span>
+                                <span
+                                  style={{
+                                    fontSize: "var(--font-size-subdescription)",
+                                    color: "#000",
+                                    fontFamily: "var(--font-inria-sans)",
+                                    fontWeight: "500",
+                                  }}
+                                >
+                                  {m.user.firstName} {m.user.lastName}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: "11px",
+                                    color: "rgba(0,0,0,0.6)",
+                                    fontFamily: "var(--font-inria-sans)",
+                                  }}
+                                >
+                                  {m.user.role}
+                                </span>
+                              </div>
                             </div>
                           ))}
                     </div>
@@ -2113,18 +2102,73 @@ export default function MessagesPage() {
         </div>
       </div>
 
+      {/* Delete Channel Confirmation Modal */}
+      {deleteConfirmation?.type === "channel" && selectedChannel && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-99999">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">
+            <h3 className="text-lg font-semibold text-black/80 mb-2">
+              Delete Channel?
+            </h3>
+            <p className="text-black/60 mb-6">
+              Are you sure you want to delete "{selectedChannel.name}"? This
+              action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirmation(null)}
+                className="px-4 py-2 text-black/60 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDeleteChannel}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+              >
+                Delete Channel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete DM Confirmation Modal */}
+      {deleteConfirmation?.type === "dm" && selectedDMUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-99999">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">
+            <h3 className="text-lg font-semibold text-black/80 mb-2">
+              Delete Conversation?
+            </h3>
+            <p className="text-black/60 mb-6">
+              Are you sure you want to delete the conversation with{" "}
+              {selectedDMUser.firstName}? This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirmation(null)}
+                className="px-4 py-2 text-black/60 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDeleteDM}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+              >
+                Delete Conversation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <CreateChannelModal
         isOpen={isChannelModalOpen}
-        onClose={() => setIsChannelModalOpen(false)}
-        onSubmit={(data) =>
-          createChannel({
-            ...data,
-            memberIds: data.memberIds.map((id) =>
-              typeof id === "string" ? parseInt(id) : id,
-            ),
-          })
-        }
+        onClose={() => {
+          setIsChannelModalOpen(false);
+          setEditingChannel(null);
+        }}
+        onSubmit={(data) => createOrUpdateChannel(data)}
         currentUserId={String(currentEmployee?.id || 0)}
+        editingChannel={editingChannel ?? undefined}
       />
     </PageContainer>
   );

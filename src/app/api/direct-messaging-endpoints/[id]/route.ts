@@ -24,7 +24,17 @@ export async function GET(
       },
       include: {
         sender: {
-          select: { id: true, firstName: true, lastName: true, email: true },
+          select: { id: true, firstName: true, lastName: true, email: true, profilePicture: true },
+        },
+        parentMessage: {
+          select: {
+            id: true,
+            content: true,
+            createdAt: true,
+            sender: {
+              select: { id: true, firstName: true, lastName: true, profilePicture: true },
+            },
+          },
         },
       },
       orderBy: { createdAt: 'asc' },

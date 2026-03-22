@@ -180,8 +180,23 @@ function TasksPageContent() {
       taskDetails && currentUser.id === taskDetails.createdById;
     const isAdminOrOwner =
       currentUser.role === "ADMIN" || currentUser.role === "OWNER";
+    const isAssignee = taskDetails?.assignees?.some(
+      (a: any) => a.assignee?.id === currentUser.id,
+    );
 
-    if (isTaskCreator || isAdminOrOwner) {
+    // Show confirmation when admin/owner changes someone else's task
+    if ((isAdminOrOwner && !isTaskCreator) || (!isAssignee && isAdminOrOwner)) {
+      const taskCreatorName =
+        taskDetails?.createdBy?.firstName ||
+        taskDetails?.createdBy?.lastName ||
+        taskDetails?.createdBy?.email ||
+        "Unknown";
+      const confirmed = await confirm({
+        title: "Update Employee Task",
+        message: `Are you sure you want to change this task's status?`,
+      });
+      if (!confirmed) return;
+    } else if (isTaskCreator || isAssignee) {
       const confirmed = await confirm({
         message: "Confirm changing task status?",
       });
@@ -303,7 +318,9 @@ function TasksPageContent() {
     toast.success("Task updated");
   };
 
-  const [taskFilter, setTaskFilter] = useState<"all" | "mine">("all");
+  // Default filter based on role: employees default to "mine", admin/owner default to "all"
+  const defaultFilter = currentUser?.role === "EMPLOYEE" ? "mine" : "all";
+  const [taskFilter, setTaskFilter] = useState<"all" | "mine">(defaultFilter);
 
   const groupedTasks = () => {
     const filtered = getFilteredAndSortedTasks();
@@ -329,11 +346,13 @@ function TasksPageContent() {
 
   return (
     <PageContainer title="Tasks">
-      {/* Toolbar – compact, matches dashboard cards */}
+      {/* Toolbar  */}
       <div className="flex items-center justify-between mt-4 mb-4 px-2">
         <div className="text-sm text-gray-700 font-medium">
           {currentUser
-            ? `Welcome back, ${currentUser.name || currentUser.email}! Here's your task list.`
+            ? currentUser.role === "EMPLOYEE"
+              ? `Welcome back, ${currentUser.name || currentUser.email}! Here are your tasks.`
+              : `Welcome back, ${currentUser.name || currentUser.email}! Here are your team's tasks.`
             : "Your Tasks"}
         </div>
         <div className="flex items-center gap-3">
@@ -393,7 +412,7 @@ function TasksPageContent() {
       </div>
 
       {/* Tasks View */}
-      <PageContentCon className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <PageContentCon className="flex-1 bg-white m-2 rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         {/* Error Display */}
         {(taskLoadError || usersLoadError) && (
           <div className="m-4 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -428,34 +447,42 @@ function TasksPageContent() {
           </div>
         )}
 
-        {/* Filter Tabs */}
+        {/* Filter Tabs - Show different options based on role */}
         <div className="flex items-center gap-2 px-4 pt-4">
-          <button
-            onClick={() => setTaskFilter("all")}
-            className={`
-              px-5 py-2 rounded-lg text-sm font-medium transition-all
-              ${
-                taskFilter === "all"
-                  ? "bg-blue-100 text-blue-800 border border-blue-200 shadow-sm"
-                  : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200"
-              }
-            `}
-          >
-            Team's Tasks ({tasks.length})
-          </button>
-          <button
-            onClick={() => setTaskFilter("mine")}
-            className={`
-              px-5 py-2 rounded-lg text-sm font-medium transition-all
-              ${
-                taskFilter === "mine"
-                  ? "bg-blue-100 text-blue-800 border border-blue-200 shadow-sm"
-                  : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200"
-              }
-            `}
-          >
-            Your Tasks ({ownCount})
-          </button>
+          {currentUser?.role !== "EMPLOYEE" ? (
+            <>
+              <button
+                onClick={() => setTaskFilter("all")}
+                className={`
+                  px-5 py-2 rounded-lg text-sm font-medium transition-all
+                  ${
+                    taskFilter === "all"
+                      ? "bg-blue-100 text-blue-800 border border-blue-200 shadow-sm"
+                      : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200"
+                  }
+                `}
+              >
+                Team's Tasks ({tasks.length})
+              </button>
+              <button
+                onClick={() => setTaskFilter("mine")}
+                className={`
+                  px-5 py-2 rounded-lg text-sm font-medium transition-all
+                  ${
+                    taskFilter === "mine"
+                      ? "bg-blue-100 text-blue-800 border border-blue-200 shadow-sm"
+                      : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200"
+                  }
+                `}
+              >
+                My Tasks ({ownCount})
+              </button>
+            </>
+          ) : (
+            <div className="px-4 py-2 text-sm text-gray-600 font-medium">
+              Showing your tasks ({ownCount})
+            </div>
+          )}
         </div>
 
         {/* Task Groups Display */}
@@ -466,7 +493,9 @@ function TasksPageContent() {
               <TaskSummary
                 tasks={getFilteredAndSortedTasks()}
                 currentUser={currentUser}
-                userRole={currentUser.role as "ADMIN" | "OWNER" | "EMPLOYEE" | undefined}
+                userRole={
+                  currentUser.role as "ADMIN" | "OWNER" | "EMPLOYEE" | undefined
+                }
                 filterMode={taskFilter === "mine" ? "my-tasks" : "team-tasks"}
               />
             </div>

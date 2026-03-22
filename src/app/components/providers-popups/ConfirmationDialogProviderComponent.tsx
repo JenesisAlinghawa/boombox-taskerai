@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState } from "react";
+import { AlertCircle, X } from "lucide-react";
 
 type ConfirmOptions = {
   message: string;
@@ -37,57 +38,46 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     <ConfirmContext.Provider value={{ confirm }}>
       {children}
       {open && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "rgba(0,0,0,0.5)",
-            zIndex: 10000,
-          }}
-        >
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[99999] p-4">
           <div
             role="dialog"
             aria-modal="true"
-            style={{
-              width: 420,
-              background: "#0b1220",
-              color: "#fff",
-              padding: 20,
-              borderRadius: 8,
-              boxShadow: "0 12px 40px rgba(0,0,0,0.6)",
-            }}
+            className="w-full max-w-md bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden"
           >
-            {title && (
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>{title}</div>
-            )}
-            <div style={{ marginBottom: 16 }}>{message}</div>
-            <div
-              style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}
-            >
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/70 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center">
+                  <AlertCircle className="w-5 h-5 text-amber-600" />
+                </div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {title || "Confirm Action"}
+                </h2>
+              </div>
               <button
                 onClick={() => handleClose(false)}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 6,
-                  background: "transparent",
-                  border: "1px solid rgba(255,255,255,0.06)",
-                  color: "#fff",
-                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="px-6 py-4">
+              <p className="text-sm text-gray-600 leading-relaxed">{message}</p>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex gap-3 justify-end">
+              <button
+                onClick={() => handleClose(false)}
+                className="px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleClose(true)}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 6,
-                  background: "#ef4444",
-                  border: "none",
-                  color: "#fff",
-                }}
+                className="px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
               >
                 Confirm
               </button>

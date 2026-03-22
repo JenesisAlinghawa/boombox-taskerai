@@ -222,12 +222,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       changes.push({ field: 'assigneeIds', oldValue: oldIds, newValue: incomingIds });
     }
     
-    // Only assignees can change status
+    // Only assignees or admin/owner can change status
     if (body.status !== undefined) {
-      if (!isTaskAssignee) {
+      if (!isTaskAssignee && !isAdminOrOwner) {
         return NextResponse.json({ 
           error: 'Forbidden',
-          warning: '⛔ Only assigned users can change task status.' 
+          warning: '⛔ Only assigned users or admins can change task status.' 
         }, { status: 403 });
       }
       data.status = body.status;

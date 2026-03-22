@@ -49,9 +49,23 @@ export const getCurrentUser = async (userId?: string | number): Promise<User | n
     });
 
     if (response.ok) {
-      const data = await response.json();
-      console.log("[SessionManager] User session retrieved:", data.user?.email, "ID:", data.user?.id);
-      return data.user;
+      // Check if response has content before parsing
+      const contentLength = response.headers.get('content-length');
+      const text = await response.text();
+      
+      if (!text) {
+        console.warn("[SessionManager] Empty response body from session API");
+        // Continue to fallback logic
+      } else {
+        try {
+          const data = JSON.parse(text);
+          console.log("[SessionManager] User session retrieved:", data.user?.email, "ID:", data.user?.id);
+          return data.user;
+        } catch (parseError) {
+          console.error("[SessionManager] Failed to parse session response:", parseError, "Response text:", text.substring(0, 100));
+          // Continue to fallback logic
+        }
+      }
     } else if (response.status === 404) {
       // User not found - clear stale session and redirect to login
       console.warn("[SessionManager] User not found - session may be stale. Clearing localStorage...");
@@ -66,7 +80,9 @@ export const getCurrentUser = async (userId?: string | number): Promise<User | n
       }
       return null;
     } else {
-      console.error("[SessionManager] Session API returned", response.status, "for userId:", id);
+      // Server error (5xx) or unexpected status - log but continue to fallback
+      console.warn("[SessionManager] Session API returned", response.status, "for userId:", id, "- Will use localStorage fallback");
+      // Continue to fallback logic below instead of returning null
     }
   } catch (error) {
     console.error("[SessionManager] Failed to fetch user session:", error);

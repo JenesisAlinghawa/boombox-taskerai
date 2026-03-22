@@ -55,7 +55,19 @@ import { sendEvent } from '@/lib/sse'
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    // Ensure request has a body
+    if (!req.body) {
+      return NextResponse.json({ error: 'Request body required' }, { status: 400 })
+    }
+
+    let body;
+    try {
+      body = await req.json();
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError)
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 })
+    }
+
     const { receiverId, type, data } = body;
 
     if (!receiverId || !type) {
@@ -68,10 +80,10 @@ export async function POST(req: NextRequest) {
       data: data || {},
     });
 
-    return NextResponse.json({ notification: notif })
+    return NextResponse.json({ notification: notif || {} })
   } catch (error: any) {
     console.error('Create notification error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error', details: error.message }, { status: 500 })
   }
 }
 

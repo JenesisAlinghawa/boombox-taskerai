@@ -22,6 +22,13 @@ interface ChannelCreationModalProps {
     profilePictureFile?: File;
   }) => Promise<void>;
   currentUserId: string;
+  editingChannel?: {
+    id: number;
+    name: string;
+    description?: string;
+    members: Array<{ user: { id: number | string } }>;
+    profilePicture?: string;
+  };
 }
 
 export function ChannelCreationModal({
@@ -29,6 +36,7 @@ export function ChannelCreationModal({
   onClose,
   onSubmit,
   currentUserId,
+  editingChannel,
 }: ChannelCreationModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -51,8 +59,29 @@ export function ChannelCreationModal({
   useEffect(() => {
     if (isOpen) {
       fetchUsers();
+      if (editingChannel) {
+        // Load existing channel data for editing
+        setName(editingChannel.name);
+        setDescription(editingChannel.description ?? "");
+        setProfilePicturePreview(editingChannel.profilePicture ?? null);
+        const existingMemberIds: Set<string> = new Set(
+          editingChannel.members.map((m) => {
+            const id = m.user.id;
+            return typeof id === "string" ? id : String(id);
+          }),
+        );
+        setSelectedMembers(existingMemberIds);
+      } else {
+        // Reset for creating new channel
+        setName("");
+        setDescription("");
+        setSelectedMembers(new Set());
+        setProfilePictureFile(null);
+        setProfilePicturePreview(null);
+        setSearchQuery("");
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, editingChannel]);
 
   useEffect(() => {
     // Filter users based on search query
@@ -157,12 +186,12 @@ export function ChannelCreationModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-99999">
       <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <h2 className="text-xl font-normal text-black/62">
-            Create New Channel
+            {editingChannel ? "Edit Channel" : "Create New Channel"}
           </h2>
           <button
             onClick={onClose}
@@ -191,7 +220,7 @@ export function ChannelCreationModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Marketing Team, Product Updates"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
               disabled={submitting}
             />
           </div>
@@ -206,7 +235,7 @@ export function ChannelCreationModal({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What is this channel about?"
               rows={3}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-black"
               disabled={submitting}
             />
           </div>
@@ -277,7 +306,7 @@ export function ChannelCreationModal({
                 placeholder="Search by name or email..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                 disabled={loading || submitting}
               />
             </div>
@@ -343,7 +372,13 @@ export function ChannelCreationModal({
               disabled={submitting || !name.trim()}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {submitting ? "Creating..." : "Create Channel"}
+              {submitting
+                ? editingChannel
+                  ? "Updating..."
+                  : "Creating..."
+                : editingChannel
+                  ? "Update Channel"
+                  : "Create Channel"}
             </button>
           </div>
         </form>

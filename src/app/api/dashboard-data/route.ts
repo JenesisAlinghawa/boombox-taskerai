@@ -50,19 +50,34 @@ export async function GET(request: NextRequest) {
     }
 
     // Get tasks for the current user (limit to prevent memory issues)
+    console.log("[Dashboard API] Fetching tasks with filter:", taskFilter);
+    
     const tasks = await prisma.task.findMany({
       where: taskFilter,
-      select: {
-        id: true,
-        title: true,
-        status: true,
-        priority: true,
-        dueDate: true,
-        createdAt: true,
-        updatedAt: true,
+      include: {
+        assignees: {
+          include: {
+            assignee: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
       },
       orderBy: {
-        createdAt: 'desc'
+        createdAt: 'desc',
       },
       take: 1000, // Limit total tasks to prevent memory issues
     });
@@ -161,6 +176,8 @@ export async function GET(request: NextRequest) {
           title: t.title,
           priority: t.priority || "medium",
           dueDate: t.dueDate ? new Date(t.dueDate).toLocaleDateString() : undefined,
+          assignees: t.assignees || [],
+          createdBy: t.createdBy,
         }));
 
     return NextResponse.json({
@@ -179,8 +196,15 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching dashboard data:", error);
+    if (error instanceof Error) {
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+    }
     return NextResponse.json(
-      { error: "Failed to fetch dashboard data" },
+      { 
+        error: "Failed to fetch dashboard data",
+        details: error instanceof Error ? error.message : "Unknown error"
+      },
       { status: 500 }
     );
   }

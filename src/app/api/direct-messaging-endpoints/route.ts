@@ -38,6 +38,21 @@ export async function GET(request: NextRequest) {
           reactions: true,
           isRead: true,
           parentMessageId: true,
+          parentMessage: {
+            select: {
+              id: true,
+              content: true,
+              createdAt: true,
+              sender: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  profilePicture: true,
+                },
+              },
+            },
+          },
           createdAt: true,
           sender: {
             select: {

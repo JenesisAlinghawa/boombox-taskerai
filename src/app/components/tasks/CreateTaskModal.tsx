@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { DatePickerInput } from "@/app/components/tasks/TaskDueDatePickerInputComponent";
 import { AlertTriangle, Paperclip, X } from "lucide-react";
+import { useConfirm } from "@/app/components/providers-popups/ConfirmationDialogProviderComponent";
 import type { User } from "./types";
 
 export default function CreateTaskModal({
@@ -18,6 +19,7 @@ export default function CreateTaskModal({
   onCreate: (data: any) => void;
   editingTask?: any;
 }) {
+  const confirm = useConfirm();
   const [title, setTitle] = useState(editingTask?.title || "");
   const [description, setDescription] = useState(
     editingTask?.description || "",
@@ -43,6 +45,45 @@ export default function CreateTaskModal({
       setAssigneeIds([currentUser.id]);
     }
   }, [currentUser, assigneeIds.length]);
+
+  // Check if there are unsaved changes (only when editing)
+  const hasUnsavedChanges = useMemo(() => {
+    if (!editingTask) return false; // No unsaved changes for new tasks
+
+    const currentAssigneeIds = assigneeIds.sort().join(",");
+    const originalAssigneeIds = (
+      editingTask?.assignees?.map((a: any) => a.assignee?.id || a.id) || []
+    )
+      .sort()
+      .join(",");
+
+    const dueDateChanged =
+      (dueDate ? new Date(dueDate).toDateString() : null) !==
+      (editingTask?.dueDate
+        ? new Date(editingTask.dueDate).toDateString()
+        : null);
+
+    return (
+      title !== (editingTask?.title || "") ||
+      description !== (editingTask?.description || "") ||
+      currentAssigneeIds !== originalAssigneeIds ||
+      priority !== (editingTask?.priority || "medium") ||
+      dueDateChanged
+    );
+  }, [title, description, assigneeIds, priority, dueDate, editingTask]);
+
+  // Handle close with confirmation for unsaved changes
+  const handleClose = async () => {
+    if (hasUnsavedChanges && editingTask) {
+      const confirmed = await confirm({
+        title: "Unsaved Changes",
+        message:
+          "You have unsaved changes. Are you sure you want to discard them?",
+      });
+      if (!confirmed) return;
+    }
+    onClose();
+  };
 
   const toggleAssignee = (userId: string) => {
     setAssigneeIds((prev) =>
@@ -207,8 +248,8 @@ export default function CreateTaskModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999] p-4 sm:p-6"
-      onClick={onClose}
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-[50] p-4 sm:p-6"
+      onClick={handleClose}
     >
       <form
         onSubmit={handleSubmit}
@@ -232,7 +273,7 @@ export default function CreateTaskModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-500 hover:text-gray-800 text-2xl leading-none transition-colors"
           >
             ×
@@ -454,7 +495,7 @@ export default function CreateTaskModal({
         <div className="flex gap-3 justify-end px-6 py-4 border-t border-gray-100 bg-gray-50/50">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="
               px-6 py-2.5 rounded-lg border border-gray-200 bg-white text-gray-700 text-sm font-medium
               hover:bg-gray-50 transition-colors shadow-sm

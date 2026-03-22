@@ -1,5 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { HfInference } from '@huggingface/inference';
+
+// Create the Hugging Face client once (same as TaskerBot)
+const inference = new HfInference(process.env.HUGGINGFACE_API_KEY);
+
+interface TaskDetail {
+  id: string;
+  title: string;
+  description?: string;
+  status: string;
+  priority?: string;
+  dueDate?: string;
+  assignee?: string;
+}
 
 interface InsightRequest {
   completed: number;
@@ -7,49 +21,80 @@ interface InsightRequest {
   pending: number;
   overdue: number;
   total: number;
+  tasks?: TaskDetail[]; // Optional task details for better analysis
 }
 
 async function generateAIInsight(data: InsightRequest): Promise<string> {
   try {
-    const prompt = `You are an AI business analyst. Based on task execution data, provide a concise, actionable insight (1-2 sentences) in a friendly tone. Use "your team" instead of generic language.
+    // Build task details string if provided
+    let taskDetailsString = "";
+    if (data.tasks && data.tasks.length > 0) {
+      taskDetailsString = `
+
+Task Details:
+${data.tasks.map((task) => {
+            const desc = task.description ? ` - ${task.description}` : "";
+            const dueInfo = task.dueDate ? ` (Due: ${task.dueDate})` : "";
+            const assignInfo = task.assignee ? ` [Assigned to: ${task.assignee}]` : "";
+            return `- [${task.status}] ${task.title}${desc}${assignInfo}${dueInfo}`;
+          }).join("\n")}`;
+    }
+
+    const userMessage = `Based on this task execution data, provide a concise, actionable insight (1-2 sentences) in a friendly tone. Use "your team" instead of generic language.
 
 Task Data:
 - Total Tasks: ${data.total}
 - Completed: ${data.completed}
 - In Progress: ${data.inProgress}
 - Pending: ${data.pending}
-- Overdue: ${data.overdue}
+- Overdue: ${data.overdue}${taskDetailsString}
 
-Generate a brief, insightful observation about the team's current task execution status. Be encouraging but honest. Focus on what's happening and what the team should focus on next.`;
+Generate a brief, insightful observation about the team's current task execution status. Be encouraging but honest. Focus on what's happening and what the team should focus on next. If specific task titles are provided, reference them if relevant.`;
 
-    const response = await fetch("https://api-inference.huggingface.co/models/mistral-community/Mistral-7B-Instruct-v0.1", {
-      headers: { Authorization: `Bearer ${process.env.HUGGING_FACE_API_KEY}` },
-      method: "POST",
-      body: JSON.stringify({ inputs: prompt, parameters: { max_length: 150, temperature: 0.7 } }),
-    });
-
-    if (!response.ok) {
-      console.error("[AI Insights] Hugging Face API error:", response.status, response.statusText);
+    console.log("[AI Insights] Generating insight using HfInference (same as TaskerBot)...");
+    
+    // Use the same HfInference client as TaskerBot - this is what works!
+    if (!process.env.HUGGINGFACE_API_KEY) {
+      console.warn("[AI Insights] Hugging Face API key not configured. Using enhanced fallback insights.");
       return generateFallbackInsight(data);
     }
 
-    const result = await response.json();
-    
-    if (Array.isArray(result) && result[0]?.generated_text) {
-      // Extract the generated text after the prompt
-      const generatedText = result[0].generated_text;
-      const insightText = generatedText.includes(prompt) 
-        ? generatedText.split(prompt)[1].trim()
-        : generatedText;
-      
-      // Clean up and return first 1-2 sentences
-      const sentences = insightText.match(/[^.!?]+[.!?]+/g) || [];
-      return sentences.slice(0, 2).join(" ").trim() || generateFallbackInsight(data);
-    }
+    try {
+      // Use chatCompletion exactly like TaskerBot does - this is the working approach!
+      const response = await inference.chatCompletion({
+        model: "meta-llama/Llama-3.1-8B-Instruct",
+        messages: [
+          {
+            role: "system",
+            content: "You are an AI business analyst specializing in team productivity and task management. Provide clear, actionable insights based on task data."
+          },
+          {
+            role: "user",
+            content: userMessage
+          }
+        ],
+        max_tokens: 150,
+        temperature: 0.7,
+      });
 
-    return generateFallbackInsight(data);
+      console.log("[AI Insights] API response received successfully");
+
+      // Extract the content exactly like TaskerBot does
+      const insight = response?.choices?.[0]?.message?.content?.trim();
+
+      if (insight && insight.length > 10) {
+        console.log("[AI Insights] Successfully generated:", insight.slice(0, 100));
+        return insight;
+      }
+
+      console.warn("[AI Insights] Response missing content, using fallback");
+      return generateFallbackInsight(data);
+    } catch (apiError) {
+      console.error("[AI Insights] Hugging Face API error:", apiError);
+      return generateFallbackInsight(data);
+    }
   } catch (error) {
-    console.error("[AI Insights] Error calling Hugging Face API:", error);
+    console.error("[AI Insights] Error in generateAIInsight:", error);
     return generateFallbackInsight(data);
   }
 }
@@ -62,24 +107,54 @@ function generateFallbackInsight(data: InsightRequest): string {
   const completionRate = Math.round((data.completed / data.total) * 100);
   const inProgressRatio = data.inProgress / data.total;
   
+  // If we have task details, generate smarter insights based on specific tasks
+  if (data.tasks && data.tasks.length > 0) {
+    const overdueTasks = data.tasks.filter(t => t.status !== "completed" && t.dueDate && new Date(t.dueDate) < new Date());
+    const soonTasks = data.tasks.filter(t => t.status !== "completed" && t.dueDate && new Date(t.dueDate) <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000));
+    const highPriorityTasks = data.tasks.filter(t => t.priority === "high" && t.status !== "completed");
+    
+    let insight = "";
+    
+    if (overdueTasks.length > 0) {
+      const overdueNames = overdueTasks.slice(0, 2).map(t => `"${t.title}"`).join(", ");
+      insight = `⚠️ ${overdueTasks.length} overdue task${overdueTasks.length > 1 ? "s" : ""} need immediate attention: ${overdueNames}. Prioritize these to prevent delays.`;
+    } else if (highPriorityTasks.length > 0) {
+      const highNames = highPriorityTasks.slice(0, 2).map(t => `"${t.title}"`).join(", ");
+      insight = `🎯 Focus on high-priority tasks: ${highNames}. These require immediate attention to stay on track.`;
+    } else if (data.inProgress === 0 && data.pending > 0) {
+      const pendingNames = data.tasks.filter(t => t.status === "pending").slice(0, 2).map(t => `"${t.title}"`).join(", ");
+      insight = `📌 Get started! Begin with: ${pendingNames}. Starting these tasks will build momentum for the team.`;
+    } else if (completionRate > 80) {
+      const inProgressNames = data.tasks.filter(t => t.status !== "completed" && t.status !== "pending").slice(0, 1).map(t => `"${t.title}"`).join(", ");
+      insight = `✨ Excellent progress! ${completionRate}% complete. Finish ${inProgressNames || "the remaining tasks"} to close strong.`;
+    } else if (completionRate > 50) {
+      insight = `📊 Solid progress! ${completionRate}% complete with ${data.pending} pending tasks. Keep the momentum going to hit your goals.`;
+    } else {
+      insight = `🚀 Team is working on ${data.inProgress} task${data.inProgress !== 1 ? "s" : ""} with ${data.pending} pending. Prioritize the highest-impact items next.`;
+    }
+    
+    return insight;
+  }
+  
+  // Fallback if no task details provided
   if (data.overdue > 0) {
     const overduePercentage = Math.round((data.overdue / data.total) * 100);
-    return `Your team has ${overduePercentage}% overdue tasks (${data.overdue} total). Focus on completing these urgent items and the ${data.inProgress} in-progress tasks to improve overall productivity.`;
+    return `⚠️ Your team has ${overduePercentage}% overdue tasks (${data.overdue} total). Focus on completing these urgent items first.`;
   }
 
   if (completionRate > 80) {
-    return `Excellent work! Your team has achieved a ${completionRate}% completion rate. Keep maintaining this momentum with the ${data.pending} pending tasks.`;
+    return `✨ Excellent work! Your team has achieved a ${completionRate}% completion rate. Keep maintaining this momentum!`;
   }
 
   if (completionRate > 50) {
-    return `Your team is making solid progress with ${completionRate}% of tasks completed. ${data.pending + data.inProgress} tasks remain—prioritize the ${data.pending} pending ones to accelerate delivery.`;
+    return `📊 Your team is making solid progress with ${completionRate}% of tasks completed. ${data.pending + data.inProgress} tasks remain—prioritize to accelerate delivery.`;
   }
 
   if (data.pending > 0 && data.inProgress === 0 && data.completed === 0) {
-    return `All ${data.pending} tasks are pending. Your team should start working on these tasks to build momentum and improve the completion rate.`;
+    return `🚀 All ${data.pending} tasks are pending. Start working on these to build momentum and improve the completion rate.`;
   }
 
-  return `Your team is progressing with ${completionRate}% completion and ${data.inProgress} tasks in progress. Consider prioritizing the ${data.pending} pending tasks to accelerate the workflow.`;
+  return `📈 Your team is progressing with ${completionRate}% completion and ${data.inProgress} tasks in progress. Focus on the ${data.pending} pending tasks next.`;
 }
 
 export async function POST(request: NextRequest) {

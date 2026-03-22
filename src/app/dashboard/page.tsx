@@ -10,7 +10,6 @@ import { ConfirmProvider } from "@/app/components/providers-popups/ConfirmationD
 import DashboardHeader from "@/app/components/dashboard/DashboardPageHeaderComponent";
 import TaskTimeline from "@/app/components/dashboard/TaskTimelineVisualizationComponent";
 import TaskStatusGrid from "@/app/components/dashboard/TaskStatusGridComponent";
-import { AnalyticsTaskExecutionSummary } from "@/app/components/dashboard/AnalyticsTaskExecutionSummaryPieChartComponent";
 import { CombinedTaskSummaryAndInsights } from "@/app/components/dashboard/CombinedTaskSummaryAndInsightsComponent";
 
 interface DashboardData {
@@ -46,7 +45,6 @@ interface DashboardData {
     date: number;
     taskCount: number;
   }>;
-  aiInsight: string;
   userRole?: "ADMIN" | "OWNER" | "EMPLOYEE";
 }
 
@@ -64,7 +62,6 @@ export default function DashboardPage() {
     overdueTasks: [],
     completedTasks: [],
     calendarTasks: [],
-    aiInsight: "",
   });
 
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
@@ -279,7 +276,7 @@ export default function DashboardPage() {
               </div>
             </div>
           ) : (
-            <div className="w-full mx-auto p-0 overflow-y-auto h-screen">
+            <div className="w-full rounded-2xl mx-auto pl-2 pb-2 overflow-y-auto h-screen">
               <div className="grid grid-cols-1 lg:grid-cols-11 gap-2 w-full p-0 min-h-full">
                 {/* LEFT COLUMN: Task Grid + AI Insights */}
                 <div className="lg:col-span-6 flex flex-col gap-2">
@@ -288,7 +285,7 @@ export default function DashboardPage() {
                   </div>
 
                   {/* Task Status Grid */}
-                  <div className="h-[620px] min-h-[500px]">
+                  <div className="h-[875px] min-h-[500px]">
                     <TaskStatusGrid
                       pending={data.pending}
                       inProgress={data.inProgress}
@@ -327,16 +324,6 @@ export default function DashboardPage() {
                       currentUser={currentUser}
                       userRole={data.userRole}
                       filterMode="dashboard"
-                    />
-                  </div>
-
-                  {/* Task Execution Summary - Overall Pie Chart */}
-                  <div className="h-64">
-                    <AnalyticsTaskExecutionSummary
-                      completed={data.completed}
-                      inProgress={data.inProgress}
-                      pending={data.pending}
-                      overdue={data.overdue}
                     />
                   </div>
                 </div>

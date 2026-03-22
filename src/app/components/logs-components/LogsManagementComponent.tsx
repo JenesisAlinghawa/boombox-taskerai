@@ -2,7 +2,6 @@
 
 import React, { useState, useMemo } from "react";
 import { Activity, Search, Filter, ArrowUpDown } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
 
 interface Log {
   id: number;

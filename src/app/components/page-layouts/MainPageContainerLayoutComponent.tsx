@@ -106,11 +106,11 @@ export const PageContainer = ({ children, title }: PageContainerProps) => {
         flexDirection: "column",
         background: "transparent",
         padding: 0,
-        marginLeft: 10,
+        margin: 0,
         overflow: "visible", // allow dropdowns to escape
       }}
     >
-      <div className="relative z-[2000] bg-blue-300 shadow-sm px-6 py-0 ml-[-10px] mb-2 overflow-visible transition-shadow duration-200">
+      <div className="relative z-[2000] bg-blue-300 shadow-sm px-6 py-2 mb-1.5 overflow-visible transition-shadow duration-200">
         <div className="flex items-center justify-between gap-4">
           {/* Page Title */}
           <div className="text-black capitalize text-lg min-w-fit hidden sm:block">

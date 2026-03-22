@@ -141,8 +141,7 @@ const TaskSummary = ({
     >
       {/* Header */}
       <div className="px-3 py-2 border-b border-amber-200 bg-amber-50/80 flex items-center gap-2 flex-shrink-0">
-        <Zap size={16} className="text-amber-600" />
-        <h2 className="text-sm font-semibold text-gray-900">Do This First</h2>
+          <h2 className="text-sm font-semibold text-gray-900">Do This First</h2>
       </div>
 
       {/* Content */}
