@@ -399,9 +399,10 @@ export const CombinedTaskSummaryAndInsights: React.FC<CombinedProps> = ({
         }
 
         // The ai-insights endpoint returns { insight: string }
-        const defaultMsg = userRole === "EMPLOYEE" 
-          ? "Analyzing your progress..." 
-          : "Analyzing your team's progress...";
+        const defaultMsg =
+          userRole === "EMPLOYEE"
+            ? "Analyzing your progress..."
+            : "Analyzing your team's progress...";
         let message = data.insight || defaultMsg;
 
         if (typeof message !== "string") {
@@ -441,9 +442,10 @@ export const CombinedTaskSummaryAndInsights: React.FC<CombinedProps> = ({
     } else if (tasks.length === 0 && !insightsGeneratedRef.current) {
       insightsGeneratedRef.current = true;
       console.log("[CombinedTaskSummary] No tasks to analyze");
-      const noTasksMsg = userRole === "EMPLOYEE" 
-        ? "No tasks assigned to you yet." 
-        : "No team tasks yet.";
+      const noTasksMsg =
+        userRole === "EMPLOYEE"
+          ? "No tasks assigned to you yet."
+          : "No team tasks yet.";
       setAiInsights(noTasksMsg);
       setLoadingInsights(false);
     }
@@ -585,7 +587,7 @@ export const CombinedTaskSummaryAndInsights: React.FC<CombinedProps> = ({
       <div className="border-b border-gray-300/50 p-4 shrink-0 flex items-center gap-2 bg-blue-50">
         <Zap size={18} className="text-blue-700" />
         <h3 className="text-sm font-semibold text-gray-800 m-0">
-          Task Summary & Team Progress
+          Task Summary
         </h3>
       </div>
 
@@ -603,7 +605,7 @@ export const CombinedTaskSummaryAndInsights: React.FC<CombinedProps> = ({
               <p className="text-xs text-gray-500">No tasks to display</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="max-h-[320px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
               {displayTasks.map((task: any, idx: number) => (
                 <div
                   key={task.id || idx}
@@ -640,103 +642,6 @@ export const CombinedTaskSummaryAndInsights: React.FC<CombinedProps> = ({
               ))}
             </div>
           )}
-        </div>
-
-        {/* Team Progress Section */}
-        <div className="border-t border-gray-200 pt-4 space-y-3">
-          <h4 className="text-xs font-semibold text-gray-700 uppercase">
-            {userRole === "EMPLOYEE" ? "Your Progress" : "Team Completion"}
-          </h4>
-
-          <div className="space-y-2">
-            {userRole === "EMPLOYEE" && currentUser ? (
-              // Employee: Show only their own progress
-              (() => {
-                const currentUserId = String(currentUser.id);
-                const userTasks = tasks.filter((task: any) => {
-                  const isAssignedToUser =
-                    task.assignees?.some(
-                      (a: any) => String(a.assignee?.id) === currentUserId,
-                    ) || String(task.assignee?.id) === currentUserId;
-                  return isAssignedToUser;
-                });
-                const completed = userTasks.filter(
-                  (t: any) => t.status === "completed",
-                ).length;
-                const total = userTasks.length;
-                const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-                return (
-                  <div key="current-user" className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-medium text-gray-700">
-                        Your Tasks
-                      </p>
-                      <span className="text-xs font-semibold text-gray-800">
-                        {percentage}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-300 ${
-                          percentage === 100
-                            ? "bg-green-500"
-                            : percentage >= 75
-                              ? "bg-blue-500"
-                              : percentage >= 50
-                                ? "bg-yellow-500"
-                                : "bg-red-500"
-                        }`}
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      {completed} / {total} tasks
-                    </p>
-                  </div>
-                );
-              })()
-            ) : (
-              // Admin/Owner: Show all team members
-              teamMembers.map((member: TeamMember) => {
-                const memberId = member.user.id;
-                const stats = memberStats[memberId];
-                const percentage = stats?.total
-                  ? Math.round((stats.completed / stats.total) * 100)
-                  : 0;
-
-                return (
-                  <div key={memberId} className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-medium text-gray-700">
-                        {member.user.firstName} {member.user.lastName}
-                      </p>
-                      <span className="text-xs font-semibold text-gray-800">
-                        {percentage}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-300 ${
-                          percentage === 100
-                            ? "bg-green-500"
-                            : percentage >= 75
-                              ? "bg-blue-500"
-                              : percentage >= 50
-                                ? "bg-yellow-500"
-                                : "bg-red-500"
-                        }`}
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      {stats?.completed || 0} / {stats?.total || 0} tasks
-                    </p>
-                  </div>
-                );
-              })
-            )}
-          </div>
         </div>
 
         {/* AI Insights Section */}

@@ -17,6 +17,9 @@ export async function GET(request: NextRequest) {
     let team = await prisma.team.findFirst({
       where: { ownerId: userId },
       include: {
+        owner: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
         members: {
           include: {
             user: {
@@ -30,6 +33,8 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    console.log("DEBUG team-management: Initial team query result:", team ? { id: team.id, ownerId: team.ownerId, membersCount: team.members?.length || 0 } : "No team found");
+
     // If no team as owner, check if they're a member of any team
     if (!team) {
       const memberRecord = await prisma.teamMember.findFirst({
@@ -37,6 +42,9 @@ export async function GET(request: NextRequest) {
         include: {
           team: {
             include: {
+              owner: {
+                select: { id: true, firstName: true, lastName: true, email: true },
+              },
               members: {
                 include: {
                   user: {
@@ -54,6 +62,7 @@ export async function GET(request: NextRequest) {
 
       if (memberRecord) {
         team = memberRecord.team;
+        console.log("DEBUG team-management: Found team as member:", team ? { id: team.id, ownerId: team.ownerId, membersCount: team.members?.length || 0 } : "No team");
       }
     }
 
@@ -72,6 +81,9 @@ export async function GET(request: NextRequest) {
           },
         },
         include: {
+          owner: {
+            select: { id: true, firstName: true, lastName: true, email: true },
+          },
           members: {
             include: {
               user: {
@@ -84,7 +96,14 @@ export async function GET(request: NextRequest) {
           },
         },
       });
+      console.log("DEBUG team-management: Created new team:", team ? { id: team.id, ownerId: team.ownerId, membersCount: team.members?.length || 0 } : "Failed to create");
     }
+
+    console.log("DEBUG team-management: Final team data:", {
+      teamId: team.id,
+      ownerId: team.ownerId,
+      members: team.members?.map(m => ({ userId: m.userId, user: m.user })) || []
+    });
 
     return NextResponse.json({ team });
   } catch (error) {

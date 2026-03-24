@@ -131,6 +131,43 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Check for duplicate tasks - same title, assignees, and due date within the same day
+    const existingTask = await db.task.findFirst({
+      where: {
+        title: title.trim(),
+        createdById: user.id,
+        dueDate: {
+          gte: new Date(dueDateObj.getFullYear(), dueDateObj.getMonth(), dueDateObj.getDate()),
+          lt: new Date(dueDateObj.getFullYear(), dueDateObj.getMonth(), dueDateObj.getDate() + 1),
+        },
+        assignees: {
+          every: {
+            assigneeId: {
+              in: assigneeIdList,
+            },
+          },
+        },
+      },
+      include: {
+        assignees: {
+          include: {
+            assignee: true,
+          },
+        },
+      },
+    });
+
+    if (existingTask) {
+      return NextResponse.json({ 
+        error: 'A task with the same title, assignees, and due date already exists',
+        existingTask: {
+          id: existingTask.id,
+          title: existingTask.title,
+          status: existingTask.status,
+        }
+      }, { status: 409 });
+    }
+
     const task = await db.task.create({
       data: {
         title,

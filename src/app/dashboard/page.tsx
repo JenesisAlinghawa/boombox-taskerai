@@ -11,6 +11,7 @@ import DashboardHeader from "@/app/components/dashboard/DashboardPageHeaderCompo
 import TaskTimeline from "@/app/components/dashboard/TaskTimelineVisualizationComponent";
 import TaskStatusGrid from "@/app/components/dashboard/TaskStatusGridComponent";
 import { CombinedTaskSummaryAndInsights } from "@/app/components/dashboard/CombinedTaskSummaryAndInsightsComponent";
+import DashboardSummaryAndHistory from "@/app/components/dashboard/DashboardSummaryAndHistoryComponent";
 
 interface DashboardData {
   pending: number;
@@ -20,32 +21,59 @@ interface DashboardData {
   pendingTasks: Array<{
     id: string;
     title: string;
+    status?: string;
     priority: string;
     dueDate?: string;
+    createdAt?: string;
+    timeSpent?: number;
   }>;
   inProgressTasks: Array<{
     id: string;
     title: string;
+    status?: string;
     priority: string;
     dueDate?: string;
+    createdAt?: string;
+    timeSpent?: number;
   }>;
   overdueTasks: Array<{
     id: string;
     title: string;
+    status?: string;
     priority: string;
     dueDate?: string;
+    createdAt?: string;
+    timeSpent?: number;
   }>;
   completedTasks: Array<{
     id: string;
     title: string;
+    status?: string;
     priority: string;
     dueDate?: string;
+    createdAt?: string;
+    timeSpent?: number;
   }>;
   calendarTasks: Array<{
     date: number;
     taskCount: number;
   }>;
+  weeklyData?: {
+    labels: string[];
+    inProgress: number[];
+    completed: number[];
+    overdue: number[];
+  };
   userRole?: "ADMIN" | "OWNER" | "EMPLOYEE";
+  teamPerformanceData?: Array<{
+    name: string;
+    totalTasks: number;
+    completedTasks: number;
+    inProgressTasks: number;
+    transfers: number;
+    overdueTasks: number;
+    completionRate: number;
+  }>;
 }
 
 export default function DashboardPage() {
@@ -62,6 +90,7 @@ export default function DashboardPage() {
     overdueTasks: [],
     completedTasks: [],
     calendarTasks: [],
+    teamPerformanceData: [],
   });
 
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
@@ -276,56 +305,81 @@ export default function DashboardPage() {
               </div>
             </div>
           ) : (
-            <div className="w-full rounded-2xl mx-auto pl-2 pb-2 overflow-y-auto h-screen">
-              <div className="grid grid-cols-1 lg:grid-cols-11 gap-2 w-full p-0 min-h-full">
-                {/* LEFT COLUMN: Task Grid + AI Insights */}
-                <div className="lg:col-span-6 flex flex-col gap-2">
-                  <div className="shrink-0">
-                    <DashboardHeader />
+            <div className="w-full rounded-2xl mx-auto pl-2 pb-2 overflow-y-auto h-full">
+              <div className="flex flex-col gap-2 w-full p-0 min-h-full">
+                {/* TOP SECTION: 2x2 Grid - Task Grid + Timeline + AI Insights */}
+                <div className="grid grid-cols-1 lg:grid-cols-11 gap-2 w-full">
+                  {/* LEFT COLUMN: Task Grid */}
+                  <div className="lg:col-span-6 flex flex-col gap-2">
+                    <div className="shrink-0">
+                      <DashboardHeader />
+                    </div>
+
+                    {/* Task Status Grid */}
+                    <div className="h-[825px] min-h-[600px]">
+                      <TaskStatusGrid
+                        pending={data.pending}
+                        inProgress={data.inProgress}
+                        completed={data.completed}
+                        overdue={data.overdue}
+                        pendingTasks={data.pendingTasks}
+                        inProgressTasks={data.inProgressTasks}
+                        overdueTasks={data.overdueTasks}
+                        completedTasks={data.completedTasks}
+                      />
+                    </div>
                   </div>
 
-                  {/* Task Status Grid */}
-                  <div className="h-[875px] min-h-[500px]">
-                    <TaskStatusGrid
-                      pending={data.pending}
-                      inProgress={data.inProgress}
-                      completed={data.completed}
-                      overdue={data.overdue}
-                      pendingTasks={data.pendingTasks}
-                      inProgressTasks={data.inProgressTasks}
-                      overdueTasks={data.overdueTasks}
-                      completedTasks={data.completedTasks}
-                    />
+                  {/* RIGHT COLUMN: Timeline + Task Summary + AI Insights */}
+                  <div className="lg:col-span-5 flex flex-col gap-2">
+                    {/* Timeline */}
+                    <div className="h-90">
+                      <TaskTimeline
+                        currentMonth={currentMonth}
+                        currentYear={currentYear}
+                        setCurrentMonth={setCurrentMonth}
+                        setCurrentYear={setCurrentYear}
+                        calendarTasks={data.calendarTasks}
+                      />
+                    </div>
+
+                    {/* Task Summary - Do This First */}
+                    <div className="h-[548px]">
+                      <CombinedTaskSummaryAndInsights
+                        tasks={[
+                          ...data.overdueTasks,
+                          ...data.inProgressTasks,
+                          ...data.pendingTasks,
+                          ...data.completedTasks,
+                        ]}
+                        currentUser={currentUser}
+                        userRole={data.userRole}
+                        filterMode="dashboard"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                {/* RIGHT COLUMN: Timeline, Task Summary, Task Execution + AI Insights */}
-                <div className="lg:col-span-5 flex flex-col gap-2">
-                  {/* Timeline */}
-                  <div className="h-90">
-                    <TaskTimeline
-                      currentMonth={currentMonth}
-                      currentYear={currentYear}
-                      setCurrentMonth={setCurrentMonth}
-                      setCurrentYear={setCurrentYear}
-                      calendarTasks={data.calendarTasks}
-                    />
-                  </div>
-
-                  {/* Task Summary - Do This First */}
-                  <div className="h-[600px]">
-                    <CombinedTaskSummaryAndInsights
-                      tasks={[
-                        ...data.overdueTasks,
-                        ...data.inProgressTasks,
-                        ...data.pendingTasks,
-                        ...data.completedTasks,
-                      ]}
-                      currentUser={currentUser}
-                      userRole={data.userRole}
-                      filterMode="dashboard"
-                    />
-                  </div>
+                {/* BOTTOM SECTION: Replaced with task summary/cards/history view */}
+                <div className="grid grid-cols-1 gap-2 w-full">
+                  <DashboardSummaryAndHistory
+                    pending={data.pending}
+                    inProgress={data.inProgress}
+                    completed={data.completed}
+                    overdue={data.overdue}
+                    weeklyData={data.weeklyData}
+                    teamPerformanceData={data.teamPerformanceData}
+                    tasks={[
+                      ...data.overdueTasks,
+                      ...data.inProgressTasks,
+                      ...data.pendingTasks,
+                      ...data.completedTasks,
+                    ].map((t) => ({
+                      ...t,
+                      status: t.status || "todo",
+                      timeSpent: t.timeSpent || 0,
+                    }))}
+                  />
                 </div>
               </div>
             </div>

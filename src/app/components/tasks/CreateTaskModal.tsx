@@ -195,6 +195,15 @@ export default function CreateTaskModal({
           const errorData = await res
             .json()
             .catch(() => ({ error: "Unknown error" }));
+
+          // Handle duplicate task error
+          if (res.status === 409 && errorData.existingTask) {
+            setError(
+              `A similar task already exists: "${errorData.existingTask.title}" (${errorData.existingTask.status})`,
+            );
+            return;
+          }
+
           throw new Error(errorData.error || `Server error: ${res.status}`);
         }
         const data = await res.json();

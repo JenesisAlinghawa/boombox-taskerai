@@ -1600,6 +1600,15 @@ Respond with ONLY one of: PRIORITY, STATUS, DUE_DATE, or UNCLEAR`;
         setCreationStep(null);
       } else {
         const error = await res.json().catch(() => ({}));
+
+        // Handle duplicate task error
+        if (res.status === 409 && error.existingTask) {
+          addBotMessage(
+            `❌ A similar task already exists: "${error.existingTask.title}" (${error.existingTask.status}). Please check if you meant to update that task instead.`,
+          );
+          return;
+        }
+
         addBotMessage(
           `Failed to create task: ${error.error || "Unknown error"}`,
         );
@@ -1690,6 +1699,15 @@ Respond with ONLY one of: PRIORITY, STATUS, DUE_DATE, or UNCLEAR`;
         else router.push("/tasks");
       } else {
         const error = await res.json().catch(() => ({}));
+
+        // Handle duplicate task error
+        if (res.status === 409 && error.existingTask) {
+          addBotMessage(
+            `❌ A similar task already exists: "${error.existingTask.title}" (${error.existingTask.status}). Please check if you meant to update that task instead.`,
+          );
+          return;
+        }
+
         addBotMessage(
           `Failed to create task: ${error.error || "Unknown error"}`,
         );

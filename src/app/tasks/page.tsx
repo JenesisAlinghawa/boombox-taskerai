@@ -6,12 +6,10 @@ import { getCurrentUser } from "@/utils/sessionManager";
 import { useAuthProtection } from "@/app/hooks/useAuthProtection";
 import { PageContainer } from "@/app/components/page-layouts/MainPageContainerLayoutComponent";
 import { PageContentCon } from "@/app/components/page-layouts/PageContentWrapperContainerComponent";
-import { DatePickerInput } from "@/app/components/tasks/TaskDueDatePickerInputComponent";
 import TaskDetailsPanel from "@/app/components/tasks/TaskDetailsDisplayPanelComponent";
-import TaskRow from "@/app/components/tasks/TaskListItemRowComponent";
 import TaskPriorityPanel from "@/app/components/tasks/TaskPrioritySelectionPanelComponent";
 import CreateTaskModal from "@/app/components/tasks/CreateTaskModal";
-import { Plus, X, TrendingUp } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useTasks } from "@/hooks/useTasks";
 import {
   ToastProvider,
@@ -23,12 +21,7 @@ import {
 } from "@/app/components/providers-popups/ConfirmationDialogProviderComponent";
 import TaskGroupedDisplay from "@/app/components/tasks/TaskGroupedDisplayComponent";
 import TaskSummary from "@/app/components/dashboard/DoThisFirst";
-import type {
-  Task,
-  Comment,
-  Attachment,
-  User,
-} from "@/app/components/tasks/types";
+import type { Task, User } from "@/app/components/tasks/types";
 
 export default function TasksPage() {
   useAuthProtection(); // Protect this route

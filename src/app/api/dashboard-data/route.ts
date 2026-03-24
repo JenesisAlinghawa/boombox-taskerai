@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     // Build query filter based on role
     let taskFilter: any;
-    
+
     if (user.role === "ADMIN" || user.role === "OWNER") {
       // Admins and Owners see all tasks
       taskFilter = {};
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
 
     // Get tasks for the current user (limit to prevent memory issues)
     console.log("[Dashboard API] Fetching tasks with filter:", taskFilter);
-    
+
     const tasks = await prisma.task.findMany({
       where: taskFilter,
       include: {
@@ -92,8 +92,8 @@ export async function GET(request: NextRequest) {
     // Count tasks marked as stuck (which are automatically marked overdue tasks) or those that are overdue
     const overdue = tasks.filter(
       (t) =>
-        (t.status === "stuck" || 
-         (t.status !== "completed" &&
+      (t.status === "stuck" ||
+        (t.status !== "completed" &&
           t.dueDate &&
           new Date(t.dueDate) < now))
     ).length;
@@ -122,8 +122,8 @@ export async function GET(request: NextRequest) {
       overdue: weekDays.map((day) =>
         tasks.filter(
           (t) =>
-            (t.status === "stuck" || 
-             (t.status !== "completed" &&
+          (t.status === "stuck" ||
+            (t.status !== "completed" &&
               t.dueDate &&
               new Date(t.dueDate) < now))
         ).length
@@ -168,17 +168,84 @@ export async function GET(request: NextRequest) {
     }
 
     // Helper function to format task data
-    const formatTasks = (taskList: typeof tasks) => 
+    const formatTasks = (taskList: typeof tasks) =>
       taskList
         .slice(0, 10) // Limit to 10 tasks per section
         .map((t) => ({
           id: t.id,
           title: t.title,
+          status: t.status || "todo",
           priority: t.priority || "medium",
           dueDate: t.dueDate ? new Date(t.dueDate).toLocaleDateString() : undefined,
+          completedAt: t.updatedAt ? new Date(t.updatedAt).toISOString() : undefined,
           assignees: t.assignees || [],
           createdBy: t.createdBy,
         }));
+
+    // Get team performance data - show all active users in the system
+    let teamPerformanceData: any[] = [];
+    try {
+      // Fetch all active, verified users from the database
+      const allUsers = await prisma.user.findMany({
+        where: {
+          active: true,
+          isVerified: true,
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+        orderBy: {
+          firstName: 'asc',
+        },
+      });
+
+      console.log("DEBUG: Found", allUsers.length, "active verified users in system");
+      console.log("DEBUG: Users:", allUsers.map(u => ({ id: u.id, name: `${u.firstName} ${u.lastName}`, email: u.email })));
+
+      teamPerformanceData = allUsers.map((member: any) => {
+        const memberId = String(member.id);
+
+        // Include tasks where the member is either assigned OR created the task
+        const memberTasks = tasks.filter((task) =>
+          task.assignees?.some((a: any) => String(a.assignee?.id) === memberId) ||
+          String(task.createdBy?.id) === memberId
+        );
+
+        const totalTasks = memberTasks.length;
+        const completedTasks = memberTasks.filter(
+          (t: any) => t.status === "completed" || t.status === "done",
+        ).length;
+        const inProgressTasks = memberTasks.filter(
+          (t: any) => t.status === "inprogress",
+        ).length;
+        const overdueTasks = memberTasks.filter((t: any) => {
+          if (t.status === "completed" || t.status === "done") return false;
+          if (!t.dueDate) return false;
+          return new Date(t.dueDate) < now;
+        }).length;
+        const transfers = memberTasks.filter((t: any) => t.status === "transferred").length;
+        const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+        console.log(`DEBUG: Member ${member.firstName} ${member.lastName} has ${totalTasks} tasks`);
+
+        return {
+          name: `${member.firstName || ""} ${member.lastName || ""}`.trim() || member.email || "Unknown",
+          totalTasks,
+          completedTasks,
+          inProgressTasks,
+          transfers,
+          overdueTasks,
+          completionRate,
+        };
+      });
+
+      console.log("DEBUG: Final teamPerformanceData:", teamPerformanceData.length, "entries");
+    } catch (error) {
+      console.error("Error fetching team performance data:", error);
+    }
 
     return NextResponse.json({
       pending,
@@ -188,11 +255,12 @@ export async function GET(request: NextRequest) {
       pendingTasks: formatTasks(tasks.filter((t) => t.status === "todo")),
       inProgressTasks: formatTasks(tasks.filter((t) => t.status === "inprogress")),
       overdueTasks: formatTasks(tasks.filter((t) => t.status === "stuck" || (t.status !== "completed" && t.dueDate && new Date(t.dueDate) < now))),
-      completedTasks: formatTasks(tasks.filter((t) => t.status === "completed")),
+      completedTasks: formatTasks(tasks.filter((t) => t.status === "completed" || t.status === "done")),
       weeklyData,
       calendarTasks,
       aiInsight,
       userRole: user.role,
+      teamPerformanceData,
     });
   } catch (error) {
     console.error("Error fetching dashboard data:", error);
@@ -201,7 +269,7 @@ export async function GET(request: NextRequest) {
       console.error("Error stack:", error.stack);
     }
     return NextResponse.json(
-      { 
+      {
         error: "Failed to fetch dashboard data",
         details: error instanceof Error ? error.message : "Unknown error"
       },
